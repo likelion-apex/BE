@@ -34,12 +34,19 @@ if ! sudo /usr/bin/systemctl restart mutsa.service; then
   health_ok=false
 else
   health_ok=false
-  for _ in {1..30}; do
-    if curl --silent --show-error --output /dev/null --connect-timeout 2 --max-time 5 \
+  health_deadline=$((SECONDS + 120))
+  while (( SECONDS < health_deadline )); do
+    if curl --silent --output /dev/null --connect-timeout 2 --max-time 5 \
       http://127.0.0.1:8082/; then
       health_ok=true
       break
     fi
+
+    if ! /usr/bin/systemctl is-active --quiet mutsa.service; then
+      echo "mutsa.service stopped before becoming healthy" >&2
+      break
+    fi
+
     sleep 2
   done
 fi
