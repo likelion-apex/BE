@@ -1,13 +1,13 @@
-package feat.apex_BE.auth.dto.request;
+package feat.auth.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 
-@Schema(description = "Access/Refresh 토큰 재발급 요청")
+@Schema(description = "Access/Refresh ?? ??? ??")
 public record ReissueTokenRequest(
 
-        @Schema(description = "발급받았던 refresh token")
-        @NotBlank(message = "refreshToken은 필수입니다.")
+        @Schema(description = "????? refresh token")
+        @NotBlank(message = "refreshToken? ?????.")
         String refreshToken
 ) {
 }

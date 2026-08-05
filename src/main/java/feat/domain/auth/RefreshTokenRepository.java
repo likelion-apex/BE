@@ -1,4 +1,4 @@
-package feat.apex_BE.domain.auth;
+package feat.domain.auth;
 
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;

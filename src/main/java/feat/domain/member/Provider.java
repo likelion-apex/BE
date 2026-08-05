@@ -1,4 +1,4 @@
-package feat.apex_BE.domain.member;
+package feat.domain.member;
 
 public enum Provider {
     KAKAO

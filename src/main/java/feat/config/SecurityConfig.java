@@ -1,8 +1,8 @@
-package feat.apex_BE.config;
+package feat.config;
 
-import feat.apex_BE.security.jwt.JwtAuthenticationEntryPoint;
-import feat.apex_BE.security.jwt.JwtAuthenticationFilter;
-import feat.apex_BE.security.jwt.JwtTokenProvider;
+import feat.security.jwt.JwtAuthenticationEntryPoint;
+import feat.security.jwt.JwtAuthenticationFilter;
+import feat.security.jwt.JwtTokenProvider;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;

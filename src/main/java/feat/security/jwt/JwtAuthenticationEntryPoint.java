@@ -1,6 +1,6 @@
-package feat.apex_BE.security.jwt;
+package feat.security.jwt;
 
-import feat.apex_BE.common.exception.ErrorCode;
+import feat.common.exception.ErrorCode;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

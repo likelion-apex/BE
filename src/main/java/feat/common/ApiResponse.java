@@ -1,4 +1,4 @@
-package feat.apex_BE.common;
+package feat.common;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 

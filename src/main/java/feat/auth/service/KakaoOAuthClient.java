@@ -1,9 +1,9 @@
-package feat.apex_BE.auth.service;
+package feat.auth.service;
 
-import feat.apex_BE.auth.dto.response.KakaoTokenResponse;
-import feat.apex_BE.auth.dto.response.KakaoUserInfoResponse;
-import feat.apex_BE.common.exception.CustomException;
-import feat.apex_BE.common.exception.ErrorCode;
+import feat.auth.dto.response.KakaoTokenResponse;
+import feat.auth.dto.response.KakaoUserInfoResponse;
+import feat.common.exception.CustomException;
+import feat.common.exception.ErrorCode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;

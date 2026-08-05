@@ -1,4 +1,4 @@
-package feat.apex_BE.common.exception;
+package feat.common.exception;
 
 public record ErrorResponse(
         String code,

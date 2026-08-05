@@ -1,6 +1,6 @@
-package feat.apex_BE.security.jwt;
+package feat.security.jwt;
 
-import feat.apex_BE.common.exception.CustomException;
+import feat.common.exception.CustomException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

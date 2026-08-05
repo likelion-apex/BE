@@ -1,8 +1,8 @@
-package feat.apex_BE.security.jwt;
+package feat.security.jwt;
 
-import feat.apex_BE.common.exception.CustomException;
-import feat.apex_BE.common.exception.ErrorCode;
-import feat.apex_BE.domain.member.Member;
+import feat.common.exception.CustomException;
+import feat.common.exception.ErrorCode;
+import feat.domain.member.Member;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jws;

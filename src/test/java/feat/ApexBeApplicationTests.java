@@ -1,4 +1,4 @@
-package feat.apex_BE;
+package feat;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

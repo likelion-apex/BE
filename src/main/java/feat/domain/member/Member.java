@@ -1,4 +1,4 @@
-package feat.apex_BE.domain.member;
+package feat.domain.member;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

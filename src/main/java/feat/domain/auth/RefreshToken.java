@@ -1,4 +1,4 @@
-package feat.apex_BE.domain.auth;
+package feat.domain.auth;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

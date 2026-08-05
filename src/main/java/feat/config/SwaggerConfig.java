@@ -1,4 +1,4 @@
-package feat.apex_BE.config;
+package feat.config;
 
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
@@ -18,7 +18,7 @@ public class SwaggerConfig {
         return new OpenAPI()
                 .info(new Info()
                         .title("apex-BE API")
-                        .description("카카오 소셜 로그인(OAuth2) 기반 인증 API 문서")
+                        .description("??? ?? ???(OAuth2) ?? ?? API ??")
                         .version("v1"))
                 .addSecurityItem(new SecurityRequirement().addList(BEARER_AUTH_SCHEME))
                 .components(new Components()

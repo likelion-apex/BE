@@ -1,6 +1,6 @@
-package feat.apex_BE.common.exception;
+package feat.common.exception;
 
-import feat.apex_BE.common.ApiResponse;
+import feat.common.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

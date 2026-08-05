@@ -1,18 +1,18 @@
-package feat.apex_BE.auth.service;
+package feat.auth.service;
 
-import feat.apex_BE.auth.dto.response.KakaoTokenResponse;
-import feat.apex_BE.auth.dto.response.KakaoUserInfoResponse;
-import feat.apex_BE.auth.dto.response.MemberResponse;
-import feat.apex_BE.auth.dto.response.TokenResponse;
-import feat.apex_BE.common.exception.CustomException;
-import feat.apex_BE.common.exception.ErrorCode;
-import feat.apex_BE.domain.auth.RefreshToken;
-import feat.apex_BE.domain.auth.RefreshTokenRepository;
-import feat.apex_BE.domain.member.Member;
-import feat.apex_BE.domain.member.MemberRepository;
-import feat.apex_BE.domain.member.Provider;
-import feat.apex_BE.domain.member.Role;
-import feat.apex_BE.security.jwt.JwtTokenProvider;
+import feat.auth.dto.response.KakaoTokenResponse;
+import feat.auth.dto.response.KakaoUserInfoResponse;
+import feat.auth.dto.response.MemberResponse;
+import feat.auth.dto.response.TokenResponse;
+import feat.common.exception.CustomException;
+import feat.common.exception.ErrorCode;
+import feat.domain.auth.RefreshToken;
+import feat.domain.auth.RefreshTokenRepository;
+import feat.domain.member.Member;
+import feat.domain.member.MemberRepository;
+import feat.domain.member.Provider;
+import feat.domain.member.Role;
+import feat.security.jwt.JwtTokenProvider;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +25,7 @@ import org.springframework.util.StringUtils;
 @Transactional
 public class AuthService {
 
-    private static final String DEFAULT_NICKNAME = "카카오사용자";
+    private static final String DEFAULT_NICKNAME = "??????";
 
     private final KakaoOAuthClient kakaoOAuthClient;
     private final MemberRepository memberRepository;

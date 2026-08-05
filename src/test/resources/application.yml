@@ -1,0 +1,16 @@
+# 테스트 실행 시 실제 카카오/JWT 시크릿(.env) 없이도 스프링 컨텍스트가 뜰 수 있도록
+# 더미 값을 제공합니다. 실제 값은 절대 여기에 넣지 마세요.
+kakao:
+  client-id: test-client-id
+  client-secret: test-client-secret
+  redirect-uri: http://localhost:5173/auth/kakao/callback
+  token-uri: https://kauth.kakao.com/oauth/token
+  user-info-uri: https://kapi.kakao.com/v2/user/me
+
+jwt:
+  secret: dGVzdC1vbmx5LWp3dC1zZWNyZXQtZG8tbm90LXVzZS1pbi1wcm9kdWN0aW9uLTEyMzQ1Ng==
+  access-token-expiration: 3600000
+  refresh-token-expiration: 1209600000
+
+cors:
+  allowed-origins: http://localhost:5173
