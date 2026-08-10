@@ -15,6 +15,7 @@ jwt:
   refresh-token-expiration: 1209600000
 
 mfds:
+  enabled: false
   service-key: test-mfds-service-key
   ingredient-info-url: https://apis.data.go.kr/1471000/CsmtcsIngdCpntInfoService01/getCsmtcsIngdCpntInfoService01
   regulation-info-url: https://apis.data.go.kr/1471000/CsmtcsReglMaterialInfoService/getCsmtcsReglMaterialInfoService
