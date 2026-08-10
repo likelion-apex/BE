@@ -14,22 +14,6 @@ jwt:
   access-token-expiration: 3600000
   refresh-token-expiration: 1209600000
 
-naver:
-  shopping:
-    client-id: test-naver-client-id
-    client-secret: test-naver-client-secret
-    search-uri: https://openapi.naver.com/v1/search/shop.json
-
-st11:
-  product-search:
-    key: test-st11-open-api-key
-    search-uri: http://openapi.11st.co.kr/openapi/OpenApiService.tmall
-
-google:
-  vision:
-    api-key: test-google-vision-api-key
-    annotate-uri: https://vision.googleapis.com/v1/images:annotate
-
 mfds:
   service-key: test-mfds-service-key
   ingredient-info-url: https://apis.data.go.kr/1471000/CsmtcsIngdCpntInfoService01/getCsmtcsIngdCpntInfoService01
