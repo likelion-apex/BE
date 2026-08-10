@@ -49,6 +49,15 @@ openai:
   model: gpt-4o-mini
   organization-id: ${OPENAI_ORGANIZATION_ID:}
 
+gemini:
+  api-key: ${GEMINI_API_KEY:}
+  base-url: https://generativelanguage.googleapis.com
+  model: ${GEMINI_MODEL:gemini-3.6-flash}
+  connect-timeout: 5s
+  read-timeout: 120s
+  cache-ttl: 30d
+  cache-maximum-size: 10000
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
