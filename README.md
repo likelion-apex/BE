@@ -48,6 +48,8 @@ GEMINI_MODEL=gemini-3.6-flash
 
 - API 키는 프론트엔드나 Git에 포함하지 않고 서버 환경변수로만 주입합니다.
 - `GEMINI_MODEL`을 생략하면 샘플 영상의 OCR 정확도와 단계 재현율이 더 높았던 `gemini-3.6-flash`를 사용합니다.
+- 로컬 실행 시에는 기본 `local` 프로필이 활성화되며 `application-local.yml`의 더미 키와 localhost 더미 URL을 사용합니다. 실제 Kakao·식약처·OpenAI·Gemini API로 요청을 보내지 않고도 애플리케이션과 Swagger를 실행할 수 있습니다.
+- 운영 환경은 `SPRING_PROFILES_ACTIVE=prod`를 사용하며 실제 비밀값을 서버 환경변수로 주입해야 합니다.
 
 ### API
 
