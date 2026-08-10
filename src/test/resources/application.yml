@@ -1,0 +1,45 @@
+# 테스트 실행 시 실제 카카오/JWT 시크릿(.env) 없이도 스프링 컨텍스트가 뜰 수 있도록
+# 더미 값을 제공합니다. 실제 값은 절대 여기에 넣지 마세요.
+kakao:
+  client-id: test-client-id
+  client-secret: test-client-secret
+  redirect-uri: http://localhost:3000/auth/kakao/callback
+  token-uri: https://kauth.kakao.com/oauth/token
+  user-info-uri: https://kapi.kakao.com/v2/user/me
+  image-search-key: test-kakao-image-search-key
+  image-search-url: https://dapi.kakao.com/v2/search/image
+
+jwt:
+  secret: dGVzdC1vbmx5LWp3dC1zZWNyZXQtZG8tbm90LXVzZS1pbi1wcm9kdWN0aW9uLTEyMzQ1Ng==
+  access-token-expiration: 3600000
+  refresh-token-expiration: 1209600000
+
+naver:
+  shopping:
+    client-id: test-naver-client-id
+    client-secret: test-naver-client-secret
+    search-uri: https://openapi.naver.com/v1/search/shop.json
+
+st11:
+  product-search:
+    key: test-st11-open-api-key
+    search-uri: http://openapi.11st.co.kr/openapi/OpenApiService.tmall
+
+google:
+  vision:
+    api-key: test-google-vision-api-key
+    annotate-uri: https://vision.googleapis.com/v1/images:annotate
+
+mfds:
+  service-key: test-mfds-service-key
+  ingredient-info-url: https://apis.data.go.kr/1471000/CsmtcsIngdCpntInfoService01/getCsmtcsIngdCpntInfoService01
+  regulation-info-url: https://apis.data.go.kr/1471000/CsmtcsReglMaterialInfoService/getCsmtcsReglMaterialInfoService
+
+openai:
+  api-key: test-openai-api-key
+  api-url: https://api.openai.com/v1/chat/completions
+  model: gpt-4o-mini
+  organization-id: ""
+
+cors:
+  allowed-origins: http://localhost:3000
