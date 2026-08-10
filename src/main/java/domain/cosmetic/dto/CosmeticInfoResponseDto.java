@@ -6,6 +6,7 @@ import lombok.Getter;
 import java.util.List;
 
 @Getter
+@Schema(description = "제품 이미지와 전성분별 상세정보")
 public class CosmeticInfoResponseDto {
 
     @Schema(description = "제품명", example = "이니스프리 그린티씨드크림")

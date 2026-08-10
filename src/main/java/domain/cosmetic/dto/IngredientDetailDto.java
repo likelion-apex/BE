@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
 
 @Getter
+@Schema(description = "화장품 성분 영문명과 국가별 규제정보")
 public class IngredientDetailDto {
 
     @Schema(description = "성분명", example = "글리세린")

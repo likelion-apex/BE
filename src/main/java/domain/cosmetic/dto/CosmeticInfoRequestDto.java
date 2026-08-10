@@ -9,6 +9,7 @@ import java.util.List;
 
 @Getter
 @NoArgsConstructor
+@Schema(description = "화장품 정보 조회 요청")
 public class CosmeticInfoRequestDto {
 
     @Schema(description = "제품명", example = "이니스프리 그린티씨드크림")

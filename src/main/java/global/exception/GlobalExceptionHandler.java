@@ -1,5 +1,9 @@
 package global.exception;
 
+import feat.apex_BE.beauty.exception.BeautyRoutineException.GeminiUnavailable;
+import feat.apex_BE.beauty.exception.BeautyRoutineException.InvalidGeminiResponse;
+import feat.apex_BE.beauty.exception.BeautyRoutineException.InvalidYouTubeUrl;
+import feat.apex_BE.beauty.exception.BeautyRoutineException.MissingGeminiConfiguration;
 import global.common.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -13,6 +17,26 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(InvalidYouTubeUrl.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidYouTubeUrl(InvalidYouTubeUrl e) {
+        return beautyError(ErrorCode.BEAUTY_INVALID_YOUTUBE_URL, e.getMessage());
+    }
+
+    @ExceptionHandler(GeminiUnavailable.class)
+    public ResponseEntity<ApiResponse<Void>> handleGeminiUnavailable(GeminiUnavailable e) {
+        return beautyError(ErrorCode.BEAUTY_GEMINI_UNAVAILABLE, e.getMessage());
+    }
+
+    @ExceptionHandler(InvalidGeminiResponse.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidGeminiResponse(InvalidGeminiResponse e) {
+        return beautyError(ErrorCode.BEAUTY_INVALID_GEMINI_RESPONSE, e.getMessage());
+    }
+
+    @ExceptionHandler(MissingGeminiConfiguration.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingGeminiConfiguration(MissingGeminiConfiguration e) {
+        return beautyError(ErrorCode.BEAUTY_MISSING_GEMINI_CONFIGURATION, e.getMessage());
+    }
 
     // 커스텀 예외 처리
     @ExceptionHandler(CustomException.class)
@@ -60,5 +84,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.fail(ErrorCode.INTERNAL_SERVER_ERROR));
+    }
+
+    private ResponseEntity<ApiResponse<Void>> beautyError(ErrorCode errorCode, String message) {
+        log.warn("뷰티 루틴 분석 실패: code={}, message={}", errorCode.getCode(), message);
+        return ResponseEntity
+                .status(errorCode.getStatus())
+                .body(ApiResponse.fail(errorCode, message));
     }
 }

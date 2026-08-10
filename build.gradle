@@ -13,6 +13,10 @@ java {
 	}
 }
 
+springBoot {
+	mainClass = 'ApexBeApplication'
+}
+
 repositories {
 	mavenCentral()
 }

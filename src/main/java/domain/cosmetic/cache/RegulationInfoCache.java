@@ -5,6 +5,7 @@ import domain.cosmetic.client.RegulationInfo;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -26,6 +27,9 @@ public class RegulationInfoCache {
     private final CsmtcsReglMaterialClient client;
     private final Map<String, RegulationInfo> cache = new ConcurrentHashMap<>();
 
+    @Value("${mfds.enabled:true}")
+    private boolean enabled;
+
     @PostConstruct
     public void init() {
         refresh();
@@ -33,6 +37,10 @@ public class RegulationInfoCache {
 
     @Scheduled(cron = "0 0 4 * * *")
     public void refresh() {
+        if (!enabled) {
+            log.info("로컬 프로필에서는 화장품 규제정보 외부 연동을 건너뜁니다.");
+            return;
+        }
         try {
             List<RegulationInfo> all = client.fetchAll();
             Map<String, RegulationInfo> loaded = new ConcurrentHashMap<>();
