@@ -4,6 +4,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -38,6 +40,11 @@ class SwaggerDocumentationTests {
 	void servesKakaoLoginTestPageWithoutAuthentication() throws Exception {
 		mockMvc.perform(get("/kakao-login-test"))
 			.andExpect(status().isOk())
-			.andExpect(content().string(org.hamcrest.Matchers.containsString("카카오 로그인 테스트")));
+			.andExpect(content().string(containsString("카카오 로그인 테스트")))
+			.andExpect(content().string(containsString("서버에서 자동으로 불러옴")))
+			.andExpect(content().string(not(containsString("__KAKAO_CLIENT_ID_BASE64__"))))
+			.andExpect(content().string(not(containsString("__KAKAO_REDIRECT_URI_BASE64__"))))
+			.andExpect(content().string(not(containsString("id=\"client-id\""))))
+			.andExpect(content().string(not(containsString("id=\"backend-url\""))));
 	}
 }

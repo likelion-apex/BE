@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
+  <meta name="kakao-client-id" content="__KAKAO_CLIENT_ID_BASE64__">
+  <meta name="kakao-redirect-uri" content="__KAKAO_REDIRECT_URI_BASE64__">
   <title>카카오 로그인 테스트</title>
   <style>
     :root {
@@ -249,6 +251,10 @@
       overflow-wrap: anywhere;
     }
 
+    .member-item.full-width {
+      grid-column: 1 / -1;
+    }
+
     .warning {
       margin: 18px 0 0;
       padding-left: 18px;
@@ -291,24 +297,23 @@
   </p>
 
   <section class="card" aria-labelledby="settings-title">
-    <h2 id="settings-title">1. 로그인 설정</h2>
+    <h2 id="settings-title">1. 서버 설정 확인</h2>
 
-    <div class="field">
-      <label for="client-id">카카오 REST API 키</label>
-      <input id="client-id" type="text" autocomplete="off" spellcheck="false" placeholder="Kakao Developers 앱의 REST API 키">
-      <p class="hint">JavaScript 키나 Admin 키가 아니라 REST API 키를 입력하세요.</p>
+    <div class="member-grid">
+      <div class="member-item">
+        <span>카카오 REST API 키</span>
+        <strong id="configured-client-id">서버에서 자동으로 불러옴</strong>
+      </div>
+      <div class="member-item">
+        <span>백엔드 주소</span>
+        <strong id="configured-backend">-</strong>
+      </div>
+      <div class="member-item full-width">
+        <span>Redirect URI</span>
+        <strong id="configured-redirect">-</strong>
+      </div>
     </div>
-
-    <div class="field">
-      <label for="redirect-uri">Redirect URI</label>
-      <input id="redirect-uri" type="url" autocomplete="off" spellcheck="false">
-      <p class="hint">카카오 개발자 콘솔과 서버의 KAKAO_REDIRECT_URI에 이 주소를 똑같이 등록해야 합니다.</p>
-    </div>
-
-    <div class="field">
-      <label for="backend-url">백엔드 주소</label>
-      <input id="backend-url" type="url" autocomplete="off" spellcheck="false">
-    </div>
+    <p class="hint">Client Secret은 서버에서만 사용하며 이 페이지나 브라우저로 전달하지 않습니다.</p>
 
     <div class="actions">
       <button id="login-button" class="kakao-button" type="button">카카오로 로그인</button>
@@ -358,24 +363,30 @@
   (() => {
     'use strict';
 
-    const STORAGE = {
-      clientId: 'apex.kakaoTest.clientId',
-      redirectUri: 'apex.kakaoTest.redirectUri',
-      backendUrl: 'apex.kakaoTest.backendUrl',
-      oauthState: 'apex.kakaoTest.oauthState'
-    };
+    const STORAGE = { oauthState: 'apex.kakaoTest.oauthState' };
 
-    const clientIdInput = document.querySelector('#client-id');
-    const redirectUriInput = document.querySelector('#redirect-uri');
-    const backendUrlInput = document.querySelector('#backend-url');
     const loginButton = document.querySelector('#login-button');
     const statusBox = document.querySelector('#status');
     const resultSection = document.querySelector('#result');
 
+    const decodeServerConfig = (name) => {
+      const encoded = document.querySelector(`meta[name="${name}"]`)?.content || '';
+      if (!encoded) {
+        return '';
+      }
+      const bytes = Uint8Array.from(window.atob(encoded), (character) => character.charCodeAt(0));
+      return new TextDecoder().decode(bytes);
+    };
+
+    const clientId = decodeServerConfig('kakao-client-id');
+    const redirectUri = decodeServerConfig('kakao-redirect-uri');
+    const backendUrl = window.location.origin;
     const cleanPageUrl = `${window.location.origin}/kakao-login-test`;
-    clientIdInput.value = sessionStorage.getItem(STORAGE.clientId) || '';
-    redirectUriInput.value = sessionStorage.getItem(STORAGE.redirectUri) || cleanPageUrl;
-    backendUrlInput.value = sessionStorage.getItem(STORAGE.backendUrl) || window.location.origin;
+    document.querySelector('#configured-backend').textContent = backendUrl;
+    document.querySelector('#configured-redirect').textContent = redirectUri || '(서버 설정 없음)';
+    document.querySelector('#configured-client-id').textContent = clientId
+      ? '서버에서 자동으로 불러옴'
+      : '(서버 설정 없음)';
 
     const setStatus = (message, type = 'info') => {
       statusBox.textContent = message;
@@ -393,41 +404,26 @@
       return Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
     };
 
-    const normalizeBaseUrl = (value) => value.trim().replace(/\/+$/, '');
-
     loginButton.addEventListener('click', () => {
       clearStatus();
       resultSection.classList.remove('visible');
 
-      const clientId = clientIdInput.value.trim();
-      const redirectUri = redirectUriInput.value.trim();
-      const backendUrl = normalizeBaseUrl(backendUrlInput.value);
-
-      if (!clientId || !redirectUri || !backendUrl) {
-        setStatus('REST API 키, Redirect URI, 백엔드 주소를 모두 입력해 주세요.', 'error');
+      if (!clientId || !redirectUri) {
+        setStatus('서버의 KAKAO_CLIENT_ID 또는 KAKAO_REDIRECT_URI 설정이 없습니다.', 'error');
         return;
       }
 
-      let parsedRedirect;
-      let parsedBackend;
       try {
-        parsedRedirect = new URL(redirectUri);
-        parsedBackend = new URL(backendUrl);
+        const parsedRedirect = new URL(redirectUri);
+        if (!['http:', 'https:'].includes(parsedRedirect.protocol)) {
+          throw new Error('unsupported protocol');
+        }
       } catch (error) {
-        setStatus('Redirect URI와 백엔드 주소를 올바른 URL로 입력해 주세요.', 'error');
-        return;
-      }
-
-      if (!['http:', 'https:'].includes(parsedRedirect.protocol)
-          || !['http:', 'https:'].includes(parsedBackend.protocol)) {
-        setStatus('Redirect URI와 백엔드 주소는 HTTP 또는 HTTPS URL이어야 합니다.', 'error');
+        setStatus('서버의 KAKAO_REDIRECT_URI가 올바른 HTTP 또는 HTTPS URL이 아닙니다.', 'error');
         return;
       }
 
       const state = createState();
-      sessionStorage.setItem(STORAGE.clientId, clientId);
-      sessionStorage.setItem(STORAGE.redirectUri, redirectUri);
-      sessionStorage.setItem(STORAGE.backendUrl, backendUrl);
       sessionStorage.setItem(STORAGE.oauthState, state);
 
       const authorizeUrl = new URL('https://kauth.kakao.com/oauth/authorize');
@@ -467,7 +463,6 @@
       setStatus('카카오 authorization code를 백엔드 JWT로 교환하고 있습니다…');
 
       try {
-        const backendUrl = normalizeBaseUrl(sessionStorage.getItem(STORAGE.backendUrl) || window.location.origin);
         const response = await fetch(`${backendUrl}/api/auth/kakao/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

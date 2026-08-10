@@ -20,9 +20,9 @@ https://mutsa.dev.me.kr/kakao-login-test
 1. 카카오 개발자 콘솔에 위 주소를 Redirect URI로 등록합니다.
 2. 서버의 `KAKAO_REDIRECT_URI`에도 같은 주소를 설정합니다.
 3. 서버에 `KAKAO_LOGIN_TEST_ENABLED=true`를 설정하고 `mutsa.service`를 재시작합니다.
-4. 테스트 페이지에 카카오 REST API 키를 입력하고 로그인합니다.
+4. 테스트 페이지를 열고 카카오로 로그인합니다. 페이지는 서버의 `KAKAO_CLIENT_ID`와 `KAKAO_REDIRECT_URI`를 자동으로 사용합니다.
 
-로그인 성공 시 Access Token과 Refresh Token을 화면에 표시하며, 토큰은 브라우저 저장소에 저장하지 않습니다. 테스트가 끝나면 운영 프론트엔드에서 사용하는 Redirect URI로 서버 설정을 복원하고 `KAKAO_LOGIN_TEST_ENABLED=false`로 변경하거나 환경변수를 제거한 뒤 서비스를 재시작하세요. 비활성화 상태에서는 테스트 HTML을 제공하지 않고 404를 반환합니다.
+`KAKAO_CLIENT_SECRET`은 브라우저로 전달하지 않고 백엔드의 authorization code 교환에만 사용합니다. 로그인 성공 시 Access Token과 Refresh Token을 화면에 표시하며, 토큰은 브라우저 저장소에 저장하지 않습니다. 테스트가 끝나면 운영 프론트엔드에서 사용하는 Redirect URI로 서버 설정을 복원하고 `KAKAO_LOGIN_TEST_ENABLED=false`로 변경하거나 환경변수를 제거한 뒤 서비스를 재시작하세요. 비활성화 상태에서는 테스트 HTML을 제공하지 않고 404를 반환합니다.
 
 ---
 
