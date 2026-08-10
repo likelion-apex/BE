@@ -5,10 +5,11 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(classes = ApexBeApplication.class)
+@SpringBootTest(classes = ApexBeApplication.class, properties = "features.kakao-login-test.enabled=true")
 @AutoConfigureMockMvc
 class SwaggerDocumentationTests {
 
@@ -31,5 +32,12 @@ class SwaggerDocumentationTests {
 			.andExpect(jsonPath("$.paths['/api/v1/beauty-routines/analyze'].post.responses['503']").exists())
 			.andExpect(jsonPath("$.components.schemas.AnalyzeBeautyRoutineRequest.properties.youtubeUrl.example")
 				.value("https://www.youtube.com/shorts/-PC1SkLxtvo"));
+	}
+
+	@Test
+	void servesKakaoLoginTestPageWithoutAuthentication() throws Exception {
+		mockMvc.perform(get("/kakao-login-test"))
+			.andExpect(status().isOk())
+			.andExpect(content().string(org.hamcrest.Matchers.containsString("카카오 로그인 테스트")));
 	}
 }
