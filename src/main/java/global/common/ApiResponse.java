@@ -1,7 +1,7 @@
-package feat.apex_BE.global.common;
+package global.common;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import feat.apex_BE.global.exception.ErrorCode;
+import global.exception.ErrorCode;
 import lombok.Getter;
 
 @Getter
@@ -30,8 +30,18 @@ public class ApiResponse<T> {
         return new ApiResponse<>(true, "COMMON-200", "요청이 성공했습니다.", null);
     }
 
+    // 성공 응답: 메시지를 직접 지정할 때
+    public static <T> ApiResponse<T> success(String message, T data) {
+        return new ApiResponse<>(true, "COMMON-200", message, data);
+    }
+
     // 실패 응답
     public static ApiResponse<Void> fail(ErrorCode errorCode) {
         return new ApiResponse<>(false, errorCode.getCode(), errorCode.getMessage(), null);
+    }
+
+    // 실패 응답: 메시지를 직접 지정할 때 (예: 예외에 담긴 상세 메시지를 그대로 노출)
+    public static ApiResponse<Void> fail(ErrorCode errorCode, String message) {
+        return new ApiResponse<>(false, errorCode.getCode(), message, null);
     }
 }

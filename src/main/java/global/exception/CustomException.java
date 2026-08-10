@@ -1,4 +1,4 @@
-package feat.apex_BE.global.exception;
+package global.exception;
 
 import lombok.Getter;
 
@@ -9,6 +9,11 @@ public class CustomException extends RuntimeException {
 
     public CustomException(ErrorCode errorCode) {
         super(errorCode.getMessage());
+        this.errorCode = errorCode;
+    }
+
+    public CustomException(ErrorCode errorCode, String message) {
+        super(message);
         this.errorCode = errorCode;
     }
 
