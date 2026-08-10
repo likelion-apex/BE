@@ -1,4 +1,7 @@
 spring:
+  application:
+    name: apex-BE
+
   datasource:
     url: jdbc:h2:mem:apexdb;MODE=MySQL
     driver-class-name: org.h2.Driver
@@ -24,7 +27,7 @@ spring:
 kakao:
   client-id: ${KAKAO_CLIENT_ID}
   client-secret: ${KAKAO_CLIENT_SECRET:}
-  redirect-uri: ${KAKAO_REDIRECT_URI:http://localhost:3000/auth/kakao/callback}
+  redirect-uri: ${KAKAO_REDIRECT_URI:http://localhost:5173/auth/kakao/callback}
   token-uri: https://kauth.kakao.com/oauth/token
   user-info-uri: https://kapi.kakao.com/v2/user/me
   image-search-key: ${KAKAO_IMAGE_SEARCH_KEY:}
@@ -45,6 +48,15 @@ openai:
   api-url: https://api.openai.com/v1/chat/completions
   model: gpt-4o-mini
   organization-id: ${OPENAI_ORGANIZATION_ID:}
+
+gemini:
+  api-key: ${GEMINI_API_KEY:}
+  base-url: https://generativelanguage.googleapis.com
+  model: ${GEMINI_MODEL:gemini-3.6-flash}
+  connect-timeout: 5s
+  read-timeout: 120s
+  cache-ttl: 30d
+  cache-maximum-size: 10000
 
 springdoc:
   swagger-ui:
