@@ -3,14 +3,27 @@
 kakao:
   client-id: test-client-id
   client-secret: test-client-secret
-  redirect-uri: http://localhost:5173/auth/kakao/callback
+  redirect-uri: http://localhost:3000/auth/kakao/callback
   token-uri: https://kauth.kakao.com/oauth/token
   user-info-uri: https://kapi.kakao.com/v2/user/me
+  image-search-key: test-kakao-image-search-key
+  image-search-url: https://dapi.kakao.com/v2/search/image
 
 jwt:
   secret: dGVzdC1vbmx5LWp3dC1zZWNyZXQtZG8tbm90LXVzZS1pbi1wcm9kdWN0aW9uLTEyMzQ1Ng==
   access-token-expiration: 3600000
   refresh-token-expiration: 1209600000
 
+mfds:
+  service-key: test-mfds-service-key
+  ingredient-info-url: https://apis.data.go.kr/1471000/CsmtcsIngdCpntInfoService01/getCsmtcsIngdCpntInfoService01
+  regulation-info-url: https://apis.data.go.kr/1471000/CsmtcsReglMaterialInfoService/getCsmtcsReglMaterialInfoService
+
+openai:
+  api-key: test-openai-api-key
+  api-url: https://api.openai.com/v1/chat/completions
+  model: gpt-4o-mini
+  organization-id: ""
+
 cors:
-  allowed-origins: http://localhost:5173
+  allowed-origins: http://localhost:3000

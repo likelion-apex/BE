@@ -30,11 +30,24 @@ kakao:
   redirect-uri: ${KAKAO_REDIRECT_URI:http://localhost:5173/auth/kakao/callback}
   token-uri: https://kauth.kakao.com/oauth/token
   user-info-uri: https://kapi.kakao.com/v2/user/me
+  image-search-key: ${KAKAO_IMAGE_SEARCH_KEY:}
+  image-search-url: https://dapi.kakao.com/v2/search/image
 
 jwt:
   secret: ${JWT_SECRET}
   access-token-expiration: 3600000       # 1 hour (ms)
   refresh-token-expiration: 1209600000   # 14 days (ms)
+
+mfds:
+  service-key: ${MFDS_SERVICE_KEY:}
+  ingredient-info-url: https://apis.data.go.kr/1471000/CsmtcsIngdCpntInfoService01/getCsmtcsIngdCpntInfoService01
+  regulation-info-url: https://apis.data.go.kr/1471000/CsmtcsReglMaterialInfoService/getCsmtcsReglMaterialInfoService
+
+openai:
+  api-key: ${OPENAI_API_KEY:}
+  api-url: https://api.openai.com/v1/chat/completions
+  model: gpt-4o-mini
+  organization-id: ${OPENAI_ORGANIZATION_ID:}
 
 springdoc:
   swagger-ui:
@@ -44,4 +57,4 @@ springdoc:
     path: /v3/api-docs
 
 cors:
-  allowed-origins: http://localhost:5173
+  allowed-origins: http://localhost:3000

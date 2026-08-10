@@ -1,0 +1,24 @@
+[Unit]
+Description=LIKELION Apex backend
+After=network-online.target mariadb.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mutsa
+Group=mutsa
+WorkingDirectory=/srv/mutsa/current
+EnvironmentFile=/etc/mutsa/mutsa.env
+ExecStart=/usr/bin/java -Xms128m -Xmx512m -XX:+UseG1GC -jar /srv/mutsa/current/app.jar
+SuccessExitStatus=143
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/mutsa
+
+[Install]
+WantedBy=multi-user.target
