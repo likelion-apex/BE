@@ -1,9 +1,9 @@
 package global.exception;
 
-import feat.apex_BE.beauty.exception.BeautyRoutineException.GeminiUnavailable;
-import feat.apex_BE.beauty.exception.BeautyRoutineException.InvalidGeminiResponse;
-import feat.apex_BE.beauty.exception.BeautyRoutineException.InvalidYouTubeUrl;
-import feat.apex_BE.beauty.exception.BeautyRoutineException.MissingGeminiConfiguration;
+import domain.beauty.exception.BeautyRoutineException.GeminiUnavailable;
+import domain.beauty.exception.BeautyRoutineException.InvalidGeminiResponse;
+import domain.beauty.exception.BeautyRoutineException.InvalidYouTubeUrl;
+import domain.beauty.exception.BeautyRoutineException.MissingGeminiConfiguration;
 import global.common.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;

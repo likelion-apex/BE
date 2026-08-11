@@ -10,7 +10,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 // which scans the entire classpath (including framework JARs) and causes bean conflicts.
 @SpringBootApplication
 @EnableScheduling
-@ComponentScan(basePackages = {"domain", "config", "global", "security", "feat.apex_BE.beauty"})
+@ComponentScan(basePackages = {"domain", "config", "global", "security"})
 @EntityScan(basePackages = "domain")
 @EnableJpaRepositories(basePackages = "domain")
 public class ApexBeApplication {
