@@ -8,6 +8,7 @@ import global.common.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -59,6 +60,23 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(ErrorCode.INVALID_INPUT_VALUE.getStatus())
                 .body(ApiResponse.fail(ErrorCode.INVALID_INPUT_VALUE, message));
+    }
+
+    // 요청 본문 파싱 실패 처리 (예: enum @JsonCreator에서 유효하지 않은 한국어 라벨을 거부한 경우, 잘못된 JSON 형식 등)
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMessageNotReadableException(HttpMessageNotReadableException e) {
+        Throwable cause = e.getMostSpecificCause();
+        if (cause instanceof CustomException customException) {
+            ErrorCode errorCode = customException.getErrorCode();
+            log.warn("요청 본문 파싱 중 CustomException 발생: {}", customException.getMessage());
+            return ResponseEntity
+                    .status(errorCode.getStatus())
+                    .body(ApiResponse.fail(errorCode, customException.getMessage()));
+        }
+        log.warn("요청 본문을 읽을 수 없습니다: {}", e.getMessage());
+        return ResponseEntity
+                .status(ErrorCode.INVALID_INPUT_VALUE.getStatus())
+                .body(ApiResponse.fail(ErrorCode.INVALID_INPUT_VALUE));
     }
 
     // 지원하지 않는 HTTP 메서드로 요청한 경우
