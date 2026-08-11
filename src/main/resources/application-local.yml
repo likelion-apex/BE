@@ -1,0 +1,38 @@
+spring:
+  config:
+    activate:
+      on-profile: local
+
+kakao:
+  client-id: ${KAKAO_CLIENT_ID:local-dummy-kakao-client-id}
+  client-secret: ${KAKAO_CLIENT_SECRET:local-dummy-kakao-client-secret}
+  redirect-uri: ${KAKAO_REDIRECT_URI:http://localhost:5173/auth/kakao/callback}
+  token-uri: ${KAKAO_TOKEN_URI:http://127.0.0.1:9/oauth/token}
+  user-info-uri: ${KAKAO_USER_INFO_URI:http://127.0.0.1:9/user/me}
+  image-search-key: ${KAKAO_IMAGE_SEARCH_KEY:local-dummy-kakao-image-key}
+  image-search-url: ${KAKAO_IMAGE_SEARCH_URL:http://127.0.0.1:9/image-search}
+
+jwt:
+  secret: ${JWT_SECRET:local-development-only-jwt-secret-key-32-bytes-minimum}
+
+mfds:
+  enabled: false
+  service-key: ${MFDS_SERVICE_KEY:local-dummy-mfds-service-key}
+  ingredient-info-url: ${MFDS_INGREDIENT_INFO_URL:http://127.0.0.1:9/mfds/ingredients}
+  regulation-info-url: ${MFDS_REGULATION_INFO_URL:http://127.0.0.1:9/mfds/regulations}
+
+openai:
+  api-key: ${OPENAI_API_KEY:local-dummy-openai-api-key}
+  api-url: ${OPENAI_API_URL:http://127.0.0.1:9/v1/chat/completions}
+  organization-id: ${OPENAI_ORGANIZATION_ID:local-dummy-openai-organization}
+
+gemini:
+  api-key: ${GEMINI_API_KEY:local-dummy-gemini-api-key}
+  base-url: ${GEMINI_BASE_URL:http://127.0.0.1:9}
+
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
+
+features:
+  kakao-login-test:
+    enabled: ${KAKAO_LOGIN_TEST_ENABLED:true}

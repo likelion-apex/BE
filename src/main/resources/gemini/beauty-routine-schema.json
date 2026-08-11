@@ -1,0 +1,89 @@
+{
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "enum": ["1.0"]
+    },
+    "analysisStatus": {
+      "type": "string",
+      "enum": ["COMPLETE", "PARTIAL", "NOT_BEAUTY_ROUTINE", "VIDEO_UNAVAILABLE"]
+    },
+    "routineType": {
+      "type": "string",
+      "enum": ["SKINCARE", "FULL_MAKEUP", "BASE_MAKEUP", "EYE_MAKEUP", "LIP_MAKEUP", "MIXED", "UNKNOWN"]
+    },
+    "summary": {
+      "type": "string",
+      "description": "One concise Korean sentence grounded in the video."
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "order": {"type": "integer"},
+          "startTime": {"type": "string", "description": "MM:SS"},
+          "endTime": {"type": ["string", "null"], "description": "MM:SS or null"},
+          "applicationArea": {"type": "string"},
+          "action": {"type": "string"},
+          "technique": {"type": "string"},
+          "purpose": {"type": "string"},
+          "purposeBasis": {
+            "type": "string",
+            "enum": ["DIRECTLY_STATED", "GENERAL_INFERENCE"]
+          },
+          "applicator": {"type": ["string", "null"]},
+          "identificationLevel": {
+            "type": "string",
+            "enum": ["EXACT_PRODUCT", "CATEGORY_ONLY", "UNKNOWN"]
+          },
+          "category": {"type": "string"},
+          "brand": {"type": ["string", "null"]},
+          "productName": {"type": ["string", "null"]},
+          "variant": {"type": ["string", "null"]},
+          "identityEvidenceText": {
+            "type": ["string", "null"],
+            "description": "Literal identifying words directly read or heard for exact product identity."
+          },
+          "observedColor": {"type": ["string", "null"]},
+          "evidenceSources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["VISUAL_LABEL", "ON_SCREEN_TEXT", "SPEECH", "CAPTION", "VISUAL_USAGE"]
+            }
+          },
+          "evidenceSummary": {"type": "string"},
+          "confidence": {"type": "number"}
+        },
+        "required": [
+          "order",
+          "startTime",
+          "endTime",
+          "applicationArea",
+          "action",
+          "technique",
+          "purpose",
+          "purposeBasis",
+          "applicator",
+          "identificationLevel",
+          "category",
+          "brand",
+          "productName",
+          "variant",
+          "identityEvidenceText",
+          "observedColor",
+          "evidenceSources",
+          "evidenceSummary",
+          "confidence"
+        ]
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {"type": "string"}
+    }
+  },
+  "required": ["schemaVersion", "analysisStatus", "routineType", "summary", "steps", "warnings"]
+}

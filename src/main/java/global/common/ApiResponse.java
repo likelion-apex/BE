@@ -1,0 +1,56 @@
+package global.common;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import global.exception.ErrorCode;
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Getter;
+
+@Getter
+@JsonInclude(JsonInclude.Include.NON_NULL)
+@Schema(description = "공통 API 응답")
+public class ApiResponse<T> {
+
+    @Schema(description = "요청 성공 여부", example = "true")
+    private final boolean success;
+
+    @Schema(description = "애플리케이션 응답 코드", example = "COMMON-200")
+    private final String code;
+
+    @Schema(description = "응답 메시지", example = "요청이 성공했습니다.")
+    private final String message;
+
+    @Schema(description = "응답 데이터. 데이터가 없는 응답에서는 생략됩니다.")
+    private final T data;
+
+    private ApiResponse(boolean success, String code, String message, T data) {
+        this.success = success;
+        this.code = code;
+        this.message = message;
+        this.data = data;
+    }
+
+    // 성공 응답: 데이터가 있을 때
+    public static <T> ApiResponse<T> success(T data) {
+        return new ApiResponse<>(true, "COMMON-200", "요청이 성공했습니다.", data);
+    }
+
+    // 성공 응답: 데이터가 없을 때
+    public static <T> ApiResponse<T> success() {
+        return new ApiResponse<>(true, "COMMON-200", "요청이 성공했습니다.", null);
+    }
+
+    // 성공 응답: 메시지를 직접 지정할 때
+    public static <T> ApiResponse<T> success(String message, T data) {
+        return new ApiResponse<>(true, "COMMON-200", message, data);
+    }
+
+    // 실패 응답
+    public static ApiResponse<Void> fail(ErrorCode errorCode) {
+        return new ApiResponse<>(false, errorCode.getCode(), errorCode.getMessage(), null);
+    }
+
+    // 실패 응답: 메시지를 직접 지정할 때 (예: 예외에 담긴 상세 메시지를 그대로 노출)
+    public static ApiResponse<Void> fail(ErrorCode errorCode, String message) {
+        return new ApiResponse<>(false, errorCode.getCode(), message, null);
+    }
+}

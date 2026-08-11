@@ -2,6 +2,9 @@ spring:
   application:
     name: apex-BE
 
+  profiles:
+    default: local
+
   datasource:
     url: jdbc:h2:mem:apexdb;MODE=MySQL
     driver-class-name: org.h2.Driver
@@ -22,19 +25,42 @@ spring:
       enabled: true
       path: /h2-console
 
-# 민감한 값(REST API 키, Client Secret, JWT Secret)은 프로젝트 루트의 .env 파일에서 주입됩니다.
-# .env는 git에 커밋되지 않으며, 필요한 키 목록은 .env.example을 참고하세요.
+# 운영 비밀값은 환경변수로 주입합니다. 로컬 기본값은 application-local.yml의
+# 외부 호출이 불가능한 더미 설정을 사용합니다.
 kakao:
   client-id: ${KAKAO_CLIENT_ID}
   client-secret: ${KAKAO_CLIENT_SECRET:}
   redirect-uri: ${KAKAO_REDIRECT_URI:http://localhost:5173/auth/kakao/callback}
   token-uri: https://kauth.kakao.com/oauth/token
   user-info-uri: https://kapi.kakao.com/v2/user/me
+  image-search-key: ${KAKAO_IMAGE_SEARCH_KEY:}
+  image-search-url: https://dapi.kakao.com/v2/search/image
 
 jwt:
   secret: ${JWT_SECRET}
   access-token-expiration: 3600000       # 1 hour (ms)
   refresh-token-expiration: 1209600000   # 14 days (ms)
+
+mfds:
+  enabled: true
+  service-key: ${MFDS_SERVICE_KEY:}
+  ingredient-info-url: https://apis.data.go.kr/1471000/CsmtcsIngdCpntInfoService01/getCsmtcsIngdCpntInfoService01
+  regulation-info-url: https://apis.data.go.kr/1471000/CsmtcsReglMaterialInfoService/getCsmtcsReglMaterialInfoService
+
+openai:
+  api-key: ${OPENAI_API_KEY:}
+  api-url: https://api.openai.com/v1/chat/completions
+  model: gpt-4o-mini
+  organization-id: ${OPENAI_ORGANIZATION_ID:}
+
+gemini:
+  api-key: ${GEMINI_API_KEY:}
+  base-url: https://generativelanguage.googleapis.com
+  model: ${GEMINI_MODEL:gemini-3.6-flash}
+  connect-timeout: 5s
+  read-timeout: 120s
+  cache-ttl: 30d
+  cache-maximum-size: 10000
 
 springdoc:
   swagger-ui:
@@ -44,4 +70,8 @@ springdoc:
     path: /v3/api-docs
 
 cors:
-  allowed-origins: http://localhost:5173
+  allowed-origins: http://localhost:3000
+
+features:
+  kakao-login-test:
+    enabled: ${KAKAO_LOGIN_TEST_ENABLED:false}
