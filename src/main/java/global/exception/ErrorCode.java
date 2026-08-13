@@ -27,7 +27,13 @@ public enum ErrorCode {
     KAKAO_USER_INFO_REQUEST_FAILED(HttpStatus.BAD_GATEWAY, "AUTH-010", "카카오 사용자 정보 조회에 실패했습니다."),
 
     // 회원
-    MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "MEMBER-001", "회원 정보를 찾을 수 없습니다.");
+    MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "MEMBER-001", "회원 정보를 찾을 수 없습니다."),
+
+    // YouTube 뷰티 루틴 분석
+    BEAUTY_INVALID_YOUTUBE_URL(HttpStatus.BAD_REQUEST, "BEAUTY-001", "유효한 YouTube URL이 아닙니다."),
+    BEAUTY_GEMINI_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "BEAUTY-002", "Gemini 서비스를 일시적으로 사용할 수 없습니다."),
+    BEAUTY_INVALID_GEMINI_RESPONSE(HttpStatus.BAD_GATEWAY, "BEAUTY-003", "Gemini 분석 응답을 처리할 수 없습니다."),
+    BEAUTY_MISSING_GEMINI_CONFIGURATION(HttpStatus.SERVICE_UNAVAILABLE, "BEAUTY-004", "Gemini 서버 설정이 필요합니다.");
 
     // 각자 도메인 에러는 여기 이어서 추가 ~
 

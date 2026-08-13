@@ -6,6 +6,7 @@ import lombok.Getter;
 import java.util.List;
 
 @Getter
+@Schema(description = "성분의 국가별 금지·제한 정보")
 public class IngredientRegulationDto {
 
     @Schema(description = "해당 성분을 금지하는 국가 목록")

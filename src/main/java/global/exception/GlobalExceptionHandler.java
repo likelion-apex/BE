@@ -1,9 +1,14 @@
 package global.exception;
 
+import domain.beauty.exception.BeautyRoutineException.GeminiUnavailable;
+import domain.beauty.exception.BeautyRoutineException.InvalidGeminiResponse;
+import domain.beauty.exception.BeautyRoutineException.InvalidYouTubeUrl;
+import domain.beauty.exception.BeautyRoutineException.MissingGeminiConfiguration;
 import global.common.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -13,6 +18,26 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(InvalidYouTubeUrl.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidYouTubeUrl(InvalidYouTubeUrl e) {
+        return beautyError(ErrorCode.BEAUTY_INVALID_YOUTUBE_URL, e.getMessage());
+    }
+
+    @ExceptionHandler(GeminiUnavailable.class)
+    public ResponseEntity<ApiResponse<Void>> handleGeminiUnavailable(GeminiUnavailable e) {
+        return beautyError(ErrorCode.BEAUTY_GEMINI_UNAVAILABLE, e.getMessage());
+    }
+
+    @ExceptionHandler(InvalidGeminiResponse.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidGeminiResponse(InvalidGeminiResponse e) {
+        return beautyError(ErrorCode.BEAUTY_INVALID_GEMINI_RESPONSE, e.getMessage());
+    }
+
+    @ExceptionHandler(MissingGeminiConfiguration.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingGeminiConfiguration(MissingGeminiConfiguration e) {
+        return beautyError(ErrorCode.BEAUTY_MISSING_GEMINI_CONFIGURATION, e.getMessage());
+    }
 
     // 커스텀 예외 처리
     @ExceptionHandler(CustomException.class)
@@ -35,6 +60,23 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(ErrorCode.INVALID_INPUT_VALUE.getStatus())
                 .body(ApiResponse.fail(ErrorCode.INVALID_INPUT_VALUE, message));
+    }
+
+    // 요청 본문 파싱 실패 처리 (예: enum @JsonCreator에서 유효하지 않은 한국어 라벨을 거부한 경우, 잘못된 JSON 형식 등)
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMessageNotReadableException(HttpMessageNotReadableException e) {
+        Throwable cause = e.getMostSpecificCause();
+        if (cause instanceof CustomException customException) {
+            ErrorCode errorCode = customException.getErrorCode();
+            log.warn("요청 본문 파싱 중 CustomException 발생: {}", customException.getMessage());
+            return ResponseEntity
+                    .status(errorCode.getStatus())
+                    .body(ApiResponse.fail(errorCode, customException.getMessage()));
+        }
+        log.warn("요청 본문을 읽을 수 없습니다: {}", e.getMessage());
+        return ResponseEntity
+                .status(ErrorCode.INVALID_INPUT_VALUE.getStatus())
+                .body(ApiResponse.fail(ErrorCode.INVALID_INPUT_VALUE));
     }
 
     // 지원하지 않는 HTTP 메서드로 요청한 경우
@@ -60,5 +102,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.fail(ErrorCode.INTERNAL_SERVER_ERROR));
+    }
+
+    private ResponseEntity<ApiResponse<Void>> beautyError(ErrorCode errorCode, String message) {
+        log.warn("뷰티 루틴 분석 실패: code={}, message={}", errorCode.getCode(), message);
+        return ResponseEntity
+                .status(errorCode.getStatus())
+                .body(ApiResponse.fail(errorCode, message));
     }
 }

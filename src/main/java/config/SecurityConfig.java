@@ -23,8 +23,11 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     private static final String[] PERMIT_ALL_PATHS = {
-            "/api/auth/**",
+            "/api/auth/kakao/login",
+            "/api/auth/reissue",
             "/api/cosmetics/**",
+            "/kakao-login-test",
+            "/kakao-login-test/",
             "/swagger-ui/**",
             "/swagger-ui.html",
             "/v3/api-docs/**",

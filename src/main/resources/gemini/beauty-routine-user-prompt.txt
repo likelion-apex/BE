@@ -1,0 +1,10 @@
+Review the full video chronologically and conservatively.
+Include only actual skincare or makeup application actions, not products merely shown or discussed.
+Order steps by the first application timestamp. Merge continuous use of the same product and separate later reuse.
+Inspect legible packaging text, on-screen text, captions, speech, and visible usage.
+Set EXACT_PRODUCT only when both brand and product name have direct evidence. Copy the actually legible or spoken identifying words into identityEvidenceText without correcting or expanding them.
+If those words cannot be transcribed, return CATEGORY_ONLY with brand, productName, variant, and identityEvidenceText null.
+Use Korean for every descriptive field and category. Do not translate literal product evidence stored in brand, productName, variant, or identityEvidenceText.
+Describe the observed technique and a short routine purpose. Mark a conventional purpose as GENERAL_INFERENCE.
+If the video is not a beauty routine or cannot be accessed, return the matching status and no invented steps.
+Return only the requested JSON.

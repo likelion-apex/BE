@@ -39,6 +39,10 @@ public class RegulationInfoCache {
 
     @Scheduled(cron = "0 0 4 * * *")
     public void refresh() {
+        if (!enabled) {
+            log.info("로컬 프로필에서는 화장품 규제정보 외부 연동을 건너뜁니다.");
+            return;
+        }
         try {
             List<RegulationInfo> all = client.fetchAll();
             Map<String, RegulationInfo> loaded = new ConcurrentHashMap<>();

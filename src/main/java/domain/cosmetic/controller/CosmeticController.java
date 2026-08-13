@@ -8,7 +8,9 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -87,11 +89,17 @@ public class CosmeticController {
                     })
             )
     )
-    @ApiResponse(
-            responseCode = "200",
-            description = "조회 성공",
-            content = @Content(examples = @ExampleObject(name = "응답 예시 (AI_GENERATED)", value = INFO_RESPONSE_EXAMPLE))
-    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "조회 성공",
+                    content = @Content(examples = @ExampleObject(name = "응답 예시 (AI_GENERATED)", value = INFO_RESPONSE_EXAMPLE))
+            ),
+            @ApiResponse(responseCode = "400", description = "제품명 누락 또는 잘못된 요청",
+                    content = @Content(schema = @Schema(implementation = global.common.ApiResponse.class))),
+            @ApiResponse(responseCode = "500", description = "예상하지 못한 서버 오류",
+                    content = @Content(schema = @Schema(implementation = global.common.ApiResponse.class)))
+    })
     public ResponseEntity<CosmeticInfoResponseDto> getCosmeticInfo(@Valid @RequestBody CosmeticInfoRequestDto request) {
         return ResponseEntity.ok(cosmeticInfoService.getCosmeticInfo(request));
     }
@@ -101,11 +109,15 @@ public class CosmeticController {
             summary = "성분 단건 조회",
             description = "성분명으로 원료성분정보(영문명)와 규제정보(금지·제한국가)를 조회합니다."
     )
-    @ApiResponse(
-            responseCode = "200",
-            description = "조회 성공",
-            content = @Content(examples = @ExampleObject(name = "응답 예시", value = INGREDIENT_RESPONSE_EXAMPLE))
-    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "조회 성공",
+                    content = @Content(examples = @ExampleObject(name = "응답 예시", value = INGREDIENT_RESPONSE_EXAMPLE))
+            ),
+            @ApiResponse(responseCode = "500", description = "예상하지 못한 서버 오류",
+                    content = @Content(schema = @Schema(implementation = global.common.ApiResponse.class)))
+    })
     public ResponseEntity<IngredientDetailDto> getIngredient(
             @Parameter(description = "성분명", example = "글리세린") @PathVariable String name) {
         return ResponseEntity.ok(cosmeticInfoService.getIngredientDetail(name));

@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="kakao-client-id" content="__KAKAO_CLIENT_ID_BASE64__">
+  <meta name="kakao-redirect-uri" content="__KAKAO_REDIRECT_URI_BASE64__">
+  <title>카카오 로그인 테스트</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --background: #111318;
+      --panel: #1a1e26;
+      --panel-strong: #202631;
+      --border: #313846;
+      --text: #f4f6fa;
+      --muted: #aab3c2;
+      --yellow: #fee500;
+      --yellow-hover: #f5dc00;
+      --yellow-text: #191600;
+      --blue: #7ca6ff;
+      --green: #5ed49a;
+      --red: #ff7f86;
+      --shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 15% 10%, rgba(124, 166, 255, 0.12), transparent 34rem),
+        radial-gradient(circle at 85% 20%, rgba(254, 229, 0, 0.08), transparent 28rem),
+        var(--background);
+      color: var(--text);
+      font-family: Inter, Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+
+    main {
+      width: min(860px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 56px 0 72px;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--yellow);
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 6vw, 3.5rem);
+      letter-spacing: -0.045em;
+      line-height: 1.08;
+    }
+
+    .lead {
+      max-width: 680px;
+      margin: 18px 0 34px;
+      color: var(--muted);
+      font-size: 1.04rem;
+    }
+
+    .card {
+      margin-top: 18px;
+      padding: 26px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      background: rgba(26, 30, 38, 0.92);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+    }
+
+    .card h2 {
+      margin: 0 0 18px;
+      font-size: 1.18rem;
+    }
+
+    .field {
+      display: grid;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    label {
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    input,
+    textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      outline: none;
+      background: #11151c;
+      color: var(--text);
+      font: inherit;
+      transition: border-color 150ms ease, box-shadow 150ms ease;
+    }
+
+    input {
+      height: 48px;
+      padding: 0 14px;
+    }
+
+    textarea {
+      min-height: 118px;
+      padding: 13px 14px;
+      resize: vertical;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.82rem;
+      line-height: 1.55;
+      overflow-wrap: anywhere;
+    }
+
+    input:focus,
+    textarea:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(124, 166, 255, 0.14);
+    }
+
+    .hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .actions,
+    .token-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    button,
+    .button-link {
+      display: inline-flex;
+      min-height: 44px;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 16px;
+      border: 0;
+      border-radius: 11px;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 800;
+      text-decoration: none;
+      transition: transform 120ms ease, background 120ms ease, opacity 120ms ease;
+    }
+
+    button:hover,
+    .button-link:hover {
+      transform: translateY(-1px);
+    }
+
+    button:disabled {
+      cursor: wait;
+      opacity: 0.6;
+      transform: none;
+    }
+
+    .kakao-button {
+      background: var(--yellow);
+      color: var(--yellow-text);
+    }
+
+    .kakao-button:hover {
+      background: var(--yellow-hover);
+    }
+
+    .secondary-button,
+    .button-link {
+      border: 1px solid var(--border);
+      background: var(--panel-strong);
+      color: var(--text);
+    }
+
+    .status {
+      display: none;
+      margin-top: 18px;
+      padding: 13px 15px;
+      border-radius: 12px;
+      font-size: 0.92rem;
+      white-space: pre-wrap;
+    }
+
+    .status.visible {
+      display: block;
+    }
+
+    .status.info {
+      border: 1px solid rgba(124, 166, 255, 0.35);
+      background: rgba(124, 166, 255, 0.1);
+      color: #cbd9ff;
+    }
+
+    .status.error {
+      border: 1px solid rgba(255, 127, 134, 0.36);
+      background: rgba(255, 127, 134, 0.1);
+      color: #ffc4c8;
+    }
+
+    .result {
+      display: none;
+    }
+
+    .result.visible {
+      display: block;
+    }
+
+    .success-heading {
+      color: var(--green);
+    }
+
+    .member-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin: 0 0 22px;
+    }
+
+    .member-item {
+      padding: 13px 14px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #141820;
+    }
+
+    .member-item span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.76rem;
+      font-weight: 700;
+    }
+
+    .member-item strong {
+      display: block;
+      margin-top: 3px;
+      overflow-wrap: anywhere;
+    }
+
+    .member-item.full-width {
+      grid-column: 1 / -1;
+    }
+
+    .warning {
+      margin: 18px 0 0;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    .warning strong {
+      color: var(--red);
+    }
+
+    @media (max-width: 640px) {
+      main {
+        padding-top: 34px;
+      }
+
+      .card {
+        padding: 20px;
+        border-radius: 16px;
+      }
+
+      .member-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .actions > *,
+      .token-actions > * {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <p class="eyebrow">Apex BE · OAuth utility</p>
+  <h1>카카오 로그인 테스트</h1>
+  <p class="lead">
+    카카오 authorization code를 백엔드에 전달하고 발급된 JWT를 확인합니다.
+    이 페이지는 개발·검증 용도이며 토큰을 브라우저 저장소에 보관하지 않습니다.
+  </p>
+
+  <section class="card" aria-labelledby="settings-title">
+    <h2 id="settings-title">1. 서버 설정 확인</h2>
+
+    <div class="member-grid">
+      <div class="member-item">
+        <span>카카오 REST API 키</span>
+        <strong id="configured-client-id">서버에서 자동으로 불러옴</strong>
+      </div>
+      <div class="member-item">
+        <span>백엔드 주소</span>
+        <strong id="configured-backend">-</strong>
+      </div>
+      <div class="member-item full-width">
+        <span>Redirect URI</span>
+        <strong id="configured-redirect">-</strong>
+      </div>
+    </div>
+    <p class="hint">Client Secret은 서버에서만 사용하며 이 페이지나 브라우저로 전달하지 않습니다.</p>
+
+    <div class="actions">
+      <button id="login-button" class="kakao-button" type="button">카카오로 로그인</button>
+      <a class="button-link" href="/swagger-ui/index.html" target="_blank" rel="noopener">Swagger 열기</a>
+    </div>
+
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+
+    <ul class="warning">
+      <li><strong>실제 사용자 계정으로만 테스트</strong>하고 토큰을 메신저·이슈·스크린샷에 공유하지 마세요.</li>
+      <li>Redirect URI를 테스트 주소로 바꿨다면 검증 후 운영 프론트엔드 주소로 복원하세요.</li>
+    </ul>
+  </section>
+
+  <section id="result" class="card result" aria-labelledby="result-title">
+    <h2 id="result-title" class="success-heading">2. JWT 발급 완료</h2>
+
+    <div class="member-grid">
+      <div class="member-item"><span>회원 ID</span><strong id="member-id">-</strong></div>
+      <div class="member-item"><span>닉네임</span><strong id="member-nickname">-</strong></div>
+      <div class="member-item"><span>이메일</span><strong id="member-email">-</strong></div>
+      <div class="member-item"><span>신규 회원</span><strong id="new-member">-</strong></div>
+      <div class="member-item"><span>인증 방식</span><strong id="grant-type">-</strong></div>
+      <div class="member-item"><span>Access Token 유효시간</span><strong id="expires-in">-</strong></div>
+    </div>
+
+    <div class="field">
+      <label for="access-token">Access Token</label>
+      <textarea id="access-token" readonly spellcheck="false"></textarea>
+      <div class="token-actions">
+        <button class="secondary-button" type="button" data-copy-target="access-token">Access Token 복사</button>
+        <button class="secondary-button" type="button" data-copy-bearer="access-token">Bearer 헤더 복사</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="refresh-token">Refresh Token</label>
+      <textarea id="refresh-token" readonly spellcheck="false"></textarea>
+      <div class="token-actions">
+        <button class="secondary-button" type="button" data-copy-target="refresh-token">Refresh Token 복사</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+  (() => {
+    'use strict';
+
+    const STORAGE = { oauthState: 'apex.kakaoTest.oauthState' };
+
+    const loginButton = document.querySelector('#login-button');
+    const statusBox = document.querySelector('#status');
+    const resultSection = document.querySelector('#result');
+
+    const decodeServerConfig = (name) => {
+      const encoded = document.querySelector(`meta[name="${name}"]`)?.content || '';
+      if (!encoded) {
+        return '';
+      }
+      const bytes = Uint8Array.from(window.atob(encoded), (character) => character.charCodeAt(0));
+      return new TextDecoder().decode(bytes);
+    };
+
+    const clientId = decodeServerConfig('kakao-client-id');
+    const redirectUri = decodeServerConfig('kakao-redirect-uri');
+    const backendUrl = window.location.origin;
+    const cleanPageUrl = `${window.location.origin}/kakao-login-test`;
+    document.querySelector('#configured-backend').textContent = backendUrl;
+    document.querySelector('#configured-redirect').textContent = redirectUri || '(서버 설정 없음)';
+    document.querySelector('#configured-client-id').textContent = clientId
+      ? '서버에서 자동으로 불러옴'
+      : '(서버 설정 없음)';
+
+    const setStatus = (message, type = 'info') => {
+      statusBox.textContent = message;
+      statusBox.className = `status visible ${type}`;
+    };
+
+    const clearStatus = () => {
+      statusBox.textContent = '';
+      statusBox.className = 'status';
+    };
+
+    const createState = () => {
+      const bytes = new Uint8Array(24);
+      window.crypto.getRandomValues(bytes);
+      return Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
+    };
+
+    loginButton.addEventListener('click', () => {
+      clearStatus();
+      resultSection.classList.remove('visible');
+
+      if (!clientId || !redirectUri) {
+        setStatus('서버의 KAKAO_CLIENT_ID 또는 KAKAO_REDIRECT_URI 설정이 없습니다.', 'error');
+        return;
+      }
+
+      try {
+        const parsedRedirect = new URL(redirectUri);
+        if (!['http:', 'https:'].includes(parsedRedirect.protocol)) {
+          throw new Error('unsupported protocol');
+        }
+      } catch (error) {
+        setStatus('서버의 KAKAO_REDIRECT_URI가 올바른 HTTP 또는 HTTPS URL이 아닙니다.', 'error');
+        return;
+      }
+
+      const state = createState();
+      sessionStorage.setItem(STORAGE.oauthState, state);
+
+      const authorizeUrl = new URL('https://kauth.kakao.com/oauth/authorize');
+      authorizeUrl.searchParams.set('client_id', clientId);
+      authorizeUrl.searchParams.set('redirect_uri', redirectUri);
+      authorizeUrl.searchParams.set('response_type', 'code');
+      authorizeUrl.searchParams.set('state', state);
+      window.location.assign(authorizeUrl.toString());
+    });
+
+    const formatDuration = (milliseconds) => {
+      if (!Number.isFinite(milliseconds) || milliseconds <= 0) {
+        return '-';
+      }
+      const minutes = Math.floor(milliseconds / 60000);
+      const hours = Math.floor(minutes / 60);
+      const remainingMinutes = minutes % 60;
+      return hours > 0 ? `${hours}시간 ${remainingMinutes}분` : `${minutes}분`;
+    };
+
+    const displayTokens = (tokenData) => {
+      const member = tokenData.member || {};
+      document.querySelector('#member-id').textContent = member.id ?? '-';
+      document.querySelector('#member-nickname').textContent = member.nickname || '-';
+      document.querySelector('#member-email').textContent = member.email || '(카카오 제공 동의 없음)';
+      document.querySelector('#new-member').textContent = tokenData.isNewMember ? '예' : '아니요';
+      document.querySelector('#grant-type').textContent = tokenData.grantType || 'Bearer';
+      document.querySelector('#expires-in').textContent = formatDuration(tokenData.accessTokenExpiresIn);
+      document.querySelector('#access-token').value = tokenData.accessToken || '';
+      document.querySelector('#refresh-token').value = tokenData.refreshToken || '';
+      resultSection.classList.add('visible');
+      resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    const exchangeCode = async (code) => {
+      loginButton.disabled = true;
+      setStatus('카카오 authorization code를 백엔드 JWT로 교환하고 있습니다…');
+
+      try {
+        const response = await fetch(`${backendUrl}/api/auth/kakao/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code })
+        });
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok || !payload?.success || !payload?.data?.accessToken) {
+          const detail = payload?.message || `HTTP ${response.status}`;
+          throw new Error(detail);
+        }
+
+        displayTokens(payload.data);
+        setStatus('로그인과 JWT 발급이 완료되었습니다. 아래 토큰을 Swagger Authorize에 사용할 수 있습니다.');
+      } catch (error) {
+        setStatus(`JWT 발급에 실패했습니다.\n${error.message}\n\n카카오 Redirect URI와 서버 KAKAO_REDIRECT_URI가 정확히 같은지 확인해 주세요.`, 'error');
+      } finally {
+        loginButton.disabled = false;
+      }
+    };
+
+    document.querySelectorAll('[data-copy-target]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const target = document.querySelector(`#${button.dataset.copyTarget}`);
+        try {
+          await navigator.clipboard.writeText(target.value);
+          const original = button.textContent;
+          button.textContent = '복사 완료';
+          window.setTimeout(() => { button.textContent = original; }, 1200);
+        } catch (error) {
+          target.select();
+          setStatus('자동 복사에 실패했습니다. 선택된 토큰을 직접 복사해 주세요.', 'error');
+        }
+      });
+    });
+
+    document.querySelectorAll('[data-copy-bearer]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const target = document.querySelector(`#${button.dataset.copyBearer}`);
+        try {
+          await navigator.clipboard.writeText(`Bearer ${target.value}`);
+          const original = button.textContent;
+          button.textContent = 'Bearer 헤더 복사 완료';
+          window.setTimeout(() => { button.textContent = original; }, 1200);
+        } catch (error) {
+          setStatus('Bearer 헤더 자동 복사에 실패했습니다.', 'error');
+        }
+      });
+    });
+
+    const query = new URLSearchParams(window.location.search);
+    const code = query.get('code');
+    const returnedState = query.get('state');
+    const kakaoError = query.get('error');
+    const kakaoErrorDescription = query.get('error_description');
+
+    if (code || kakaoError) {
+      window.history.replaceState({}, document.title, cleanPageUrl);
+    }
+
+    if (kakaoError) {
+      sessionStorage.removeItem(STORAGE.oauthState);
+      setStatus(`카카오 로그인이 취소되었거나 실패했습니다.\n${kakaoErrorDescription || kakaoError}`, 'error');
+    } else if (code) {
+      const expectedState = sessionStorage.getItem(STORAGE.oauthState);
+      sessionStorage.removeItem(STORAGE.oauthState);
+
+      if (!expectedState || !returnedState || expectedState !== returnedState) {
+        setStatus('OAuth state 값이 일치하지 않습니다. 새로고침 후 로그인을 다시 시작해 주세요.', 'error');
+      } else {
+        exchangeCode(code);
+      }
+    }
+  })();
+</script>
+</body>
+</html>

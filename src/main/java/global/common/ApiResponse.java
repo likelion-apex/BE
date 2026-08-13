@@ -2,15 +2,24 @@ package global.common;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import global.exception.ErrorCode;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
 
 @Getter
 @JsonInclude(JsonInclude.Include.NON_NULL)
+@Schema(description = "공통 API 응답")
 public class ApiResponse<T> {
 
+    @Schema(description = "요청 성공 여부", example = "true")
     private final boolean success;
+
+    @Schema(description = "애플리케이션 응답 코드", example = "COMMON-200")
     private final String code;
+
+    @Schema(description = "응답 메시지", example = "요청이 성공했습니다.")
     private final String message;
+
+    @Schema(description = "응답 데이터. 데이터가 없는 응답에서는 생략됩니다.")
     private final T data;
 
     private ApiResponse(boolean success, String code, String message, T data) {
