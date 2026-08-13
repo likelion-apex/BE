@@ -11,6 +11,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -29,6 +30,15 @@ public class OpenAiIngredientClient {
             한국어 표준 성분명으로, 배합량이 많은 순서대로 나열하세요.
             제품을 확실히 알 수 없으면 빈 배열을 반환하세요.
             반드시 아래 JSON 형식으로만 답변하세요: {"ingredients": ["성분1", "성분2"]}
+            """;
+
+    private static final String PURPOSE_SYSTEM_PROMPT = """
+            당신은 화장품 성분의 배합목적(용도)을 알려주는 어시스턴트입니다.
+            사용자가 알려준 성분 목록 각각에 대해 화장품 원료로서의 배합목적을 1~3개씩 한국어로 나열하세요
+            (예: "피부 보습", "피부 컨디셔닝", "기제(용매)", "피부 진정").
+            성분의 배합목적을 확실히 알 수 없으면 해당 성분은 빈 배열로 응답하세요.
+            반드시 아래 JSON 형식으로만, 요청받은 성분 개수와 이름을 그대로 유지하여 답변하세요:
+            {"ingredients": [{"name": "성분1", "purposes": ["용도1", "용도2"]}]}
             """;
 
     private final RestClient restClient;
@@ -109,6 +119,84 @@ public class OpenAiIngredientClient {
         } catch (Exception e) {
             log.warn("ChatGPT 전성분 응답 파싱 실패: productName={}, content={}", productName, content);
             return List.of();
+        }
+    }
+
+    /**
+     * 성분명 목록을 받아 각 성분의 배합목적(용도) 목록을 조회한다.
+     * 결과는 요청 순서를 보존한 Map(성분명 -> 배합목적 목록)으로 반환하며, 실패하거나
+     * 응답에 없는 성분은 결과에 포함되지 않는다.
+     */
+    public Map<String, List<String>> fetchIngredientPurposes(List<String> ingredientNames) {
+        if (apiKey == null || apiKey.isBlank() || ingredientNames == null || ingredientNames.isEmpty()) {
+            return Map.of();
+        }
+        try {
+            Map<String, Object> requestBody = Map.of(
+                    "model", model,
+                    "temperature", 0,
+                    "response_format", Map.of("type", "json_object"),
+                    "messages", List.of(
+                            Map.of("role", "system", "content", PURPOSE_SYSTEM_PROMPT),
+                            Map.of("role", "user", "content", "성분 목록: " + String.join(", ", ingredientNames))
+                    )
+            );
+
+            JsonNode response = restClient.post()
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
+                    .headers(headers -> {
+                        if (organizationId != null && !organizationId.isBlank()) {
+                            headers.set("OpenAI-Organization", organizationId);
+                        }
+                    })
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(requestBody)
+                    .retrieve()
+                    .body(JsonNode.class);
+
+            return parsePurposes(response, ingredientNames);
+        } catch (RestClientException e) {
+            log.warn("ChatGPT 배합목적 조회 실패: ingredientNames={}, message={}", ingredientNames, e.getMessage());
+            return Map.of();
+        }
+    }
+
+    private Map<String, List<String>> parsePurposes(JsonNode response, List<String> ingredientNames) {
+        if (response == null) {
+            return Map.of();
+        }
+        String content = response.path("choices").path(0).path("message").path("content").asText(null);
+        if (content == null || content.isBlank()) {
+            return Map.of();
+        }
+        try {
+            JsonNode parsed = objectMapper.readTree(content);
+            JsonNode ingredientsNode = parsed.path("ingredients");
+            if (!ingredientsNode.isArray()) {
+                return Map.of();
+            }
+            Map<String, List<String>> result = new LinkedHashMap<>();
+            ingredientsNode.forEach(node -> {
+                String name = node.path("name").asText(null);
+                if (name == null || name.isBlank()) {
+                    return;
+                }
+                List<String> purposes = new ArrayList<>();
+                JsonNode purposesNode = node.path("purposes");
+                if (purposesNode.isArray()) {
+                    purposesNode.forEach(purposeNode -> {
+                        String value = purposeNode.asText(null);
+                        if (value != null && !value.isBlank()) {
+                            purposes.add(value.trim());
+                        }
+                    });
+                }
+                result.put(name.trim(), purposes);
+            });
+            return result;
+        } catch (Exception e) {
+            log.warn("ChatGPT 배합목적 응답 파싱 실패: ingredientNames={}, content={}", ingredientNames, content);
+            return Map.of();
         }
     }
 }

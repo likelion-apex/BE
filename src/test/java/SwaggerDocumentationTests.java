@@ -22,7 +22,7 @@ class SwaggerDocumentationTests {
 	void documentsEveryProductionApiWithExpectedSecurityAndResponses() throws Exception {
 		mockMvc.perform(get("/v3/api-docs"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.paths.length()").value(10))
+			.andExpect(jsonPath("$.paths.length()").value(17))
 			.andExpect(jsonPath("$.paths['/api/auth/kakao/login'].post.summary").value("카카오 로그인/회원가입"))
 			.andExpect(jsonPath("$.paths['/api/auth/kakao/login'].post.security").doesNotExist())
 			.andExpect(jsonPath("$.paths['/api/auth/reissue'].post.responses['401']").exists())
@@ -39,7 +39,17 @@ class SwaggerDocumentationTests {
 			.andExpect(jsonPath("$.paths['/api/v1/beauty-routines/analyze'].post.security[0].bearerAuth").isArray())
 			.andExpect(jsonPath("$.paths['/api/v1/beauty-routines/analyze'].post.responses['503']").exists())
 			.andExpect(jsonPath("$.components.schemas.AnalyzeBeautyRoutineRequest.properties.youtubeUrl.example")
-				.value("https://www.youtube.com/shorts/-PC1SkLxtvo"));
+				.value("https://www.youtube.com/shorts/-PC1SkLxtvo"))
+			.andExpect(jsonPath("$.paths['/api/v1/products/search'].get.summary").value("화장품 검색"))
+			.andExpect(jsonPath("$.paths['/api/v1/products/search'].get.security[0].bearerAuth").isArray())
+			.andExpect(jsonPath("$.paths['/api/v1/inventory'].get.summary").value("인벤토리 전체 조회"))
+			.andExpect(jsonPath("$.paths['/api/v1/inventory'].post.summary").value("인벤토리 추가"))
+			.andExpect(jsonPath("$.paths['/api/v1/inventory'].post.security[0].bearerAuth").isArray())
+			.andExpect(jsonPath("$.paths['/api/v1/inventory/favorites'].get.summary").value("즐겨찾는 화장품 노출"))
+			.andExpect(jsonPath("$.paths['/api/v1/inventory/{inventoryId}'].delete.summary").value("인벤토리 삭제"))
+			.andExpect(jsonPath("$.paths['/api/v1/inventory/{inventoryId}/favorite'].patch.summary").value("즐겨찾기 등록/해제"))
+			.andExpect(jsonPath("$.paths['/api/v1/inventory/{inventoryId}/ai-analysis'].get.security[0].bearerAuth").isArray())
+			.andExpect(jsonPath("$.paths['/api/v1/inventory/{inventoryId}/ingredients'].get.summary").value("성분 분석"));
 	}
 
 	@Test

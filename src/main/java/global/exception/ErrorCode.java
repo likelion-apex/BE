@@ -33,7 +33,12 @@ public enum ErrorCode {
     BEAUTY_INVALID_YOUTUBE_URL(HttpStatus.BAD_REQUEST, "BEAUTY-001", "유효한 YouTube URL이 아닙니다."),
     BEAUTY_GEMINI_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "BEAUTY-002", "Gemini 서비스를 일시적으로 사용할 수 없습니다."),
     BEAUTY_INVALID_GEMINI_RESPONSE(HttpStatus.BAD_GATEWAY, "BEAUTY-003", "Gemini 분석 응답을 처리할 수 없습니다."),
-    BEAUTY_MISSING_GEMINI_CONFIGURATION(HttpStatus.SERVICE_UNAVAILABLE, "BEAUTY-004", "Gemini 서버 설정이 필요합니다.");
+    BEAUTY_MISSING_GEMINI_CONFIGURATION(HttpStatus.SERVICE_UNAVAILABLE, "BEAUTY-004", "Gemini 서버 설정이 필요합니다."),
+
+    // 인벤토리
+    PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "INVENTORY-001", "화장품 정보를 찾을 수 없습니다."),
+    INVENTORY_NOT_FOUND(HttpStatus.NOT_FOUND, "INVENTORY-002", "인벤토리 항목을 찾을 수 없습니다."),
+    AI_ANALYSIS_FAILED(HttpStatus.BAD_GATEWAY, "INVENTORY-003", "AI 분석에 실패했습니다. 잠시 후 다시 시도해주세요.");
 
     // 각자 도메인 에러는 여기 이어서 추가 ~
 
