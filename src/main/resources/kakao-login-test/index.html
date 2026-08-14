@@ -351,6 +351,36 @@
       color: #56616b;
     }
 
+    .analysis-feedback {
+      display: none;
+      margin: 0;
+      padding: 11px 12px;
+      border: 1px solid #b9e9f8;
+      border-radius: 10px;
+      background: #eefaff;
+      color: #16617a;
+      font-size: 0.78rem;
+      font-weight: 700;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+
+    .analysis-feedback.visible {
+      display: block;
+    }
+
+    .analysis-feedback.error {
+      border-color: #ffc9c9;
+      background: #fff2f2;
+      color: #b42318;
+    }
+
+    .analysis-feedback.success {
+      border-color: #a7e8c2;
+      background: #effcf4;
+      color: #167244;
+    }
+
     .profile-panel,
     .progress-panel,
     .briefing-card,
@@ -838,6 +868,7 @@
                    value="https://www.youtube.com/shorts/t1S24pgO2XQ">
             <p class="routine-muted">최대 5분 이하의 공개 영상만 분석할 수 있습니다.</p>
             <button id="analysis-button" class="routine-button" type="submit">AI 전체 루틴 분석 요청하기</button>
+            <p id="analysis-feedback" class="analysis-feedback" role="status" aria-live="polite"></p>
           </form>
 
           <section id="progress-panel" class="progress-panel" hidden>
@@ -901,6 +932,7 @@
     const statusBox = document.querySelector('#status');
     const resultSection = document.querySelector('#result');
     const analysisLab = document.querySelector('#analysis-lab');
+    const analysisFeedback = document.querySelector('#analysis-feedback');
     const debugBox = document.querySelector('#analysis-debug');
     const progressPanel = document.querySelector('#progress-panel');
     const routineResult = document.querySelector('#routine-result');
@@ -936,6 +968,13 @@
     const clearStatus = () => {
       statusBox.textContent = '';
       statusBox.className = 'status';
+    };
+
+    const setAnalysisFeedback = (message, type = 'info') => {
+      analysisFeedback.textContent = message || '';
+      analysisFeedback.className = message
+        ? `analysis-feedback visible ${type}`
+        : 'analysis-feedback';
     };
 
     const createState = () => {
@@ -1167,20 +1206,29 @@
         }
         if (['FAILED', 'CANCELLED'].includes(payload.data.status)) {
           stopPolling();
-          setStatus(payload.data.errorMessage || payload.data.message, payload.data.status === 'FAILED' ? 'error' : 'info');
+          setAnalysisFeedback(
+            payload.data.errorMessage || payload.data.message,
+            payload.data.status === 'FAILED' ? 'error' : 'info'
+          );
           return;
         }
         pollTimer = window.setTimeout(pollStatus, 1500);
       } catch (error) {
         stopPolling();
-        setStatus(`분석 상태 조회에 실패했습니다. 같은 분석 ID로 다시 조회할 수 있습니다.\n${error.message}`, 'error');
+        setAnalysisFeedback(
+          `분석 상태 조회에 실패했습니다. 같은 분석 ID로 다시 조회할 수 있습니다.\n${error.message}`,
+          'error'
+        );
       }
     };
 
     document.querySelector('#analysis-form').addEventListener('submit', async (event) => {
       event.preventDefault();
       const button = document.querySelector('#analysis-button');
+      const idleButtonText = button.textContent;
       button.disabled = true;
+      button.textContent = '분석 요청 중…';
+      setAnalysisFeedback('서버에 분석 요청을 전송하고 있습니다. 잠시만 기다려 주세요.');
       stopPolling();
       routineResult.classList.remove('visible');
       optimizationReport.classList.remove('visible');
@@ -1193,6 +1241,7 @@
         currentAnalysisId = payload.data.analysisId;
         progressPanel.hidden = false;
         renderProgress(payload.data);
+        setAnalysisFeedback(`분석 요청이 접수되었습니다. 분석 ID #${currentAnalysisId}`, 'success');
         showDebug(`분석 생성 · #${currentAnalysisId}`, payload);
         if (payload.data.status === 'COMPLETED') {
           await loadAnalysisDetail(currentAnalysisId);
@@ -1200,9 +1249,15 @@
           pollStatus();
         }
       } catch (error) {
-        setStatus(`루틴 분석 요청에 실패했습니다.\n${error.message}`, 'error');
+        progressPanel.hidden = true;
+        const message = error.message.includes('YOUTUBE_API_KEY')
+          ? '서버 설정이 완료되지 않아 분석을 시작할 수 없습니다.\n서버 관리자에게 YOUTUBE_API_KEY 등록을 요청해 주세요.'
+          : `루틴 분석 요청에 실패했습니다.\n${error.message}`;
+        setAnalysisFeedback(message, 'error');
+        showDebug('분석 요청 실패', { error: error.message });
       } finally {
         button.disabled = false;
+        button.textContent = idleButtonText;
       }
     });
 
@@ -1212,9 +1267,10 @@
         const payload = await apiFetch(`/api/shortform-analyses/${currentAnalysisId}/cancel`, { method: 'POST' });
         stopPolling();
         renderProgress(payload.data);
+        setAnalysisFeedback(payload.data.message || '분석 요청을 취소했습니다.');
         showDebug(`분석 취소 · #${currentAnalysisId}`, payload);
       } catch (error) {
-        setStatus(`분석 취소에 실패했습니다.\n${error.message}`, 'error');
+        setAnalysisFeedback(`분석 취소에 실패했습니다.\n${error.message}`, 'error');
       }
     });
 
@@ -1265,11 +1321,12 @@
         renderBriefing(payload.data.result);
         renderSteps(payload.data.result.steps);
         routineResult.classList.add('visible');
+        setAnalysisFeedback('전체 스킨케어 루틴 분석이 완료되었습니다.', 'success');
         showDebug(`분석 결과 · #${analysisId}`, payload);
         routineResult.scrollIntoView({ behavior: 'smooth', block: 'start' });
         await loadRecentAnalyses();
       } catch (error) {
-        setStatus(`분석 결과 조회에 실패했습니다.\n${error.message}`, 'error');
+        setAnalysisFeedback(`분석 결과 조회에 실패했습니다.\n${error.message}`, 'error');
       }
     };
 

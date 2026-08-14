@@ -71,6 +71,9 @@ class SwaggerDocumentationTests {
 			.andExpect(content().string(not(containsString("id=\"backend-url\""))))
 			.andExpect(content().string(containsString("AI 전체 스킨케어 루틴 분석")))
 			.andExpect(content().string(containsString("https://www.youtube.com/shorts/t1S24pgO2XQ")))
+			.andExpect(content().string(containsString("id=\"analysis-feedback\"")))
+			.andExpect(content().string(containsString("분석 요청 중…")))
+			.andExpect(content().string(containsString("YOUTUBE_API_KEY 등록을 요청해 주세요")))
 			.andExpect(content().string(containsString("data-save-type=\"TODAY\"")));
 	}
 }
