@@ -9,6 +9,8 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
 
     List<Inventory> findAllByMemberIdOrderByCreatedAtDesc(Long memberId);
 
+    List<Inventory> findAllByMemberIdAndOwnTypeOrderByCreatedAtDesc(Long memberId, OwnType ownType);
+
     List<Inventory> findAllByMemberIdAndFavoriteTrueOrderByCreatedAtDesc(Long memberId, Pageable pageable);
 
     long countByMemberIdAndFavoriteTrue(Long memberId);

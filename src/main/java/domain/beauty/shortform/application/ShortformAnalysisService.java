@@ -1,0 +1,164 @@
+package domain.beauty.shortform.application;
+
+import domain.beauty.domain.NormalizedYouTubeVideo;
+import domain.beauty.shortform.api.ShortformAnalysisResponses.Applied;
+import domain.beauty.shortform.api.ShortformAnalysisResponses.Created;
+import domain.beauty.shortform.api.ShortformAnalysisResponses.Detail;
+import domain.beauty.shortform.api.ShortformAnalysisResponses.History;
+import domain.beauty.shortform.api.ShortformAnalysisResponses.HistoryItem;
+import domain.beauty.shortform.api.ShortformAnalysisResponses.Optimization;
+import domain.beauty.shortform.api.ShortformAnalysisResponses.ProductDetail;
+import domain.beauty.shortform.api.ShortformAnalysisResponses.Status;
+import domain.beauty.shortform.application.ShortformAnalysisStateService.AnalysisProfile;
+import domain.beauty.shortform.application.ShortformAnalysisStateService.CreateResult;
+import domain.beauty.shortform.client.YouTubeMetadataClient;
+import domain.beauty.shortform.domain.RoutineOptimizationSnapshot;
+import domain.beauty.shortform.domain.RoutineSaveType;
+import domain.beauty.shortform.domain.ShortformAnalysis;
+import domain.beauty.shortform.domain.ShortformAnalysisSnapshot;
+import domain.beauty.shortform.domain.ShortformAnalysisStatus;
+import domain.beauty.support.YouTubeUrlNormalizer;
+import domain.routine.RoutineCreationService;
+import domain.routine.RoutineCreationService.RoutineApplyResult;
+import global.exception.CustomException;
+import global.exception.ErrorCode;
+import java.util.List;
+import org.springframework.stereotype.Service;
+
+@Service
+public class ShortformAnalysisService {
+
+    private final YouTubeUrlNormalizer urlNormalizer;
+    private final YouTubeMetadataClient youtubeMetadataClient;
+    private final ShortformAnalysisStateService stateService;
+    private final AnalysisFingerprint fingerprint;
+    private final ShortformAnalysisJsonMapper jsonMapper;
+    private final RoutineCreationService routineCreationService;
+
+    public ShortformAnalysisService(
+            YouTubeUrlNormalizer urlNormalizer,
+            YouTubeMetadataClient youtubeMetadataClient,
+            ShortformAnalysisStateService stateService,
+            AnalysisFingerprint fingerprint,
+            ShortformAnalysisJsonMapper jsonMapper,
+            RoutineCreationService routineCreationService
+    ) {
+        this.urlNormalizer = urlNormalizer;
+        this.youtubeMetadataClient = youtubeMetadataClient;
+        this.stateService = stateService;
+        this.fingerprint = fingerprint;
+        this.jsonMapper = jsonMapper;
+        this.routineCreationService = routineCreationService;
+    }
+
+    public Created create(Long memberId, String videoUrl) {
+        NormalizedYouTubeVideo video = urlNormalizer.normalize(videoUrl);
+        youtubeMetadataClient.validate(video.videoId());
+        AnalysisProfile profile = stateService.loadProfile(memberId);
+        String analysisFingerprint = fingerprint.create(video.videoId(), profile);
+        CreateResult result = stateService.createOrReuse(
+                memberId, video.videoId(), video.watchUrl(), analysisFingerprint);
+        ShortformAnalysis analysis = result.analysis();
+        return new Created(
+                analysis.getId(), analysis.getStatus(), analysis.getProgress(), !result.created());
+    }
+
+    public Status status(Long memberId, Long analysisId) {
+        return toStatus(stateService.getOwned(memberId, analysisId));
+    }
+
+    public Status cancel(Long memberId, Long analysisId) {
+        return toStatus(stateService.cancel(memberId, analysisId));
+    }
+
+    public History recent(Long memberId) {
+        List<HistoryItem> items = stateService.recent(memberId).stream()
+                .map(this::toHistoryItem)
+                .toList();
+        return new History(items);
+    }
+
+    public Detail detail(Long memberId, Long analysisId) {
+        ShortformAnalysis analysis = stateService.getOwned(memberId, analysisId);
+        stateService.requireCompleted(analysis);
+        return new Detail(
+                analysis.getId(),
+                analysis.getStatus(),
+                analysis.getCreatedAt(),
+                analysis.getCompletedAt(),
+                readAnalysis(analysis)
+        );
+    }
+
+    public ProductDetail productDetail(Long memberId, Long analysisId, Long resultId) {
+        ShortformAnalysisSnapshot snapshot = detail(memberId, analysisId).result();
+        ShortformAnalysisSnapshot.StepResult result = snapshot.steps().stream()
+                .filter(step -> step.resultId() == resultId)
+                .findFirst()
+                .orElseThrow(() -> new CustomException(ErrorCode.SHORTFORM_ANALYSIS_NOT_FOUND));
+        return new ProductDetail(analysisId, result, snapshot.disclaimer());
+    }
+
+    public Optimization optimize(Long memberId, Long analysisId) {
+        ShortformAnalysis analysis = stateService.markOptimized(memberId, analysisId);
+        return new Optimization(
+                analysis.getId(),
+                analysis.getOptimizedAt(),
+                jsonMapper.read(analysis.getOptimizationJson(), RoutineOptimizationSnapshot.class)
+        );
+    }
+
+    public Applied apply(Long memberId, Long analysisId, RoutineSaveType saveType) {
+        ShortformAnalysis analysis = stateService.getOwned(memberId, analysisId);
+        stateService.requireCompleted(analysis);
+        if (analysis.getOptimizedAt() == null) {
+            throw new CustomException(ErrorCode.SHORTFORM_OPTIMIZATION_REQUIRED);
+        }
+        RoutineApplyResult result = routineCreationService.create(
+                memberId,
+                analysisId,
+                saveType,
+                readAnalysis(analysis),
+                jsonMapper.read(analysis.getOptimizationJson(), RoutineOptimizationSnapshot.class)
+        );
+        return new Applied(
+                analysisId,
+                result.routineId(),
+                result.saveType(),
+                result.status(),
+                result.reused()
+        );
+    }
+
+    private Status toStatus(ShortformAnalysis analysis) {
+        return new Status(
+                analysis.getId(),
+                analysis.getStatus(),
+                analysis.getProgress(),
+                analysis.getStatusMessage(),
+                analysis.getErrorCode(),
+                analysis.getErrorMessage(),
+                analysis.getUpdatedAt()
+        );
+    }
+
+    private HistoryItem toHistoryItem(ShortformAnalysis analysis) {
+        if (analysis.getStatus() != ShortformAnalysisStatus.COMPLETED || analysis.getResultJson() == null) {
+            return new HistoryItem(
+                    analysis.getId(), analysis.getStatus(), null, 0, null, analysis.getCreatedAt());
+        }
+        ShortformAnalysisSnapshot snapshot = readAnalysis(analysis);
+        return new HistoryItem(
+                analysis.getId(),
+                analysis.getStatus(),
+                snapshot.title(),
+                snapshot.steps().size(),
+                snapshot.overallScore(),
+                analysis.getCreatedAt()
+        );
+    }
+
+    private ShortformAnalysisSnapshot readAnalysis(ShortformAnalysis analysis) {
+        return jsonMapper.read(analysis.getResultJson(), ShortformAnalysisSnapshot.class);
+    }
+}

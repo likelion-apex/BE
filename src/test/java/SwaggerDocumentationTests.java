@@ -22,7 +22,7 @@ class SwaggerDocumentationTests {
 	void documentsEveryProductionApiWithExpectedSecurityAndResponses() throws Exception {
 		mockMvc.perform(get("/v3/api-docs"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.paths.length()").value(17))
+			.andExpect(jsonPath("$.paths.length()").value(24))
 			.andExpect(jsonPath("$.paths['/api/auth/kakao/login'].post.summary").value("카카오 로그인/회원가입"))
 			.andExpect(jsonPath("$.paths['/api/auth/kakao/login'].post.security").doesNotExist())
 			.andExpect(jsonPath("$.paths['/api/auth/reissue'].post.responses['401']").exists())
@@ -49,7 +49,14 @@ class SwaggerDocumentationTests {
 			.andExpect(jsonPath("$.paths['/api/v1/inventory/{inventoryId}'].delete.summary").value("인벤토리 삭제"))
 			.andExpect(jsonPath("$.paths['/api/v1/inventory/{inventoryId}/favorite'].patch.summary").value("즐겨찾기 등록/해제"))
 			.andExpect(jsonPath("$.paths['/api/v1/inventory/{inventoryId}/ai-analysis'].get.security[0].bearerAuth").isArray())
-			.andExpect(jsonPath("$.paths['/api/v1/inventory/{inventoryId}/ingredients'].get.summary").value("성분 분석"));
+			.andExpect(jsonPath("$.paths['/api/v1/inventory/{inventoryId}/ingredients'].get.summary").value("성분 분석"))
+			.andExpect(jsonPath("$.paths['/api/shortform-analyses'].post.summary").value("전체 스킨케어 루틴 분석 요청"))
+			.andExpect(jsonPath("$.paths['/api/shortform-analyses'].get.security[0].bearerAuth").isArray())
+			.andExpect(jsonPath("$.paths['/api/shortform-analyses/{analysisId}/status'].get.summary").value("루틴 분석 진행 상태 조회"))
+			.andExpect(jsonPath("$.paths['/api/shortform-analyses/{analysisId}/cancel'].post.summary").value("루틴 분석 취소"))
+			.andExpect(jsonPath("$.paths['/api/shortform-analyses/{analysisId}/results/{resultId}'].get.summary").value("루틴 단계별 제품 분석 상세 조회"))
+			.andExpect(jsonPath("$.paths['/api/shortform-analyses/{analysisId}/optimize'].post.summary").value("내 인벤토리 기반 루틴 최적화"))
+			.andExpect(jsonPath("$.paths['/api/shortform-analyses/{analysisId}/apply'].post.summary").value("분석한 루틴 적용 또는 보관"));
 	}
 
 	@Test
@@ -61,6 +68,9 @@ class SwaggerDocumentationTests {
 			.andExpect(content().string(not(containsString("__KAKAO_CLIENT_ID_BASE64__"))))
 			.andExpect(content().string(not(containsString("__KAKAO_REDIRECT_URI_BASE64__"))))
 			.andExpect(content().string(not(containsString("id=\"client-id\""))))
-			.andExpect(content().string(not(containsString("id=\"backend-url\""))));
+			.andExpect(content().string(not(containsString("id=\"backend-url\""))))
+			.andExpect(content().string(containsString("AI 전체 스킨케어 루틴 분석")))
+			.andExpect(content().string(containsString("https://www.youtube.com/shorts/t1S24pgO2XQ")))
+			.andExpect(content().string(containsString("data-save-type=\"TODAY\"")));
 	}
 }
