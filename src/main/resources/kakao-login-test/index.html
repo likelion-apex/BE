@@ -42,7 +42,7 @@
     }
 
     main {
-      width: min(860px, calc(100% - 32px));
+      width: min(1120px, calc(100% - 32px));
       margin: 0 auto;
       padding: 56px 0 72px;
     }
@@ -266,6 +266,437 @@
       color: var(--red);
     }
 
+    .analysis-lab {
+      display: none;
+    }
+
+    .analysis-lab.visible {
+      display: block;
+    }
+
+    .lab-grid {
+      display: grid;
+      grid-template-columns: minmax(360px, 430px) minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .phone-panel {
+      overflow: hidden;
+      border-radius: 28px;
+      background: #fff;
+      color: #171a1f;
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.4);
+    }
+
+    .phone-header {
+      padding: 22px 22px 14px;
+      border-bottom: 1px solid #e6e8ea;
+    }
+
+    .phone-header small {
+      color: #03c1fb;
+      font-weight: 800;
+    }
+
+    .phone-header h2 {
+      margin: 7px 0 3px;
+      font-size: 1.25rem;
+      letter-spacing: -0.025em;
+    }
+
+    .phone-header p,
+    .routine-muted {
+      margin: 0;
+      color: #56616b;
+      font-size: 0.82rem;
+    }
+
+    .phone-body {
+      display: grid;
+      gap: 18px;
+      padding: 20px;
+    }
+
+    .routine-form {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      border: 1px solid #ccd1d5;
+      border-radius: 16px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+    }
+
+    .routine-form input,
+    .routine-form select {
+      height: 44px;
+      padding: 0 12px;
+      border: 1px solid #ccd1d5;
+      border-radius: 9px;
+      background: #fff;
+      color: #171a1f;
+      font: inherit;
+    }
+
+    .routine-button {
+      min-height: 48px;
+      background: #03c1fb;
+      color: #fff;
+      border-radius: 8px;
+    }
+
+    .routine-button.ghost {
+      border: 1px solid #ccd1d5;
+      background: #fff;
+      color: #56616b;
+    }
+
+    .profile-panel,
+    .progress-panel,
+    .briefing-card,
+    .optimization-report {
+      padding: 16px;
+      border: 1px solid #ccd1d5;
+      border-radius: 18px;
+      background: #fff;
+      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.08);
+    }
+
+    .profile-panel h3,
+    .progress-panel h3,
+    .routine-result h3,
+    .optimization-report h3 {
+      margin: 0 0 10px;
+      font-size: 0.96rem;
+    }
+
+    .concern-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin: 10px 0;
+    }
+
+    .concern-grid label {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 9px;
+      border: 1px solid #ccd1d5;
+      border-radius: 999px;
+      color: #56616b;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .concern-grid input {
+      width: auto;
+      height: auto;
+    }
+
+    .progress-list {
+      display: grid;
+      gap: 10px;
+      margin: 12px 0;
+    }
+
+    .progress-step {
+      display: grid;
+      grid-template-columns: 22px 1fr;
+      gap: 9px;
+      align-items: start;
+      color: #8e99a4;
+      font-size: 0.78rem;
+    }
+
+    .progress-step::before {
+      content: '';
+      width: 14px;
+      height: 14px;
+      margin-top: 2px;
+      border: 2px solid #ccd1d5;
+      border-radius: 50%;
+    }
+
+    .progress-step.done,
+    .progress-step.active {
+      color: #03c1fb;
+      font-weight: 800;
+    }
+
+    .progress-step.done::before {
+      border-color: #03c1fb;
+      background: #03c1fb;
+      box-shadow: inset 0 0 0 3px #fff;
+    }
+
+    .progress-step.active::before {
+      border-color: #03c1fb;
+      animation: pulse 1s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      50% { box-shadow: 0 0 0 5px rgba(3, 193, 251, 0.15); }
+    }
+
+    .progress-track {
+      height: 5px;
+      overflow: hidden;
+      border-radius: 99px;
+      background: #e6e8ea;
+    }
+
+    .progress-track span {
+      display: block;
+      width: 0;
+      height: 100%;
+      background: #03c1fb;
+      transition: width 250ms ease;
+    }
+
+    .routine-result {
+      display: none;
+      gap: 16px;
+    }
+
+    .routine-result.visible {
+      display: grid;
+    }
+
+    .briefing-card {
+      display: grid;
+      gap: 12px;
+    }
+
+    .briefing-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .briefing-title strong {
+      color: #03c1fb;
+    }
+
+    .routine-tag {
+      padding: 4px 7px;
+      border-radius: 5px;
+      background: #03c1fb;
+      color: #fff;
+      font-size: 0.68rem;
+      font-weight: 800;
+    }
+
+    .score-box {
+      padding: 12px;
+      border-radius: 12px;
+      background: #e6f9ff;
+      color: #34373e;
+      font-size: 0.78rem;
+    }
+
+    .score-box strong {
+      display: block;
+      margin-bottom: 6px;
+      color: #03c1fb;
+      font-size: 0.9rem;
+    }
+
+    .briefing-facts {
+      display: grid;
+      gap: 7px;
+      padding-top: 10px;
+      border-top: 1px solid #ccd1d5;
+      font-size: 0.76rem;
+    }
+
+    .briefing-facts div {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .step-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .routine-step-card {
+      display: grid;
+      gap: 9px;
+      min-height: 230px;
+      padding: 12px;
+      border: 1px solid #ccd1d5;
+      border-radius: 10px;
+      background: #fff;
+      color: #171a1f;
+      text-align: left;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.07);
+    }
+
+    .step-heading {
+      display: flex;
+      gap: 7px;
+      align-items: center;
+      font-size: 0.78rem;
+      font-weight: 800;
+    }
+
+    .step-number {
+      display: inline-flex;
+      width: 20px;
+      height: 20px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: #03c1fb;
+      color: #fff;
+    }
+
+    .product-thumb {
+      width: 58px;
+      height: 58px;
+      margin: 0 auto;
+      border-radius: 9px;
+      background: #8e99a4;
+      object-fit: cover;
+    }
+
+    .step-product {
+      min-height: 40px;
+      font-size: 0.83rem;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .safety-box {
+      padding: 9px;
+      border-radius: 10px;
+      background: #f7f7f8;
+      color: #56616b;
+      font-size: 0.7rem;
+      line-height: 1.45;
+    }
+
+    .safety-box.safe { background: #e6fff3; }
+    .safety-box.caution { background: #fff9e6; }
+    .safety-box.warning { background: #fff5f5; color: #990000; }
+    .safety-box.unknown { background: #f7f7f8; }
+
+    .optimization-report {
+      display: none;
+    }
+
+    .optimization-report.visible {
+      display: block;
+    }
+
+    .metric-list {
+      display: grid;
+      gap: 7px;
+      margin: 12px 0;
+      font-size: 0.78rem;
+    }
+
+    .metric-list div {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .optimized-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .optimized-step {
+      padding: 11px;
+      border: 1px solid #03c1fb;
+      border-radius: 12px;
+      font-size: 0.75rem;
+    }
+
+    .optimized-step strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .debug-panel pre {
+      min-height: 280px;
+      max-height: 720px;
+      overflow: auto;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: #0c0f14;
+      color: #cbd9ff;
+      font: 0.76rem/1.55 "SFMono-Regular", Consolas, monospace;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .recent-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .recent-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px;
+      border: 1px solid #ccd1d5;
+      border-radius: 10px;
+      background: #fff;
+      color: #171a1f;
+      font-size: 0.74rem;
+      text-align: left;
+    }
+
+    .routine-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(20, 25, 31, 0.72);
+    }
+
+    .routine-modal.visible {
+      display: flex;
+    }
+
+    .modal-sheet {
+      width: min(430px, 100%);
+      max-height: 86vh;
+      overflow: auto;
+      padding: 20px;
+      border-radius: 22px 22px 14px 14px;
+      background: #fff;
+      color: #171a1f;
+    }
+
+    .modal-sheet h3 { margin-top: 0; }
+
+    .reason-card {
+      margin-top: 9px;
+      padding: 12px;
+      border-radius: 12px;
+      background: #e6f9ff;
+      font-size: 0.78rem;
+    }
+
+    .ingredient-list {
+      padding-left: 18px;
+      color: #56616b;
+      font-size: 0.76rem;
+    }
+
     @media (max-width: 640px) {
       main {
         padding-top: 34px;
@@ -283,6 +714,14 @@
       .actions > *,
       .token-actions > * {
         width: 100%;
+      }
+
+      .lab-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .phone-panel {
+        border-radius: 20px;
       }
     }
   </style>
@@ -357,7 +796,100 @@
       </div>
     </div>
   </section>
+
+  <section id="analysis-lab" class="analysis-lab" aria-labelledby="analysis-lab-title">
+    <p class="eyebrow" style="margin-top: 40px; color: #03c1fb;">Figma flow · backend test</p>
+    <h2 id="analysis-lab-title">AI 전체 스킨케어 루틴 분석</h2>
+    <p class="lead">핵심 제품 분석은 제외하고, 전체 루틴 분석부터 저장까지 검증합니다.</p>
+
+    <div class="lab-grid">
+      <div class="phone-panel">
+        <header class="phone-header">
+          <small>AI 루틴 분석</small>
+          <h2>영상 속 스킨케어 루틴,<br>내 피부에도 잘 맞을까요?</h2>
+          <p>YouTube 링크로 전체 루틴을 분석해 보세요.</p>
+        </header>
+
+        <div class="phone-body">
+          <section class="profile-panel">
+            <h3>테스트용 피부 프로필</h3>
+            <div class="routine-form">
+              <select id="skin-type" aria-label="피부 타입">
+                <option value="수부지">수부지</option>
+                <option value="건성">건성</option>
+                <option value="중성">중성</option>
+                <option value="지성">지성</option>
+                <option value="복합성">복합성</option>
+              </select>
+              <div class="concern-grid" id="skin-concerns">
+                <label><input type="checkbox" value="속건조" checked>속건조</label>
+                <label><input type="checkbox" value="민감성" checked>민감성</label>
+                <label><input type="checkbox" value="여드름">여드름</label>
+                <label><input type="checkbox" value="홍조">홍조</label>
+                <label><input type="checkbox" value="색소·블랙헤드">색소·블랙헤드</label>
+              </div>
+              <button id="save-profile-button" class="routine-button ghost" type="button">피부 프로필 저장</button>
+            </div>
+          </section>
+
+          <form id="analysis-form" class="routine-form">
+            <label for="video-url">YouTube 영상 URL</label>
+            <input id="video-url" type="url" required maxlength="2048"
+                   value="https://www.youtube.com/shorts/t1S24pgO2XQ">
+            <p class="routine-muted">최대 5분 이하의 공개 영상만 분석할 수 있습니다.</p>
+            <button id="analysis-button" class="routine-button" type="submit">AI 전체 루틴 분석 요청하기</button>
+          </form>
+
+          <section id="progress-panel" class="progress-panel" hidden>
+            <h3>영상 속 루틴이 나에게 적합한지 검토 중…</h3>
+            <div class="progress-track"><span id="progress-bar"></span></div>
+            <div class="progress-list">
+              <div class="progress-step" data-phase="EXTRACTING_VIDEO">영상 속 핵심 제품 및 단계 추출</div>
+              <div class="progress-step" data-phase="MATCHING_PRODUCTS">제품 카탈로그 연결</div>
+              <div class="progress-step" data-phase="PERSONALIZING">피부 타입 맞춤 분석</div>
+              <div class="progress-step" data-phase="OPTIMIZING">인벤토리 제품과 성분 궁합 확인</div>
+            </div>
+            <p id="progress-message" class="routine-muted">분석 요청을 준비하고 있습니다.</p>
+            <button id="cancel-analysis-button" class="routine-button ghost" type="button">분석 취소하기</button>
+          </section>
+
+          <section id="routine-result" class="routine-result">
+            <div id="briefing-card" class="briefing-card"></div>
+            <div>
+              <h3>영상 속 루틴 단계별 분석</h3>
+              <div id="step-grid" class="step-grid"></div>
+            </div>
+            <button id="optimize-button" class="routine-button" type="button">인벤토리 제품과 성분 궁합 확인하기</button>
+            <div id="optimization-report" class="optimization-report"></div>
+            <div id="apply-actions" class="routine-form" hidden>
+              <strong>이 루틴을 어떻게 저장할까요?</strong>
+              <button class="routine-button" type="button" data-save-type="TODAY">이 루틴으로 오늘 시작하기</button>
+              <button class="routine-button ghost" type="button" data-save-type="LIBRARY">나의 루틴 보관함에 저장</button>
+            </div>
+          </section>
+
+          <section>
+            <h3 style="margin-bottom: 8px;">최근 분석한 루틴</h3>
+            <div id="recent-list" class="recent-list"><p class="routine-muted">로그인 후 조회합니다.</p></div>
+          </section>
+        </div>
+      </div>
+
+      <aside class="card debug-panel" style="margin-top: 0;">
+        <h2>API 디버그</h2>
+        <p class="hint">분석 ID, 모델, 토큰, 원시 응답을 확인할 수 있습니다. 비밀키와 JWT는 출력하지 않습니다.</p>
+        <pre id="analysis-debug">로그인 후 분석을 시작해 주세요.</pre>
+      </aside>
+    </div>
+  </section>
 </main>
+
+<div id="routine-modal" class="routine-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="modal-sheet">
+    <button id="modal-close" class="routine-button ghost" type="button" style="float:right; min-height:36px;">닫기</button>
+    <div id="modal-content"></div>
+  </div>
+</div>
 
 <script>
   (() => {
@@ -368,6 +900,14 @@
     const loginButton = document.querySelector('#login-button');
     const statusBox = document.querySelector('#status');
     const resultSection = document.querySelector('#result');
+    const analysisLab = document.querySelector('#analysis-lab');
+    const debugBox = document.querySelector('#analysis-debug');
+    const progressPanel = document.querySelector('#progress-panel');
+    const routineResult = document.querySelector('#routine-result');
+    const optimizationReport = document.querySelector('#optimization-report');
+    let accessToken = '';
+    let currentAnalysisId = null;
+    let pollTimer = null;
 
     const decodeServerConfig = (name) => {
       const encoded = document.querySelector(`meta[name="${name}"]`)?.content || '';
@@ -454,7 +994,11 @@
       document.querySelector('#expires-in').textContent = formatDuration(tokenData.accessTokenExpiresIn);
       document.querySelector('#access-token').value = tokenData.accessToken || '';
       document.querySelector('#refresh-token').value = tokenData.refreshToken || '';
+      accessToken = tokenData.accessToken || '';
       resultSection.classList.add('visible');
+      analysisLab.classList.add('visible');
+      hydrateProfile();
+      loadRecentAnalyses();
       resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
@@ -511,6 +1055,339 @@
           setStatus('Bearer 헤더 자동 복사에 실패했습니다.', 'error');
         }
       });
+    });
+
+    const escapeHtml = (value) => String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+
+    const safeImageUrl = (value) => {
+      if (!value) return '';
+      try {
+        const parsed = new URL(value);
+        return ['http:', 'https:'].includes(parsed.protocol) ? parsed.toString() : '';
+      } catch (error) {
+        return '';
+      }
+    };
+
+    const showDebug = (label, payload) => {
+      debugBox.textContent = `${label}\n\n${JSON.stringify(payload, null, 2)}`;
+    };
+
+    const apiFetch = async (path, options = {}) => {
+      if (!accessToken) {
+        throw new Error('먼저 카카오 로그인을 완료해 주세요.');
+      }
+      const response = await fetch(`${backendUrl}${path}`, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+          ...(options.headers || {})
+        }
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.message || `HTTP ${response.status}`);
+      }
+      return payload;
+    };
+
+    const hydrateProfile = async () => {
+      try {
+        const payload = await apiFetch('/api/members/me');
+        const profile = payload.data || {};
+        if (profile.skinType) {
+          document.querySelector('#skin-type').value = profile.skinType;
+        }
+        const concerns = new Set(profile.skinConcerns || []);
+        document.querySelectorAll('#skin-concerns input').forEach((input) => {
+          input.checked = concerns.has(input.value);
+        });
+      } catch (error) {
+        setStatus(`피부 프로필 조회에 실패했습니다.\n${error.message}`, 'error');
+      }
+    };
+
+    document.querySelector('#save-profile-button').addEventListener('click', async (event) => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      try {
+        const skinType = document.querySelector('#skin-type').value;
+        const skinConcerns = Array.from(document.querySelectorAll('#skin-concerns input:checked'))
+          .map((input) => input.value);
+        await apiFetch('/api/members/me/skin-type', {
+          method: 'PATCH', body: JSON.stringify({ skinType })
+        });
+        const payload = await apiFetch('/api/members/me/skin-concerns', {
+          method: 'PATCH', body: JSON.stringify({ skinConcerns })
+        });
+        showDebug('피부 프로필 저장 응답', payload);
+        setStatus('AI 루틴 분석에 사용할 피부 프로필을 저장했습니다.');
+      } catch (error) {
+        setStatus(`피부 프로필 저장에 실패했습니다.\n${error.message}`, 'error');
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    const phaseOrder = ['EXTRACTING_VIDEO', 'MATCHING_PRODUCTS', 'PERSONALIZING', 'OPTIMIZING'];
+
+    const renderProgress = (status) => {
+      document.querySelector('#progress-bar').style.width = `${status.progress || 0}%`;
+      document.querySelector('#progress-message').textContent = status.errorMessage || status.message || '';
+      const activeIndex = phaseOrder.indexOf(status.status);
+      document.querySelectorAll('.progress-step').forEach((element, index) => {
+        element.classList.toggle('done', status.status === 'COMPLETED' || index < activeIndex);
+        element.classList.toggle('active', index === Math.max(activeIndex, 0) && !['COMPLETED', 'FAILED', 'CANCELLED'].includes(status.status));
+      });
+    };
+
+    const stopPolling = () => {
+      if (pollTimer) {
+        window.clearTimeout(pollTimer);
+        pollTimer = null;
+      }
+    };
+
+    const pollStatus = async () => {
+      if (!currentAnalysisId) return;
+      try {
+        const payload = await apiFetch(`/api/shortform-analyses/${currentAnalysisId}/status`);
+        showDebug(`분석 상태 · #${currentAnalysisId}`, payload);
+        renderProgress(payload.data);
+        if (payload.data.status === 'COMPLETED') {
+          stopPolling();
+          await loadAnalysisDetail(currentAnalysisId);
+          return;
+        }
+        if (['FAILED', 'CANCELLED'].includes(payload.data.status)) {
+          stopPolling();
+          setStatus(payload.data.errorMessage || payload.data.message, payload.data.status === 'FAILED' ? 'error' : 'info');
+          return;
+        }
+        pollTimer = window.setTimeout(pollStatus, 1500);
+      } catch (error) {
+        stopPolling();
+        setStatus(`분석 상태 조회에 실패했습니다. 같은 분석 ID로 다시 조회할 수 있습니다.\n${error.message}`, 'error');
+      }
+    };
+
+    document.querySelector('#analysis-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const button = document.querySelector('#analysis-button');
+      button.disabled = true;
+      stopPolling();
+      routineResult.classList.remove('visible');
+      optimizationReport.classList.remove('visible');
+      document.querySelector('#apply-actions').hidden = true;
+      try {
+        const videoUrl = document.querySelector('#video-url').value.trim();
+        const payload = await apiFetch('/api/shortform-analyses', {
+          method: 'POST', body: JSON.stringify({ videoUrl })
+        });
+        currentAnalysisId = payload.data.analysisId;
+        progressPanel.hidden = false;
+        renderProgress(payload.data);
+        showDebug(`분석 생성 · #${currentAnalysisId}`, payload);
+        if (payload.data.status === 'COMPLETED') {
+          await loadAnalysisDetail(currentAnalysisId);
+        } else {
+          pollStatus();
+        }
+      } catch (error) {
+        setStatus(`루틴 분석 요청에 실패했습니다.\n${error.message}`, 'error');
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    document.querySelector('#cancel-analysis-button').addEventListener('click', async () => {
+      if (!currentAnalysisId) return;
+      try {
+        const payload = await apiFetch(`/api/shortform-analyses/${currentAnalysisId}/cancel`, { method: 'POST' });
+        stopPolling();
+        renderProgress(payload.data);
+        showDebug(`분석 취소 · #${currentAnalysisId}`, payload);
+      } catch (error) {
+        setStatus(`분석 취소에 실패했습니다.\n${error.message}`, 'error');
+      }
+    });
+
+    const renderBriefing = (result) => {
+      const highlights = (result.highlights || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('');
+      document.querySelector('#briefing-card').innerHTML = `
+        <div class="briefing-title">
+          <strong>${escapeHtml(result.title)}</strong>
+          <span class="routine-tag">${escapeHtml(result.tag)}</span>
+        </div>
+        <div class="score-box">
+          <strong>AI 매칭 점수 ${escapeHtml(result.overallScore)}점</strong>
+          <ul style="margin:0; padding-left:18px;">${highlights}</ul>
+        </div>
+        <div class="briefing-facts">
+          <div><span>루틴 핵심 목표</span><strong>${escapeHtml(result.coreGoal)}</strong></div>
+          <div><span>시너지 성분 조합</span><strong style="color:#03c1fb;">${escapeHtml(result.synergyCombo)}</strong></div>
+        </div>
+        <p class="routine-muted">${escapeHtml(result.summary)}</p>
+      `;
+    };
+
+    const renderSteps = (steps) => {
+      document.querySelector('#step-grid').innerHTML = (steps || []).map((step) => {
+        const image = safeImageUrl(step.imageUrl);
+        const imageMarkup = image
+          ? `<img class="product-thumb" src="${escapeHtml(image)}" alt="">`
+          : '<div class="product-thumb"></div>';
+        return `
+          <button class="routine-step-card" type="button" data-result-id="${escapeHtml(step.resultId)}">
+            <span class="step-heading"><span class="step-number">${escapeHtml(step.order)}</span>${escapeHtml(step.category)}</span>
+            ${imageMarkup}
+            <span class="step-product">${escapeHtml(step.productName)}</span>
+            <span class="routine-muted">${escapeHtml(step.matchSummary)}</span>
+            <span class="safety-box ${String(step.safetyLevel || 'UNKNOWN').toLowerCase()}">
+              <strong>${escapeHtml(step.safetyTitle)}</strong><br>${escapeHtml(step.safetySummary)}
+            </span>
+          </button>
+        `;
+      }).join('');
+    };
+
+    const loadAnalysisDetail = async (analysisId) => {
+      try {
+        const payload = await apiFetch(`/api/shortform-analyses/${analysisId}`);
+        currentAnalysisId = analysisId;
+        progressPanel.hidden = true;
+        renderBriefing(payload.data.result);
+        renderSteps(payload.data.result.steps);
+        routineResult.classList.add('visible');
+        showDebug(`분석 결과 · #${analysisId}`, payload);
+        routineResult.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        await loadRecentAnalyses();
+      } catch (error) {
+        setStatus(`분석 결과 조회에 실패했습니다.\n${error.message}`, 'error');
+      }
+    };
+
+    document.querySelector('#step-grid').addEventListener('click', async (event) => {
+      const card = event.target.closest('[data-result-id]');
+      if (!card || !currentAnalysisId) return;
+      try {
+        const payload = await apiFetch(`/api/shortform-analyses/${currentAnalysisId}/results/${card.dataset.resultId}`);
+        const result = payload.data.result;
+        const reasons = (result.reasons || []).map((reason) => `
+          <div class="reason-card"><strong>${escapeHtml(reason.title)}</strong><br>${escapeHtml(reason.description)}</div>
+        `).join('');
+        const ingredients = (result.ingredients || []).map((ingredient) => `
+          <li><strong>${escapeHtml(ingredient.name)}</strong> · ${escapeHtml((ingredient.purposes || []).join(', ') || '용도 미확인')}<br>
+          <small>${escapeHtml(ingredient.source)}${ingredient.regulationSummary ? ` · ${escapeHtml(ingredient.regulationSummary)}` : ''}</small></li>
+        `).join('');
+        document.querySelector('#modal-content').innerHTML = `
+          <h3 id="modal-title">${escapeHtml(result.productName)}</h3>
+          <p><strong>AI 매칭 점수 ${escapeHtml(result.matchScore)}점</strong></p>
+          ${reasons}
+          <h4>대표 성분 · 추정 ${escapeHtml(result.estimatedIngredientCount)}개</h4>
+          <ul class="ingredient-list">${ingredients || '<li>확인 가능한 성분 정보가 없습니다.</li>'}</ul>
+          <p class="routine-muted">${escapeHtml(payload.data.disclaimer)}</p>
+        `;
+        document.querySelector('#routine-modal').classList.add('visible');
+        showDebug(`제품 상세 · #${card.dataset.resultId}`, payload);
+      } catch (error) {
+        setStatus(`제품 상세 조회에 실패했습니다.\n${error.message}`, 'error');
+      }
+    });
+
+    document.querySelector('#modal-close').addEventListener('click', () => {
+      document.querySelector('#routine-modal').classList.remove('visible');
+    });
+
+    document.querySelector('#routine-modal').addEventListener('click', (event) => {
+      if (event.target.id === 'routine-modal') {
+        event.currentTarget.classList.remove('visible');
+      }
+    });
+
+    document.querySelector('#optimize-button').addEventListener('click', async (event) => {
+      if (!currentAnalysisId) return;
+      const button = event.currentTarget;
+      button.disabled = true;
+      try {
+        const payload = await apiFetch(`/api/shortform-analyses/${currentAnalysisId}/optimize`, { method: 'POST' });
+        const result = payload.data.result;
+        const steps = (result.steps || []).map((step) => `
+          <div class="optimized-step">
+            <strong>${escapeHtml(step.order)}. ${escapeHtml(step.productName)} · ${escapeHtml(step.status)}</strong>
+            ${escapeHtml(step.reason)}
+          </div>
+        `).join('');
+        optimizationReport.innerHTML = `
+          <h3>AI 매칭 리포트</h3>
+          <div class="metric-list">
+            <div><span>숏폼 속 새로운 제품</span><strong>${escapeHtml(result.newProductCount)}개</strong></div>
+            <div><span>인벤토리 속 호환 제품</span><strong>${escapeHtml(result.compatibleCount)}개</strong></div>
+            <div><span>AI가 대체한 제품</span><strong style="color:#03c1fb;">${escapeHtml(result.replacedCount)}개</strong></div>
+            <div><span>대체품 없음</span><strong>${escapeHtml(result.missingCount)}개</strong></div>
+          </div>
+          <p class="routine-muted">${escapeHtml(result.summary)}</p>
+          <div class="optimized-list">${steps}</div>
+        `;
+        optimizationReport.classList.add('visible');
+        document.querySelector('#apply-actions').hidden = false;
+        showDebug(`인벤토리 최적화 · #${currentAnalysisId}`, payload);
+      } catch (error) {
+        setStatus(`인벤토리 최적화에 실패했습니다.\n${error.message}`, 'error');
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    document.querySelector('#apply-actions').addEventListener('click', async (event) => {
+      const button = event.target.closest('[data-save-type]');
+      if (!button || !currentAnalysisId) return;
+      button.disabled = true;
+      try {
+        const payload = await apiFetch(`/api/shortform-analyses/${currentAnalysisId}/apply`, {
+          method: 'POST', body: JSON.stringify({ saveType: button.dataset.saveType })
+        });
+        showDebug(`루틴 저장 · ${button.dataset.saveType}`, payload);
+        setStatus(`루틴 저장 완료 · routineId=${payload.data.routineId}${payload.data.reused ? ' (기존 저장 결과 재사용)' : ''}`);
+      } catch (error) {
+        setStatus(`루틴 저장에 실패했습니다.\n${error.message}`, 'error');
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    const loadRecentAnalyses = async () => {
+      if (!accessToken) return;
+      try {
+        const payload = await apiFetch('/api/shortform-analyses');
+        const items = payload.data.items || [];
+        document.querySelector('#recent-list').innerHTML = items.length ? items.map((item) => `
+          <button class="recent-item" type="button" data-analysis-id="${escapeHtml(item.analysisId)}" data-analysis-status="${escapeHtml(item.status)}">
+            <span><strong>${escapeHtml(item.title || '분석 중인 루틴')}</strong><br>${escapeHtml(item.stepCount)}단계 · ${escapeHtml(item.status)}</span>
+            <strong>${item.overallScore == null ? '-' : `${escapeHtml(item.overallScore)}점`}</strong>
+          </button>
+        `).join('') : '<p class="routine-muted">아직 분석한 루틴이 없습니다.</p>';
+      } catch (error) {
+        document.querySelector('#recent-list').innerHTML = `<p class="routine-muted">${escapeHtml(error.message)}</p>`;
+      }
+    };
+
+    document.querySelector('#recent-list').addEventListener('click', (event) => {
+      const item = event.target.closest('[data-analysis-id]');
+      if (!item) return;
+      currentAnalysisId = Number(item.dataset.analysisId);
+      if (item.dataset.analysisStatus === 'COMPLETED') {
+        loadAnalysisDetail(currentAnalysisId);
+      } else {
+        progressPanel.hidden = false;
+        pollStatus();
+      }
     });
 
     const query = new URLSearchParams(window.location.search);

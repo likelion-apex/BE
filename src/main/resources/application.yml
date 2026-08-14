@@ -52,6 +52,18 @@ openai:
   api-url: https://api.openai.com/v1/chat/completions
   model: gpt-4o-mini
   organization-id: ${OPENAI_ORGANIZATION_ID:}
+  routine-model: ${OPENAI_ROUTINE_MODEL:gpt-4o-mini}
+  routine-prompt-version: "1.0"
+  connect-timeout: 5s
+  read-timeout: 60s
+  max-output-tokens: 6000
+
+youtube:
+  api-key: ${YOUTUBE_API_KEY:}
+  base-url: https://www.googleapis.com
+  max-duration: 5m
+  connect-timeout: 5s
+  read-timeout: 10s
 
 gemini:
   api-key: ${GEMINI_API_KEY:}

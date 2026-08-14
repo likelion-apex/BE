@@ -1,0 +1,84 @@
+package domain.beauty.shortform.client;
+
+import domain.beauty.shortform.config.YouTubeProperties;
+import global.exception.CustomException;
+import global.exception.ErrorCode;
+import java.time.Duration;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+import tools.jackson.databind.JsonNode;
+
+@Component
+public class YouTubeMetadataClient {
+
+    private final RestClient restClient;
+    private final YouTubeProperties properties;
+
+    public YouTubeMetadataClient(
+            @Qualifier("youtubeMetadataRestClient") RestClient restClient,
+            YouTubeProperties properties
+    ) {
+        this.restClient = restClient;
+        this.properties = properties;
+    }
+
+    public YouTubeVideoMetadata validate(String videoId) {
+        if (properties.getApiKey() == null || properties.getApiKey().isBlank()) {
+            throw new CustomException(
+                    ErrorCode.SHORTFORM_CONFIGURATION_MISSING,
+                    "YOUTUBE_API_KEY 환경변수가 필요합니다."
+            );
+        }
+
+        try {
+            JsonNode response = restClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/youtube/v3/videos")
+                            .queryParam("part", "contentDetails,status,snippet")
+                            .queryParam("id", videoId)
+                            .queryParam("key", properties.getApiKey())
+                            .build())
+                    .retrieve()
+                    .body(JsonNode.class);
+
+            JsonNode item = response == null ? null : response.path("items").path(0);
+            if (item == null || item.isMissingNode() || item.isEmpty()) {
+                throw new CustomException(ErrorCode.SHORTFORM_VIDEO_UNAVAILABLE);
+            }
+
+            String privacyStatus = item.path("status").path("privacyStatus").stringValue("");
+            String uploadStatus = item.path("status").path("uploadStatus").stringValue("");
+            if (!"public".equals(privacyStatus) || !"processed".equals(uploadStatus)) {
+                throw new CustomException(ErrorCode.SHORTFORM_VIDEO_UNAVAILABLE);
+            }
+
+            Duration duration = Duration.parse(item.path("contentDetails").path("duration").stringValue(""));
+            if (duration.compareTo(properties.getMaxDuration()) > 0) {
+                throw new CustomException(
+                        ErrorCode.SHORTFORM_VIDEO_TOO_LONG,
+                        "최대 5분 이하의 YouTube 영상만 분석할 수 있습니다."
+                );
+            }
+
+            JsonNode snippet = item.path("snippet");
+            String thumbnailUrl = snippet.path("thumbnails").path("high").path("url").stringValue(null);
+            if (thumbnailUrl == null) {
+                thumbnailUrl = snippet.path("thumbnails").path("default").path("url").stringValue(null);
+            }
+            return new YouTubeVideoMetadata(
+                    videoId,
+                    duration,
+                    snippet.path("title").stringValue(""),
+                    thumbnailUrl
+            );
+        } catch (CustomException exception) {
+            throw exception;
+        } catch (IllegalArgumentException exception) {
+            throw new CustomException(ErrorCode.SHORTFORM_VIDEO_UNAVAILABLE, "영상 재생 시간을 확인할 수 없습니다.");
+        } catch (RestClientException exception) {
+            throw new CustomException(ErrorCode.SHORTFORM_EXTERNAL_API_UNAVAILABLE, "YouTube 영상 정보를 확인할 수 없습니다.");
+        }
+    }
+}

@@ -26,6 +26,10 @@ openai:
   api-url: ${OPENAI_API_URL:http://127.0.0.1:9/v1/chat/completions}
   organization-id: ${OPENAI_ORGANIZATION_ID:local-dummy-openai-organization}
 
+youtube:
+  api-key: ${YOUTUBE_API_KEY:local-dummy-youtube-api-key}
+  base-url: ${YOUTUBE_BASE_URL:http://127.0.0.1:9}
+
 gemini:
   api-key: ${GEMINI_API_KEY:local-dummy-gemini-api-key}
   base-url: ${GEMINI_BASE_URL:http://127.0.0.1:9}

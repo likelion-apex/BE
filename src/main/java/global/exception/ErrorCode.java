@@ -35,6 +35,20 @@ public enum ErrorCode {
     BEAUTY_INVALID_GEMINI_RESPONSE(HttpStatus.BAD_GATEWAY, "BEAUTY-003", "Gemini 분석 응답을 처리할 수 없습니다."),
     BEAUTY_MISSING_GEMINI_CONFIGURATION(HttpStatus.SERVICE_UNAVAILABLE, "BEAUTY-004", "Gemini 서버 설정이 필요합니다."),
 
+    // AI 전체 스킨케어 루틴 분석
+    SHORTFORM_ANALYSIS_NOT_FOUND(HttpStatus.NOT_FOUND, "ANALYSIS-001", "루틴 분석 결과를 찾을 수 없습니다."),
+    SHORTFORM_ANALYSIS_NOT_COMPLETED(HttpStatus.CONFLICT, "ANALYSIS-002", "루틴 분석이 아직 완료되지 않았습니다."),
+    SHORTFORM_VIDEO_TOO_LONG(HttpStatus.BAD_REQUEST, "ANALYSIS-003", "최대 5분 이하의 영상만 분석할 수 있습니다."),
+    SHORTFORM_VIDEO_UNAVAILABLE(HttpStatus.BAD_REQUEST, "ANALYSIS-004", "공개 상태의 YouTube 영상을 확인할 수 없습니다."),
+    SHORTFORM_PROFILE_INCOMPLETE(HttpStatus.BAD_REQUEST, "ANALYSIS-005", "피부 타입을 먼저 등록해 주세요."),
+    SHORTFORM_CONFIGURATION_MISSING(HttpStatus.SERVICE_UNAVAILABLE, "ANALYSIS-006", "루틴 분석 서버 설정이 필요합니다."),
+    SHORTFORM_EXTERNAL_API_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "ANALYSIS-007", "외부 분석 서비스를 일시적으로 사용할 수 없습니다."),
+    SHORTFORM_INVALID_AI_RESPONSE(HttpStatus.BAD_GATEWAY, "ANALYSIS-008", "AI 분석 응답을 처리할 수 없습니다."),
+    SHORTFORM_ANALYSIS_CANCELLED(HttpStatus.CONFLICT, "ANALYSIS-009", "취소된 루틴 분석입니다."),
+    SHORTFORM_OPTIMIZATION_REQUIRED(HttpStatus.CONFLICT, "ANALYSIS-010", "인벤토리 최적화를 먼저 확인해 주세요."),
+    SHORTFORM_NOT_SKINCARE(HttpStatus.BAD_REQUEST, "ANALYSIS-011", "스킨케어 루틴 영상만 분석할 수 있습니다."),
+    ROUTINE_TODAY_CONFLICT(HttpStatus.CONFLICT, "ROUTINE-001", "이미 진행 중인 오늘의 루틴이 있습니다."),
+
     // 인벤토리
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "INVENTORY-001", "화장품 정보를 찾을 수 없습니다."),
     INVENTORY_NOT_FOUND(HttpStatus.NOT_FOUND, "INVENTORY-002", "인벤토리 항목을 찾을 수 없습니다."),
