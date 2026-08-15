@@ -1,7 +1,7 @@
 package domain.beauty.shortform.client;
 
+import domain.beauty.shortform.client.ProductEnrichmentResult.Response;
 import domain.beauty.shortform.config.OpenAiRoutineProperties;
-import domain.beauty.shortform.client.RoutinePersonalizationResult.Response;
 import global.exception.CustomException;
 import global.exception.ErrorCode;
 import java.util.LinkedHashMap;
@@ -21,17 +21,17 @@ import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
 @Component
-public class OpenAiRoutineAnalysisClient {
+public class OpenAiProductEnrichmentClient {
 
     private final RestClient restClient;
     private final OpenAiRoutineProperties properties;
-    private final OpenAiRoutinePromptResources promptResources;
+    private final OpenAiProductEnrichmentPromptResources promptResources;
     private final ObjectMapper objectMapper;
 
-    public OpenAiRoutineAnalysisClient(
+    public OpenAiProductEnrichmentClient(
             @Qualifier("shortformOpenAiRestClient") RestClient restClient,
             OpenAiRoutineProperties properties,
-            OpenAiRoutinePromptResources promptResources,
+            OpenAiProductEnrichmentPromptResources promptResources,
             ObjectMapper objectMapper
     ) {
         this.restClient = restClient;
@@ -40,28 +40,30 @@ public class OpenAiRoutineAnalysisClient {
         this.objectMapper = objectMapper;
     }
 
-    public Response analyze(RoutinePersonalizationInput input) {
+    public Response enrich(ProductEnrichmentInput input) {
         if (properties.getApiKey() == null || properties.getApiKey().isBlank()) {
-            throw new CustomException(ErrorCode.SHORTFORM_CONFIGURATION_MISSING, "OPENAI_API_KEY 환경변수가 필요합니다.");
+            throw new CustomException(ErrorCode.SHORTFORM_CONFIGURATION_MISSING,
+                    "OPENAI_API_KEY 환경변수가 필요합니다.");
         }
 
         try {
-            String inputJson = objectMapper.writeValueAsString(input);
             Map<String, Object> body = new LinkedHashMap<>();
-            body.put("model", properties.getRoutineModel());
+            body.put("model", properties.getProductModel());
             body.put("temperature", 0);
-            body.put("max_tokens", properties.getMaxOutputTokens());
+            body.put("max_tokens", properties.getProductMaxOutputTokens());
             body.put("response_format", Map.of(
                     "type", "json_schema",
                     "json_schema", Map.of(
-                            "name", "shortform_routine_analysis",
+                            "name", "shortform_product_enrichment",
                             "strict", true,
                             "schema", promptResources.responseSchema()
                     )
             ));
             body.put("messages", List.of(
                     Map.of("role", "system", "content", promptResources.systemPrompt()),
-                    Map.of("role", "user", "content", "다음 JSON 데이터만 근거로 분석하세요.\n" + inputJson)
+                    Map.of("role", "user", "content",
+                            "다음 JSON의 제품만 보강하세요. repairMissingIngredients가 true이면 빈 전성분을 한 번 보정하는 요청입니다.\n"
+                                    + objectMapper.writeValueAsString(input))
             ));
 
             JsonNode envelope = execute(body);
@@ -69,23 +71,19 @@ public class OpenAiRoutineAnalysisClient {
             if (content == null || content.isBlank()) {
                 throw new CustomException(ErrorCode.SHORTFORM_INVALID_AI_RESPONSE);
             }
-
-            RoutinePersonalizationResult analysis = objectMapper.readValue(content, RoutinePersonalizationResult.class);
+            ProductEnrichmentResult result = objectMapper.readValue(content, ProductEnrichmentResult.class);
             JsonNode usage = envelope.path("usage");
-            String model = envelope.path("model").stringValue(properties.getRoutineModel());
-            Response response = new Response(
-                    analysis,
-                    model,
-                    usage.path("prompt_tokens").asLong(),
-                    usage.path("completion_tokens").asLong()
-            );
-            log.info("OpenAI 개인화 분석 완료: model={}, inputTokens={}, outputTokens={}",
-                    response.model(), response.inputTokens(), response.outputTokens());
-            return response;
+            String model = envelope.path("model").stringValue(properties.getProductModel());
+            long inputTokens = usage.path("prompt_tokens").asLong();
+            long outputTokens = usage.path("completion_tokens").asLong();
+            log.info("OpenAI 제품 보강 완료: model={}, products={}, inputTokens={}, outputTokens={}",
+                    model, input.products().size(), inputTokens, outputTokens);
+            return new Response(result, model, inputTokens, outputTokens);
         } catch (CustomException exception) {
             throw exception;
         } catch (JacksonException exception) {
-            throw new CustomException(ErrorCode.SHORTFORM_INVALID_AI_RESPONSE, "OpenAI 응답 JSON을 해석할 수 없습니다.");
+            throw new CustomException(ErrorCode.SHORTFORM_INVALID_AI_RESPONSE,
+                    "OpenAI 제품 보강 응답 JSON을 해석할 수 없습니다.");
         }
     }
 
@@ -97,7 +95,8 @@ public class OpenAiRoutineAnalysisClient {
                         .uri(properties.getApiUrl())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + properties.getApiKey())
                         .headers(headers -> {
-                            if (properties.getOrganizationId() != null && !properties.getOrganizationId().isBlank()) {
+                            if (properties.getOrganizationId() != null
+                                    && !properties.getOrganizationId().isBlank()) {
                                 headers.set("OpenAI-Organization", properties.getOrganizationId());
                             }
                         })
@@ -105,19 +104,20 @@ public class OpenAiRoutineAnalysisClient {
                         .body(body)
                         .retrieve()
                         .body(JsonNode.class);
-                log.info("OpenAI 개인화 분석 HTTP 성공: status=200, model={}", properties.getRoutineModel());
+                log.info("OpenAI 제품 보강 HTTP 성공: status=200, model={}", properties.getProductModel());
                 return response;
             } catch (RestClientResponseException exception) {
                 lastFailure = exception;
-                log.warn("OpenAI 개인화 분석 HTTP 실패: status={}, model={}, attempt={}",
-                        exception.getStatusCode().value(), properties.getRoutineModel(), attempt + 1);
-                if (exception.getStatusCode().value() != 429 && !exception.getStatusCode().is5xxServerError()) {
+                log.warn("OpenAI 제품 보강 HTTP 실패: status={}, model={}, attempt={}",
+                        exception.getStatusCode().value(), properties.getProductModel(), attempt + 1);
+                if (exception.getStatusCode().value() != 429
+                        && !exception.getStatusCode().is5xxServerError()) {
                     break;
                 }
             } catch (RestClientException exception) {
                 lastFailure = exception;
-                log.warn("OpenAI 개인화 분석 연결 실패: model={}, attempt={}",
-                        properties.getRoutineModel(), attempt + 1);
+                log.warn("OpenAI 제품 보강 연결 실패: model={}, attempt={}",
+                        properties.getProductModel(), attempt + 1);
             }
             if (!waitBeforeRetry(attempt)) {
                 break;
@@ -125,7 +125,9 @@ public class OpenAiRoutineAnalysisClient {
         }
         throw new CustomException(
                 ErrorCode.SHORTFORM_EXTERNAL_API_UNAVAILABLE,
-                lastFailure == null ? "OpenAI 분석 요청에 실패했습니다." : "OpenAI 분석 서비스를 일시적으로 사용할 수 없습니다."
+                lastFailure == null
+                        ? "OpenAI 제품 보강 요청에 실패했습니다."
+                        : "OpenAI 제품 보강 서비스를 일시적으로 사용할 수 없습니다."
         );
     }
 

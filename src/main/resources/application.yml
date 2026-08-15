@@ -53,10 +53,13 @@ openai:
   model: gpt-4o-mini
   organization-id: ${OPENAI_ORGANIZATION_ID:}
   routine-model: ${OPENAI_ROUTINE_MODEL:gpt-4o-mini}
-  routine-prompt-version: "1.0"
+  routine-prompt-version: "2.0"
+  product-model: ${OPENAI_PRODUCT_MODEL:gpt-4o-mini}
+  product-prompt-version: "1.0"
   connect-timeout: 5s
   read-timeout: 60s
   max-output-tokens: 6000
+  product-max-output-tokens: 12000
 
 youtube:
   api-key: ${YOUTUBE_API_KEY:}

@@ -11,10 +11,13 @@ public class OpenAiRoutineProperties {
     private URI apiUrl = URI.create("https://api.openai.com/v1/chat/completions");
     private String organizationId = "";
     private String routineModel = "gpt-4o-mini";
-    private String routinePromptVersion = "1.0";
+    private String routinePromptVersion = "2.0";
+    private String productModel = "gpt-4o-mini";
+    private String productPromptVersion = "1.0";
     private Duration connectTimeout = Duration.ofSeconds(5);
     private Duration readTimeout = Duration.ofSeconds(60);
     private int maxOutputTokens = 6_000;
+    private int productMaxOutputTokens = 12_000;
 
     public String getApiKey() {
         return apiKey;
@@ -56,6 +59,22 @@ public class OpenAiRoutineProperties {
         this.routinePromptVersion = routinePromptVersion;
     }
 
+    public String getProductModel() {
+        return productModel;
+    }
+
+    public void setProductModel(String productModel) {
+        this.productModel = productModel;
+    }
+
+    public String getProductPromptVersion() {
+        return productPromptVersion;
+    }
+
+    public void setProductPromptVersion(String productPromptVersion) {
+        this.productPromptVersion = productPromptVersion;
+    }
+
     public Duration getConnectTimeout() {
         return connectTimeout;
     }
@@ -78,5 +97,13 @@ public class OpenAiRoutineProperties {
 
     public void setMaxOutputTokens(int maxOutputTokens) {
         this.maxOutputTokens = maxOutputTokens;
+    }
+
+    public int getProductMaxOutputTokens() {
+        return productMaxOutputTokens;
+    }
+
+    public void setProductMaxOutputTokens(int productMaxOutputTokens) {
+        this.productMaxOutputTokens = productMaxOutputTokens;
     }
 }

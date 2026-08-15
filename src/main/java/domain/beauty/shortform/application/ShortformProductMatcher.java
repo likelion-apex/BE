@@ -2,10 +2,13 @@ package domain.beauty.shortform.application;
 
 import domain.beauty.domain.BeautyRoutineAnalysis.IdentificationLevel;
 import domain.beauty.domain.BeautyRoutineAnalysis.Step;
+import domain.beauty.shortform.domain.IngredientDataStatus;
+import domain.beauty.shortform.domain.ProductResolutionStatus;
 import domain.cosmetic.client.KakaoImageClient;
 import domain.inventory.Product;
 import domain.inventory.ProductRepository;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -19,19 +22,91 @@ public class ShortformProductMatcher {
         this.imageClient = imageClient;
     }
 
-    public List<MatchedVideoStep> match(List<Step> steps) {
-        return steps.stream().map(this::match).toList();
+    public List<MatchedVideoStep> match(
+            List<Step> steps,
+            Map<Integer, ProductEnrichmentData> enrichments
+    ) {
+        return steps.stream()
+                .map(step -> match(step, enrichments.getOrDefault(step.order(), ProductEnrichmentData.unresolved())))
+                .toList();
     }
 
-    private MatchedVideoStep match(Step step) {
+    private MatchedVideoStep match(Step step, ProductEnrichmentData enrichment) {
         if (step.identificationLevel() != IdentificationLevel.EXACT_PRODUCT || step.productName() == null) {
-            return new MatchedVideoStep(step, null, null);
+            return new MatchedVideoStep(
+                    step, null, null, step.brand(), step.category(), ProductResolutionStatus.UNRESOLVED,
+                    0, IngredientDataStatus.NOT_ELIGIBLE, ProductEnrichmentData.unresolved());
         }
-        Product product = productRepository.findFirstByNameIgnoreCase(step.productName()).orElse(null);
+
+        Product product = findCatalogProduct(step, enrichment);
+        String displayBrand = product != null
+                ? textOr(product.getBrand(), textOr(enrichment.displayBrand(), step.brand()))
+                : textOr(enrichment.displayBrand(), step.brand());
+        String displayProductName = product != null
+                ? textOr(product.getName(), textOr(enrichment.displayProductName(), step.productName()))
+                : textOr(enrichment.displayProductName(), textOr(step.productName(), step.category()));
+        ProductResolutionStatus resolutionStatus = product != null
+                ? ProductResolutionStatus.CATALOG_MATCH
+                : enrichment.resolutionConfidence() >= 0.85 && enrichment.displayProductName() != null
+                        ? ProductResolutionStatus.AI_NORMALIZED
+                        : ProductResolutionStatus.VIDEO_LITERAL;
+        double resolutionConfidence = product != null ? 1 : Math.max(step.confidence(), enrichment.resolutionConfidence());
+        IngredientDataStatus ingredientStatus = enrichment.resolutionConfidence() < 0.85
+                || enrichment.displayProductName() == null
+                ? IngredientDataStatus.NOT_ELIGIBLE
+                : enrichment.ingredients() == null || enrichment.ingredients().isEmpty()
+                        ? IngredientDataStatus.UNAVAILABLE
+                        : IngredientDataStatus.AVAILABLE;
+
         if (product != null) {
-            return new MatchedVideoStep(step, product.getId(), product.getImageUrl());
+            return new MatchedVideoStep(
+                    step,
+                    product.getId(),
+                    product.getImageUrl(),
+                    displayBrand,
+                    displayProductName,
+                    resolutionStatus,
+                    resolutionConfidence,
+                    ingredientStatus,
+                    enrichment
+            );
         }
-        String query = step.brand() == null ? step.productName() : step.brand() + " " + step.productName();
-        return new MatchedVideoStep(step, null, imageClient.searchImageUrl(query));
+        String query = displayBrand == null ? displayProductName : displayBrand + " " + displayProductName;
+        return new MatchedVideoStep(
+                step,
+                null,
+                imageClient.searchImageUrl(query),
+                displayBrand,
+                displayProductName,
+                resolutionStatus,
+                resolutionConfidence,
+                ingredientStatus,
+                enrichment
+        );
+    }
+
+    private Product findCatalogProduct(Step step, ProductEnrichmentData enrichment) {
+        Product rawMatch = step.brand() == null
+                ? productRepository.findFirstByNameIgnoreCase(step.productName()).orElse(null)
+                : productRepository.findFirstByNameIgnoreCaseAndBrandIgnoreCase(
+                        step.productName(), step.brand()).orElse(null);
+        if (rawMatch != null) {
+            return rawMatch;
+        }
+        if (enrichment.displayProductName() == null) {
+            return null;
+        }
+        if (enrichment.displayBrand() != null) {
+            Product normalizedWithBrand = productRepository.findFirstByNameIgnoreCaseAndBrandIgnoreCase(
+                    enrichment.displayProductName(), enrichment.displayBrand()).orElse(null);
+            if (normalizedWithBrand != null) {
+                return normalizedWithBrand;
+            }
+        }
+        return productRepository.findFirstByNameIgnoreCase(enrichment.displayProductName()).orElse(null);
+    }
+
+    private String textOr(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value.trim();
     }
 }

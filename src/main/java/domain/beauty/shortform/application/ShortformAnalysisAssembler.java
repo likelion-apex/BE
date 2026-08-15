@@ -7,7 +7,11 @@ import domain.beauty.shortform.application.ShortformAnalysisStateService.JobCont
 import domain.beauty.shortform.client.RoutinePersonalizationInput;
 import domain.beauty.shortform.client.RoutinePersonalizationResult;
 import domain.beauty.shortform.client.RoutinePersonalizationResult.Response;
+import domain.beauty.shortform.client.ProductEnrichmentResult;
 import domain.beauty.shortform.config.OpenAiRoutineProperties;
+import domain.beauty.shortform.domain.AssessmentCategory;
+import domain.beauty.shortform.domain.IngredientDataStatus;
+import domain.beauty.shortform.domain.IngredientRiskLevel;
 import domain.beauty.shortform.domain.OptimizationStatus;
 import domain.beauty.shortform.domain.RoutineOptimizationSnapshot;
 import domain.beauty.shortform.domain.RoutineOptimizationSnapshot.OptimizedStep;
@@ -15,10 +19,12 @@ import domain.beauty.shortform.domain.SafetyLevel;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.AiMetadata;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.IngredientDetail;
+import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.IngredientStats;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.ReasonCard;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.ReasonTone;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.StepResult;
 import domain.beauty.shortform.domain.VideoRoutineExtraction;
+import domain.beauty.shortform.application.ShortformProductEnrichmentService.BatchResult;
 import domain.cosmetic.cache.RegulationInfoCache;
 import domain.cosmetic.client.RegulationInfo;
 import java.util.ArrayList;
@@ -62,10 +68,24 @@ public class ShortformAnalysisAssembler {
                         step.source().category(),
                         step.source().brand(),
                         step.source().productName(),
+                        step.displayBrand(),
+                        step.displayProductName(),
                         step.source().purpose(),
                         step.source().evidenceSummary(),
                         step.source().confidence(),
-                        step.productId()
+                        step.productId(),
+                        step.ingredientDataStatus(),
+                        safe(step.enrichment().ingredients()).stream()
+                                .map(ingredient -> new RoutinePersonalizationInput.Ingredient(
+                                        ingredient.order(),
+                                        ingredient.name(),
+                                        safe(ingredient.purposes()),
+                                        safe(ingredient.skinBenefits()),
+                                        ingredient.riskScore(),
+                                        ingredient.caution20(),
+                                        ingredient.allergen()
+                                ))
+                                .toList()
                 )).toList(),
                 context.inventory().stream().map(item -> new RoutinePersonalizationInput.InventoryProduct(
                         item.inventoryId(),
@@ -81,7 +101,8 @@ public class ShortformAnalysisAssembler {
             JobContext context,
             List<MatchedVideoStep> matchedSteps,
             Response aiResponse,
-            VideoRoutineExtraction extraction
+            VideoRoutineExtraction extraction,
+            BatchResult enrichment
     ) {
         RoutinePersonalizationResult ai = aiResponse.analysis();
         Map<Integer, RoutinePersonalizationResult.StepAnalysis> aiSteps = indexSteps(ai.steps());
@@ -93,7 +114,7 @@ public class ShortformAnalysisAssembler {
                 .toList();
 
         ShortformAnalysisSnapshot snapshot = new ShortformAnalysisSnapshot(
-                "1.0",
+                "2.0",
                 context.videoId(),
                 context.youtubeUrl(),
                 textOr(ai.title(), "나를 위한 스킨케어 루틴"),
@@ -111,6 +132,12 @@ public class ShortformAnalysisAssembler {
                         extraction.getPromptVersion(),
                         extraction.getInputTokens(),
                         extraction.getOutputTokens(),
+                        enrichment.model(),
+                        enrichment.promptVersion(),
+                        enrichment.inputTokens(),
+                        enrichment.outputTokens(),
+                        enrichment.cacheHits(),
+                        enrichment.cacheMisses(),
                         aiResponse.model(),
                         openAiProperties.getRoutinePromptVersion(),
                         aiResponse.inputTokens(),
@@ -126,17 +153,21 @@ public class ShortformAnalysisAssembler {
             RoutinePersonalizationResult.StepAnalysis aiStep
     ) {
         BeautyRoutineAnalysis.Step source = matched.source();
-        boolean exactProduct = source.identificationLevel() == IdentificationLevel.EXACT_PRODUCT;
+        boolean ingredientAvailable = matched.ingredientDataStatus() == IngredientDataStatus.AVAILABLE;
         RoutinePersonalizationResult.StepAnalysis normalized = aiStep == null ? fallbackStep(source.order()) : aiStep;
-        SafetyLevel safetyLevel = exactProduct && normalized.safetyLevel() != null
+        SafetyLevel safetyLevel = ingredientAvailable && normalized.safetyLevel() != null
                 ? normalized.safetyLevel()
                 : SafetyLevel.UNKNOWN;
-        List<IngredientDetail> ingredients = exactProduct
-                ? safe(normalized.ingredients()).stream().map(this::toIngredient).toList()
+        List<IngredientDetail> ingredients = ingredientAvailable
+                ? safe(matched.enrichment().ingredients()).stream().map(this::toIngredient).toList()
                 : List.of();
+        IngredientStats ingredientStats = ingredientAvailable ? toIngredientStats(ingredients) : null;
         List<ReasonCard> reasons = safe(normalized.reasons()).stream()
                 .map(reason -> new ReasonCard(
-                        reason.tone() == null ? ReasonTone.NEUTRAL : reason.tone(),
+                        toneOf(reason.assessmentCategory()),
+                        reason.assessmentCategory() == null
+                                ? AssessmentCategory.CAUTION
+                                : reason.assessmentCategory(),
                         textOr(reason.title(), "AI 분석"),
                         textOr(reason.description(), "확인 가능한 근거가 부족합니다."),
                         textOr(reason.evidenceSource(), "AI_ESTIMATED")
@@ -145,6 +176,7 @@ public class ShortformAnalysisAssembler {
         if (reasons.isEmpty()) {
             reasons = List.of(new ReasonCard(
                     ReasonTone.NEUTRAL,
+                    AssessmentCategory.CAUTION,
                     "성분 확인 필요",
                     "제품 라벨의 전성분을 확인한 뒤 피부 반응을 살펴보세요.",
                     "VIDEO_EVIDENCE"
@@ -159,6 +191,10 @@ public class ShortformAnalysisAssembler {
                 source.category(),
                 source.brand(),
                 source.productName() == null ? source.category() : source.productName(),
+                matched.displayBrand(),
+                matched.displayProductName(),
+                matched.productResolutionStatus(),
+                matched.productResolutionConfidence(),
                 matched.imageUrl(),
                 matched.productId(),
                 source.confidence(),
@@ -166,25 +202,84 @@ public class ShortformAnalysisAssembler {
                 clamp(normalized.matchScore()),
                 textOr(normalized.matchSummary(), "피부 프로필과의 궁합을 확인할 정보가 부족합니다."),
                 safetyLevel,
-                exactProduct ? textOr(normalized.safetyTitle(), "AI 안전도 참고") : "제품 식별 정보 부족",
-                exactProduct
+                ingredientAvailable ? textOr(normalized.safetyTitle(), "AI 안전도 참고") : "성분 정보 확인 필요",
+                ingredientAvailable
                         ? textOr(normalized.safetySummary(), "실제 전성분과 패치 테스트를 함께 확인해 주세요.")
-                        : "영상에서 정확한 제품을 확인하지 못해 안전도를 판단하지 않았습니다.",
+                        : ingredientUnavailableMessage(matched.ingredientDataStatus()),
                 reasons,
-                exactProduct ? Math.max(normalized.estimatedIngredientCount(), ingredients.size()) : 0,
+                matched.ingredientDataStatus(),
+                ingredientAvailable ? ingredients.size() : null,
+                ingredientStats,
                 ingredients
         );
     }
 
-    private IngredientDetail toIngredient(RoutinePersonalizationResult.Ingredient ingredient) {
+    private IngredientDetail toIngredient(ProductEnrichmentResult.Ingredient ingredient) {
         Optional<RegulationInfo> regulation = regulationInfoCache.find(ingredient.name());
         return new IngredientDetail(
+                ingredient.order(),
                 ingredient.name(),
                 safe(ingredient.purposes()),
+                safe(ingredient.skinBenefits()),
+                ingredient.riskScore(),
+                riskLevel(ingredient.riskScore()),
+                ingredient.caution20(),
+                ingredient.allergen(),
                 "AI_ESTIMATED",
                 regulation.isPresent(),
                 regulation.map(this::regulationSummary).orElse(null)
         );
+    }
+
+    private IngredientStats toIngredientStats(List<IngredientDetail> ingredients) {
+        int low = 0;
+        int moderate = 0;
+        int high = 0;
+        int unknown = 0;
+        int caution20 = 0;
+        int allergen = 0;
+        for (IngredientDetail ingredient : ingredients) {
+            switch (ingredient.riskLevel()) {
+                case LOW -> low++;
+                case MODERATE -> moderate++;
+                case HIGH -> high++;
+                case UNKNOWN -> unknown++;
+            }
+            caution20 += ingredient.caution20() ? 1 : 0;
+            allergen += ingredient.allergen() ? 1 : 0;
+        }
+        return new IngredientStats(
+                ingredients.size(), low, moderate, high, unknown, caution20, allergen);
+    }
+
+    private IngredientRiskLevel riskLevel(Integer score) {
+        if (score == null) {
+            return IngredientRiskLevel.UNKNOWN;
+        }
+        if (score <= 2) {
+            return IngredientRiskLevel.LOW;
+        }
+        if (score <= 6) {
+            return IngredientRiskLevel.MODERATE;
+        }
+        return IngredientRiskLevel.HIGH;
+    }
+
+    private ReasonTone toneOf(AssessmentCategory category) {
+        if (category == null) {
+            return ReasonTone.NEUTRAL;
+        }
+        return switch (category) {
+            case SAFE, BENEFICIAL -> ReasonTone.POSITIVE;
+            case CAUTION -> ReasonTone.CAUTION;
+            case WARNING -> ReasonTone.WARNING;
+        };
+    }
+
+    private String ingredientUnavailableMessage(IngredientDataStatus status) {
+        return status == IngredientDataStatus.NOT_ELIGIBLE
+                ? "영상에서 제품을 충분히 식별하지 못해 전체 성분 탭을 제공하지 않습니다."
+                : "제품은 식별했지만 확인 가능한 전체 성분 정보를 찾지 못했습니다.";
     }
 
     private String regulationSummary(RegulationInfo info) {
@@ -240,8 +335,8 @@ public class ShortformAnalysisAssembler {
                 missingCount++;
                 productId = matched.productId();
                 category = source.category();
-                productName = source.productName() == null ? source.category() : source.productName();
-                brand = source.brand();
+                productName = matched.displayProductName();
+                brand = matched.displayBrand();
                 imageUrl = matched.imageUrl();
                 reason = recommendation == null
                         ? "인벤토리에서 같은 역할의 제품을 찾지 못했습니다."
@@ -299,8 +394,6 @@ public class ShortformAnalysisAssembler {
                 SafetyLevel.UNKNOWN,
                 "성분 확인 필요",
                 "제품 라벨과 피부 반응을 직접 확인해 주세요.",
-                List.of(),
-                0,
                 List.of()
         );
     }

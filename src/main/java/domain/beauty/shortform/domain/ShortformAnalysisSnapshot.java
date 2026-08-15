@@ -27,6 +27,10 @@ public record ShortformAnalysisSnapshot(
             String category,
             String brand,
             String productName,
+            String displayBrand,
+            String displayProductName,
+            ProductResolutionStatus productResolutionStatus,
+            double productResolutionConfidence,
             String imageUrl,
             Long productId,
             double identificationConfidence,
@@ -37,13 +41,16 @@ public record ShortformAnalysisSnapshot(
             String safetyTitle,
             String safetySummary,
             List<ReasonCard> reasons,
-            int estimatedIngredientCount,
+            IngredientDataStatus ingredientDataStatus,
+            Integer estimatedIngredientCount,
+            IngredientStats ingredientStats,
             List<IngredientDetail> ingredients
     ) {
     }
 
     public record ReasonCard(
             ReasonTone tone,
+            AssessmentCategory assessmentCategory,
             String title,
             String description,
             String evidenceSource
@@ -58,11 +65,28 @@ public record ShortformAnalysisSnapshot(
     }
 
     public record IngredientDetail(
+            int order,
             String name,
             List<String> purposes,
+            List<String> skinBenefits,
+            Integer riskScore,
+            IngredientRiskLevel riskLevel,
+            boolean caution20,
+            boolean allergen,
             String source,
             boolean regulated,
             String regulationSummary
+    ) {
+    }
+
+    public record IngredientStats(
+            int totalCount,
+            int lowRiskCount,
+            int moderateRiskCount,
+            int highRiskCount,
+            int unknownRiskCount,
+            int caution20Count,
+            int allergenCount
     ) {
     }
 
@@ -71,6 +95,12 @@ public record ShortformAnalysisSnapshot(
             String geminiPromptVersion,
             long geminiInputTokens,
             long geminiOutputTokens,
+            String productEnrichmentModel,
+            String productEnrichmentPromptVersion,
+            long productEnrichmentInputTokens,
+            long productEnrichmentOutputTokens,
+            int productEnrichmentCacheHits,
+            int productEnrichmentCacheMisses,
             String openAiModel,
             String openAiPromptVersion,
             long openAiInputTokens,

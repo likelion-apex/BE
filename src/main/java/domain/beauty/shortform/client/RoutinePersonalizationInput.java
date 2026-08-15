@@ -1,5 +1,6 @@
 package domain.beauty.shortform.client;
 
+import domain.beauty.shortform.domain.IngredientDataStatus;
 import java.util.List;
 
 public record RoutinePersonalizationInput(
@@ -19,10 +20,25 @@ public record RoutinePersonalizationInput(
             String category,
             String brand,
             String productName,
+            String displayBrand,
+            String displayProductName,
             String purpose,
             String evidenceSummary,
             double confidence,
-            Long matchedProductId
+            Long matchedProductId,
+            IngredientDataStatus ingredientDataStatus,
+            List<Ingredient> ingredients
+    ) {
+    }
+
+    public record Ingredient(
+            int order,
+            String name,
+            List<String> purposes,
+            List<String> skinBenefits,
+            Integer riskScore,
+            boolean caution20,
+            boolean allergen
     ) {
     }
 

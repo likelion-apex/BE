@@ -11,7 +11,7 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 public class GeminiPromptResources {
 
-	public static final String VERSION = "1.0";
+	public static final String VERSION = "1.2";
 
 	private final String systemPrompt;
 	private final String userPrompt;

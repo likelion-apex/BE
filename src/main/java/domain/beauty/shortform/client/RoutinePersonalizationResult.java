@@ -1,7 +1,7 @@
 package domain.beauty.shortform.client;
 
 import domain.beauty.shortform.domain.SafetyLevel;
-import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.ReasonTone;
+import domain.beauty.shortform.domain.AssessmentCategory;
 import java.util.List;
 
 public record RoutinePersonalizationResult(
@@ -23,16 +23,11 @@ public record RoutinePersonalizationResult(
             SafetyLevel safetyLevel,
             String safetyTitle,
             String safetySummary,
-            List<Reason> reasons,
-            int estimatedIngredientCount,
-            List<Ingredient> ingredients
+            List<Reason> reasons
     ) {
     }
 
-    public record Reason(ReasonTone tone, String title, String description, String evidenceSource) {
-    }
-
-    public record Ingredient(String name, List<String> purposes) {
+    public record Reason(AssessmentCategory assessmentCategory, String title, String description, String evidenceSource) {
     }
 
     public record InventoryRecommendation(int order, Long inventoryId, String reason) {
