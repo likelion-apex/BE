@@ -4,14 +4,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.web.servlet.MockMvc;
 
-import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(classes = ApexBeApplication.class, properties = "features.kakao-login-test.enabled=true")
+@SpringBootTest(classes = ApexBeApplication.class)
 @AutoConfigureMockMvc
 class SwaggerDocumentationTests {
 
@@ -59,29 +56,4 @@ class SwaggerDocumentationTests {
 			.andExpect(jsonPath("$.paths['/api/shortform-analyses/{analysisId}/apply'].post.summary").value("분석한 루틴 적용 또는 보관"));
 	}
 
-	@Test
-	void servesKakaoLoginTestPageWithoutAuthentication() throws Exception {
-		mockMvc.perform(get("/kakao-login-test"))
-			.andExpect(status().isOk())
-			.andExpect(content().string(containsString("카카오 로그인 테스트")))
-			.andExpect(content().string(containsString("서버에서 자동으로 불러옴")))
-			.andExpect(content().string(not(containsString("__KAKAO_CLIENT_ID_BASE64__"))))
-			.andExpect(content().string(not(containsString("__KAKAO_REDIRECT_URI_BASE64__"))))
-			.andExpect(content().string(not(containsString("id=\"client-id\""))))
-			.andExpect(content().string(not(containsString("id=\"backend-url\""))))
-			.andExpect(content().string(containsString("AI 전체 스킨케어 루틴 분석")))
-			.andExpect(content().string(containsString("https://www.youtube.com/shorts/t1S24pgO2XQ")))
-			.andExpect(content().string(containsString("id=\"analysis-feedback\"")))
-			.andExpect(content().string(containsString("분석 요청 중…")))
-			.andExpect(content().string(containsString("YOUTUBE_API_KEY 등록을 요청해 주세요")))
-			.andExpect(content().string(containsString("data-save-type=\"TODAY\"")));
-	}
-
-	@Test
-	void servesFigmaModalAssetsWithoutAuthentication() throws Exception {
-		mockMvc.perform(get("/kakao-login-test/assets/ai-profile.svg"))
-			.andExpect(status().isOk())
-			.andExpect(content().contentTypeCompatibleWith("image/svg+xml"))
-			.andExpect(content().string(containsString("<svg")));
-	}
 }

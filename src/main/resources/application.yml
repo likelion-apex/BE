@@ -86,7 +86,3 @@ springdoc:
 
 cors:
   allowed-origins: http://localhost:3000
-
-features:
-  kakao-login-test:
-    enabled: ${KAKAO_LOGIN_TEST_ENABLED:false}

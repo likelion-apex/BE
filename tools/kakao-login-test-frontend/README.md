@@ -1,0 +1,42 @@
+# APEX 백엔드 로컬 테스트 프론트
+
+배포된 백엔드 API를 로컬 브라우저에서 카카오 로그인부터 AI 전체 루틴 분석까지 검증하는 Vite 앱입니다. 백엔드 서버는 테스트 HTML이나 SVG를 제공하지 않습니다.
+
+## 최초 설정
+
+```bash
+cd tools/kakao-login-test-frontend
+cp .env.example .env.local
+npm install
+```
+
+`.env.local`에서 `VITE_KAKAO_CLIENT_ID`를 실제 카카오 REST API 키로 바꿉니다. 다음 세 위치의 Redirect URI는 반드시 완전히 같아야 합니다.
+
+```text
+http://localhost:3000/onboarding/kakaocallback
+```
+
+1. 카카오 개발자 콘솔 Redirect URI
+2. 배포 서버 `KAKAO_REDIRECT_URI`
+3. 로컬 앱 `VITE_KAKAO_REDIRECT_URI`
+
+배포 서버의 `CORS_ALLOWED_ORIGINS`에도 `http://localhost:3000`이 포함되어 있어야 합니다.
+
+## 실행
+
+```bash
+npm run dev
+```
+
+브라우저에서 `http://localhost:3000`을 열고 카카오 로그인을 진행합니다. 카카오가 `/onboarding/kakaocallback`으로 돌려보내면 Vite가 같은 앱을 제공하고, 앱이 authorization code를 배포 백엔드의 `/api/auth/kakao/login`으로 전달합니다.
+
+`VITE_` 환경변수는 브라우저에 공개됩니다. Client Secret, JWT Secret, OpenAI·Gemini·YouTube·MFDS API 키는 이 폴더의 환경변수에 넣지 마세요.
+
+## 배포 결과만 확인
+
+```bash
+npm run build
+npm run preview
+```
+
+`preview`도 카카오 Redirect URI와 일치하도록 `localhost:3000`에서 실행됩니다.
