@@ -32,8 +32,8 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtTokenProvider jwtTokenProvider;
 
-    public TokenResponse loginWithKakao(String code) {
-        KakaoTokenResponse kakaoToken = kakaoOAuthClient.requestToken(code);
+    public TokenResponse loginWithKakao(String code, String redirectUri) {
+        KakaoTokenResponse kakaoToken = kakaoOAuthClient.requestToken(code, redirectUri);
         KakaoUserInfoResponse userInfo = kakaoOAuthClient.requestUserInfo(kakaoToken.accessToken());
 
         String providerId = String.valueOf(userInfo.id());
