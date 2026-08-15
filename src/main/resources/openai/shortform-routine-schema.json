@@ -18,7 +18,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["order", "matchScore", "matchSummary", "safetyLevel", "safetyTitle", "safetySummary", "reasons", "estimatedIngredientCount", "ingredients"],
+        "required": ["order", "matchScore", "matchSummary", "safetyLevel", "safetyTitle", "safetySummary", "reasons"],
         "properties": {
           "order": {"type": "integer", "minimum": 1, "maximum": 12},
           "matchScore": {"type": "integer", "minimum": 0, "maximum": 100},
@@ -33,26 +33,12 @@
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["tone", "title", "description", "evidenceSource"],
+              "required": ["assessmentCategory", "title", "description", "evidenceSource"],
               "properties": {
-                "tone": {"type": "string", "enum": ["POSITIVE", "NEUTRAL", "CAUTION", "WARNING"]},
+                "assessmentCategory": {"type": "string", "enum": ["SAFE", "BENEFICIAL", "CAUTION", "WARNING"]},
                 "title": {"type": "string", "minLength": 1, "maxLength": 80},
                 "description": {"type": "string", "minLength": 1, "maxLength": 240},
                 "evidenceSource": {"type": "string", "minLength": 1, "maxLength": 80}
-              }
-            }
-          },
-          "estimatedIngredientCount": {"type": "integer", "minimum": 0, "maximum": 200},
-          "ingredients": {
-            "type": "array",
-            "maxItems": 6,
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["name", "purposes"],
-              "properties": {
-                "name": {"type": "string", "minLength": 1, "maxLength": 80},
-                "purposes": {"type": "array", "maxItems": 3, "items": {"type": "string", "maxLength": 80}}
               }
             }
           }

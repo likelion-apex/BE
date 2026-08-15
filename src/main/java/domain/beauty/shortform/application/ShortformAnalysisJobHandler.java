@@ -4,6 +4,7 @@ import domain.beauty.domain.BeautyRoutineAnalysis;
 import domain.beauty.shortform.application.ShortformAnalysisAssembler.AssembledResult;
 import domain.beauty.shortform.application.ShortformAnalysisStateService.JobContext;
 import domain.beauty.shortform.application.VideoRoutineExtractionService.ExtractionResult;
+import domain.beauty.shortform.application.ShortformProductEnrichmentService.BatchResult;
 import domain.beauty.shortform.client.OpenAiRoutineAnalysisClient;
 import domain.beauty.shortform.client.RoutinePersonalizationInput;
 import domain.beauty.shortform.client.RoutinePersonalizationResult.Response;
@@ -23,6 +24,7 @@ public class ShortformAnalysisJobHandler {
     private final ShortformAnalysisStateService stateService;
     private final VideoRoutineExtractionService extractionService;
     private final ShortformProductMatcher productMatcher;
+    private final ShortformProductEnrichmentService productEnrichmentService;
     private final ShortformAnalysisAssembler assembler;
     private final OpenAiRoutineAnalysisClient openAiClient;
     private final OpenAiRoutineProperties openAiProperties;
@@ -32,6 +34,7 @@ public class ShortformAnalysisJobHandler {
             ShortformAnalysisStateService stateService,
             VideoRoutineExtractionService extractionService,
             ShortformProductMatcher productMatcher,
+            ShortformProductEnrichmentService productEnrichmentService,
             ShortformAnalysisAssembler assembler,
             OpenAiRoutineAnalysisClient openAiClient,
             OpenAiRoutineProperties openAiProperties,
@@ -40,6 +43,7 @@ public class ShortformAnalysisJobHandler {
         this.stateService = stateService;
         this.extractionService = extractionService;
         this.productMatcher = productMatcher;
+        this.productEnrichmentService = productEnrichmentService;
         this.assembler = assembler;
         this.openAiClient = openAiClient;
         this.openAiProperties = openAiProperties;
@@ -72,7 +76,10 @@ public class ShortformAnalysisJobHandler {
                     ShortformAnalysisStatus.MATCHING_PRODUCTS,
                     "영상 제품을 서비스의 제품 정보와 연결하고 있습니다."
             );
-            List<MatchedVideoStep> matchedSteps = productMatcher.match(extraction.result().analysis().steps());
+            BatchResult enrichment = productEnrichmentService.getOrEnrich(
+                    extraction.result().analysis().steps());
+            List<MatchedVideoStep> matchedSteps = productMatcher.match(
+                    extraction.result().analysis().steps(), enrichment.productsByOrder());
 
             if (stopIfCancelled(analysisId)) {
                 return;
@@ -95,7 +102,7 @@ public class ShortformAnalysisJobHandler {
                     "인벤토리 제품과의 궁합을 확인하고 있습니다."
             );
             AssembledResult assembled = assembler.assemble(
-                    context, matchedSteps, aiResponse, extraction.entity());
+                    context, matchedSteps, aiResponse, extraction.entity(), enrichment);
 
             if (stopIfCancelled(analysisId)) {
                 return;

@@ -76,4 +76,12 @@ class SwaggerDocumentationTests {
 			.andExpect(content().string(containsString("YOUTUBE_API_KEY 등록을 요청해 주세요")))
 			.andExpect(content().string(containsString("data-save-type=\"TODAY\"")));
 	}
+
+	@Test
+	void servesFigmaModalAssetsWithoutAuthentication() throws Exception {
+		mockMvc.perform(get("/kakao-login-test/assets/ai-profile.svg"))
+			.andExpect(status().isOk())
+			.andExpect(content().contentTypeCompatibleWith("image/svg+xml"))
+			.andExpect(content().string(containsString("<svg")));
+	}
 }

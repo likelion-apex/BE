@@ -17,7 +17,7 @@ public class AnalysisFingerprint {
                 .map(item -> item.inventoryId() + ":" + item.productId() + ":" + item.category() + ":" + item.productName())
                 .reduce((left, right) -> left + "|" + right)
                 .orElse("");
-        String source = String.join("#", videoId, profile.skinType(), concerns, inventory, "shortform-personalization-v1");
+        String source = String.join("#", videoId, profile.skinType(), concerns, inventory, "shortform-personalization-v2");
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(source.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException exception) {
