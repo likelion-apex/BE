@@ -42,6 +42,9 @@ public record ShortformAnalysisSnapshot(
             String safetySummary,
             List<ReasonCard> reasons,
             IngredientDataStatus ingredientDataStatus,
+            IngredientVerificationStatus ingredientVerificationStatus,
+            String ingredientMarketOrVariant,
+            List<IngredientSource> ingredientSources,
             Integer estimatedIngredientCount,
             IngredientStats ingredientStats,
             List<IngredientDetail> ingredients
@@ -62,6 +65,13 @@ public record ShortformAnalysisSnapshot(
         NEUTRAL,
         CAUTION,
         WARNING
+    }
+
+    public record IngredientSource(
+            String url,
+            String title,
+            IngredientSourceType sourceType
+    ) {
     }
 
     public record IngredientDetail(

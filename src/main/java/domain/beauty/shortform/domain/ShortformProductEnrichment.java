@@ -45,6 +45,9 @@ public class ShortformProductEnrichment {
     @Column(name = "output_tokens", nullable = false)
     private long outputTokens;
 
+    @Column(name = "expires_at")
+    private LocalDateTime expiresAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -55,7 +58,8 @@ public class ShortformProductEnrichment {
             String promptVersion,
             String resultJson,
             long inputTokens,
-            long outputTokens
+            long outputTokens,
+            LocalDateTime expiresAt
     ) {
         this.cacheKey = cacheKey;
         this.model = model;
@@ -63,5 +67,26 @@ public class ShortformProductEnrichment {
         this.resultJson = resultJson;
         this.inputTokens = inputTokens;
         this.outputTokens = outputTokens;
+        this.expiresAt = expiresAt;
+    }
+
+    public boolean isExpired(LocalDateTime now) {
+        return expiresAt != null && !expiresAt.isAfter(now);
+    }
+
+    public void refresh(
+            String model,
+            String promptVersion,
+            String resultJson,
+            long inputTokens,
+            long outputTokens,
+            LocalDateTime expiresAt
+    ) {
+        this.model = model;
+        this.promptVersion = promptVersion;
+        this.resultJson = resultJson;
+        this.inputTokens = inputTokens;
+        this.outputTokens = outputTokens;
+        this.expiresAt = expiresAt;
     }
 }

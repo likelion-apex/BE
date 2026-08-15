@@ -24,7 +24,8 @@ mfds:
 openai:
   api-key: ${OPENAI_API_KEY:local-dummy-openai-api-key}
   api-url: ${OPENAI_API_URL:http://127.0.0.1:9/v1/chat/completions}
-  organization-id: ${OPENAI_ORGANIZATION_ID:local-dummy-openai-organization}
+  product-api-url: ${OPENAI_PRODUCT_API_URL:http://127.0.0.1:9/v1/responses}
+  organization-id: ${OPENAI_ORGANIZATION_ID:}
 
 youtube:
   api-key: ${YOUTUBE_API_KEY:local-dummy-youtube-api-key}

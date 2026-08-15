@@ -12,6 +12,7 @@ import domain.beauty.shortform.config.OpenAiRoutineProperties;
 import domain.beauty.shortform.domain.AssessmentCategory;
 import domain.beauty.shortform.domain.IngredientDataStatus;
 import domain.beauty.shortform.domain.IngredientRiskLevel;
+import domain.beauty.shortform.domain.IngredientVerificationStatus;
 import domain.beauty.shortform.domain.OptimizationStatus;
 import domain.beauty.shortform.domain.RoutineOptimizationSnapshot;
 import domain.beauty.shortform.domain.RoutineOptimizationSnapshot.OptimizedStep;
@@ -19,6 +20,7 @@ import domain.beauty.shortform.domain.SafetyLevel;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.AiMetadata;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.IngredientDetail;
+import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.IngredientSource;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.IngredientStats;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.ReasonCard;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.ReasonTone;
@@ -114,7 +116,7 @@ public class ShortformAnalysisAssembler {
                 .toList();
 
         ShortformAnalysisSnapshot snapshot = new ShortformAnalysisSnapshot(
-                "2.0",
+                "2.1",
                 context.videoId(),
                 context.youtubeUrl(),
                 textOr(ai.title(), "나를 위한 스킨케어 루틴"),
@@ -158,8 +160,11 @@ public class ShortformAnalysisAssembler {
         SafetyLevel safetyLevel = ingredientAvailable && normalized.safetyLevel() != null
                 ? normalized.safetyLevel()
                 : SafetyLevel.UNKNOWN;
+        IngredientVerificationStatus verificationStatus = matched.enrichment().ingredientVerificationStatus();
         List<IngredientDetail> ingredients = ingredientAvailable
-                ? safe(matched.enrichment().ingredients()).stream().map(this::toIngredient).toList()
+                ? safe(matched.enrichment().ingredients()).stream()
+                        .map(ingredient -> toIngredient(ingredient, verificationStatus))
+                        .toList()
                 : List.of();
         IngredientStats ingredientStats = ingredientAvailable ? toIngredientStats(ingredients) : null;
         List<ReasonCard> reasons = safe(normalized.reasons()).stream()
@@ -208,13 +213,22 @@ public class ShortformAnalysisAssembler {
                         : ingredientUnavailableMessage(matched.ingredientDataStatus()),
                 reasons,
                 matched.ingredientDataStatus(),
+                verificationStatus,
+                matched.enrichment().marketOrVariant(),
+                safe(matched.enrichment().sources()).stream()
+                        .map(ingredientSource -> new IngredientSource(
+                                ingredientSource.url(), ingredientSource.title(), ingredientSource.sourceType()))
+                        .toList(),
                 ingredientAvailable ? ingredients.size() : null,
                 ingredientStats,
                 ingredients
         );
     }
 
-    private IngredientDetail toIngredient(ProductEnrichmentResult.Ingredient ingredient) {
+    private IngredientDetail toIngredient(
+            ProductEnrichmentResult.Ingredient ingredient,
+            IngredientVerificationStatus verificationStatus
+    ) {
         Optional<RegulationInfo> regulation = regulationInfoCache.find(ingredient.name());
         return new IngredientDetail(
                 ingredient.order(),
@@ -225,7 +239,7 @@ public class ShortformAnalysisAssembler {
                 riskLevel(ingredient.riskScore()),
                 ingredient.caution20(),
                 ingredient.allergen(),
-                "AI_ESTIMATED",
+                "OPENAI_WEB_" + verificationStatus.name(),
                 regulation.isPresent(),
                 regulation.map(this::regulationSummary).orElse(null)
         );

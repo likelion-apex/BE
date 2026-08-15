@@ -3,7 +3,7 @@ package domain.beauty.shortform.client;
 import java.util.List;
 
 public record ProductEnrichmentInput(
-        boolean repairMissingIngredients,
+        boolean verificationPass,
         List<Product> products
 ) {
     public record Product(
