@@ -36,7 +36,3 @@ gemini:
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
-
-features:
-  kakao-login-test:
-    enabled: ${KAKAO_LOGIN_TEST_ENABLED:true}
