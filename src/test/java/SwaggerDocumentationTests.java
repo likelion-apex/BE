@@ -19,7 +19,7 @@ class SwaggerDocumentationTests {
 	void documentsEveryProductionApiWithExpectedSecurityAndResponses() throws Exception {
 		mockMvc.perform(get("/v3/api-docs"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.paths.length()").value(25))
+			.andExpect(jsonPath("$.paths.length()").value(26))
 			.andExpect(jsonPath("$.paths['/api/auth/kakao/login'].post.summary").value("카카오 로그인/회원가입"))
 			.andExpect(jsonPath("$.paths['/api/auth/kakao/login'].post.security").doesNotExist())
 			.andExpect(jsonPath("$.paths['/api/auth/reissue'].post.responses['401']").exists())
@@ -49,6 +49,8 @@ class SwaggerDocumentationTests {
 			.andExpect(jsonPath("$.paths['/api/v1/inventory/{inventoryId}/ingredients'].get.summary").value("성분 분석"))
 			.andExpect(jsonPath("$.paths['/api/v1/products/{productId}/skin-analysis'].get.summary").value("제품 피부적합도 분석"))
 			.andExpect(jsonPath("$.paths['/api/v1/products/{productId}/skin-analysis'].get.security[0].bearerAuth").isArray())
+			.andExpect(jsonPath("$.paths['/api/v1/products/compatibility'].post.summary").value("제품 간 궁합 비교"))
+			.andExpect(jsonPath("$.paths['/api/v1/products/compatibility'].post.security[0].bearerAuth").isArray())
 			.andExpect(jsonPath("$.paths['/api/shortform-analyses'].post.summary").value("전체 스킨케어 루틴 분석 요청"))
 			.andExpect(jsonPath("$.paths['/api/shortform-analyses'].get.security[0].bearerAuth").isArray())
 			.andExpect(jsonPath("$.paths['/api/shortform-analyses/{analysisId}/status'].get.summary").value("루틴 분석 진행 상태 조회"))
