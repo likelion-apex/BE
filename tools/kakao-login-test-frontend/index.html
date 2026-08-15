@@ -1016,6 +1016,8 @@
 </div>
 
 <script type="module">
+  import { buildKakaoAuthorizeUrl, normalizeKakaoClientId } from '/src/config.js';
+
   (() => {
     'use strict';
 
@@ -1035,7 +1037,12 @@
     let pollTimer = null;
 
     const env = (value, fallback = '') => String(value || fallback).trim();
-    const clientId = env(import.meta.env.VITE_KAKAO_CLIENT_ID);
+    const rawClientId = env(import.meta.env.VITE_KAKAO_CLIENT_ID);
+    const {
+      clientId,
+      hadAssignmentPrefix: clientIdHadAssignmentPrefix,
+      formatIsValid: clientIdFormatIsValid
+    } = normalizeKakaoClientId(rawClientId);
     const redirectUri = env(
       import.meta.env.VITE_KAKAO_REDIRECT_URI,
       'http://localhost:3000/onboarding/kakaocallback'
@@ -1045,7 +1052,9 @@
     document.querySelector('#configured-backend').textContent = backendUrl;
     document.querySelector('#configured-redirect').textContent = redirectUri || '(VITE_KAKAO_REDIRECT_URI 미설정)';
     document.querySelector('#configured-client-id').textContent = clientId
-      ? 'VITE_KAKAO_CLIENT_ID 설정됨'
+      ? clientIdHadAssignmentPrefix
+        ? '설정됨 · 잘못된 접두어 자동 제거'
+        : 'VITE_KAKAO_CLIENT_ID 설정됨'
       : '(VITE_KAKAO_CLIENT_ID 미설정)';
     document.querySelector('#swagger-link').href = `${backendUrl}/swagger-ui/index.html`;
 
@@ -1058,6 +1067,14 @@
       statusBox.textContent = '';
       statusBox.className = 'status';
     };
+
+    if (clientIdHadAssignmentPrefix) {
+      setStatus(
+        '.env.local의 VITE_KAKAO_CLIENT_ID 값에 KAKAO_CLIENT_ID= 접두어가 함께 들어 있어 자동으로 제거했습니다. 등호 오른쪽에는 REST API 키 값만 입력해 주세요.'
+      );
+    } else if (clientId && !clientIdFormatIsValid) {
+      setStatus('VITE_KAKAO_CLIENT_ID 형식이 올바르지 않습니다. 카카오 REST API 키 값만 입력해 주세요.', 'error');
+    }
 
     const setAnalysisFeedback = (message, type = 'info') => {
       analysisFeedback.textContent = message || '';
@@ -1081,6 +1098,11 @@
         return;
       }
 
+      if (!clientIdFormatIsValid) {
+        setStatus('VITE_KAKAO_CLIENT_ID 형식이 올바르지 않습니다. KAKAO_CLIENT_ID= 없이 REST API 키 값만 입력해 주세요.', 'error');
+        return;
+      }
+
       try {
         const parsedRedirect = new URL(redirectUri);
         if (!['http:', 'https:'].includes(parsedRedirect.protocol)) {
@@ -1094,12 +1116,7 @@
       const state = createState();
       sessionStorage.setItem(STORAGE.oauthState, state);
 
-      const authorizeUrl = new URL('https://kauth.kakao.com/oauth/authorize');
-      authorizeUrl.searchParams.set('client_id', clientId);
-      authorizeUrl.searchParams.set('redirect_uri', redirectUri);
-      authorizeUrl.searchParams.set('response_type', 'code');
-      authorizeUrl.searchParams.set('state', state);
-      window.location.assign(authorizeUrl.toString());
+      window.location.assign(buildKakaoAuthorizeUrl({ clientId, redirectUri, state }));
     });
 
     const formatDuration = (milliseconds) => {
