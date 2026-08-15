@@ -13,6 +13,7 @@ import global.exception.CustomException;
 import global.exception.ErrorCode;
 import java.util.List;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -113,6 +114,9 @@ public class ShortformAnalysisStateService {
             VideoRoutineExtraction extraction,
             String resultJson,
             String optimizationJson,
+            String resultTitle,
+            int resultStepCount,
+            int resultOverallScore,
             String openAiModel,
             String openAiPromptVersion,
             long inputTokens,
@@ -122,6 +126,9 @@ public class ShortformAnalysisStateService {
                 extraction,
                 resultJson,
                 optimizationJson,
+                resultTitle,
+                resultStepCount,
+                resultOverallScore,
                 openAiModel,
                 openAiPromptVersion,
                 inputTokens,
@@ -162,8 +169,8 @@ public class ShortformAnalysisStateService {
     }
 
     @Transactional(readOnly = true)
-    public List<ShortformAnalysis> recent(Long memberId) {
-        return analysisRepository.findTop10ByMemberIdOrderByCreatedAtDesc(memberId);
+    public List<ShortformAnalysisRepository.HistorySummary> recent(Long memberId) {
+        return analysisRepository.findRecentSummaries(memberId, PageRequest.of(0, 10));
     }
 
     public void requireCompleted(ShortformAnalysis analysis) {

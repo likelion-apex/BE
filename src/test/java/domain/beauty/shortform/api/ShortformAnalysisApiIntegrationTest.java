@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import domain.beauty.shortform.application.ShortformAnalysisJobHandler;
 import domain.beauty.shortform.client.YouTubeMetadataClient;
 import domain.beauty.shortform.client.YouTubeVideoMetadata;
+import domain.beauty.shortform.domain.ShortformAnalysis;
 import domain.beauty.shortform.domain.ShortformAnalysisRepository;
 import domain.member.Member;
 import domain.member.MemberRepository;
@@ -27,6 +28,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @SpringBootTest(classes = ApexBeApplication.class)
 @AutoConfigureMockMvc
@@ -99,6 +101,40 @@ class ShortformAnalysisApiIntegrationTest {
                         .with(authentication(memberAuthentication(other.getId()))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("ANALYSIS-001"));
+    }
+
+    @Test
+    void returnsRecentHistoryWithoutReadingLegacyResultJson() throws Exception {
+        Member member = saveMember("legacy-member");
+        ShortformAnalysis legacy = new ShortformAnalysis(
+                member,
+                "legacyVideo",
+                "https://www.youtube.com/watch?v=legacyVideo",
+                "legacy-fingerprint"
+        );
+        legacy.complete(
+                null,
+                "{broken-json",
+                "{}",
+                "구버전 루틴",
+                4,
+                77,
+                "gpt-test",
+                "1.0",
+                1,
+                1
+        );
+        ReflectionTestUtils.setField(legacy, "resultTitle", null);
+        ReflectionTestUtils.setField(legacy, "resultStepCount", null);
+        ReflectionTestUtils.setField(legacy, "resultOverallScore", null);
+        analysisRepository.saveAndFlush(legacy);
+
+        mockMvc.perform(get("/api/shortform-analyses")
+                        .with(authentication(memberAuthentication(member.getId()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].title").value("이전 분석 결과"))
+                .andExpect(jsonPath("$.data.items[0].stepCount").value(0))
+                .andExpect(jsonPath("$.data.items[0].overallScore").doesNotExist());
     }
 
     private Member saveMember(String providerId) {

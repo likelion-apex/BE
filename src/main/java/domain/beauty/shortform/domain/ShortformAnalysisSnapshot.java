@@ -37,7 +37,10 @@ public record ShortformAnalysisSnapshot(
             String evidenceSummary,
             int matchScore,
             String matchSummary,
+            List<String> keyBenefits,
+            ScoreBreakdown scoreBreakdown,
             SafetyLevel safetyLevel,
+            AssessmentCategory primaryAssessmentCategory,
             String safetyTitle,
             String safetySummary,
             List<ReasonCard> reasons,
@@ -48,6 +51,13 @@ public record ShortformAnalysisSnapshot(
             Integer estimatedIngredientCount,
             IngredientStats ingredientStats,
             List<IngredientDetail> ingredients
+    ) {
+    }
+
+    public record ScoreBreakdown(
+            int skinTypeFit,
+            int benefitFit,
+            int ingredientSafety
     ) {
     }
 

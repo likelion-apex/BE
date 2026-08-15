@@ -1,13 +1,11 @@
 package domain.beauty.shortform.client;
 
-import domain.beauty.shortform.domain.SafetyLevel;
 import domain.beauty.shortform.domain.AssessmentCategory;
 import java.util.List;
 
 public record RoutinePersonalizationResult(
         String title,
         String tag,
-        int overallScore,
         List<String> highlights,
         String coreGoal,
         String synergyCombo,
@@ -18,13 +16,13 @@ public record RoutinePersonalizationResult(
 ) {
     public record StepAnalysis(
             int order,
-            int matchScore,
-            String matchSummary,
-            SafetyLevel safetyLevel,
-            String safetyTitle,
-            String safetySummary,
+            ScoreBreakdown scoreBreakdown,
+            List<String> keyBenefits,
             List<Reason> reasons
     ) {
+    }
+
+    public record ScoreBreakdown(int skinTypeFit, int benefitFit) {
     }
 
     public record Reason(AssessmentCategory assessmentCategory, String title, String description, String evidenceSource) {

@@ -68,6 +68,15 @@ public class ShortformAnalysis {
     @Column(name = "result_json", columnDefinition = "TEXT")
     private String resultJson;
 
+    @Column(name = "result_title", length = 100)
+    private String resultTitle;
+
+    @Column(name = "result_step_count")
+    private Integer resultStepCount;
+
+    @Column(name = "result_overall_score")
+    private Integer resultOverallScore;
+
     @Lob
     @Column(name = "optimization_json", columnDefinition = "TEXT")
     private String optimizationJson;
@@ -133,6 +142,9 @@ public class ShortformAnalysis {
             VideoRoutineExtraction extraction,
             String resultJson,
             String optimizationJson,
+            String resultTitle,
+            int resultStepCount,
+            int resultOverallScore,
             String openAiModel,
             String openAiPromptVersion,
             long inputTokens,
@@ -144,6 +156,9 @@ public class ShortformAnalysis {
         this.extraction = extraction;
         this.resultJson = resultJson;
         this.optimizationJson = optimizationJson;
+        this.resultTitle = resultTitle;
+        this.resultStepCount = resultStepCount;
+        this.resultOverallScore = resultOverallScore;
         this.openAiModel = openAiModel;
         this.openAiPromptVersion = openAiPromptVersion;
         this.openAiInputTokens = inputTokens;

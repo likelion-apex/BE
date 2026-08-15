@@ -24,6 +24,7 @@ import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.IngredientSource
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.IngredientStats;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.ReasonCard;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.ReasonTone;
+import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.ScoreBreakdown;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.StepResult;
 import domain.beauty.shortform.domain.VideoRoutineExtraction;
 import domain.beauty.shortform.application.ShortformProductEnrichmentService.BatchResult;
@@ -36,13 +37,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import org.springframework.stereotype.Component;
 
 @Component
 public class ShortformAnalysisAssembler {
 
     public static final String DISCLAIMER =
-            "AI가 영상·제품명·회원 프로필을 바탕으로 생성한 참고 정보입니다. 실제 전성분 라벨과 피부 반응을 확인하고 이상 반응 시 사용을 중단해 주세요.";
+            "성분과 피부 반응에는 개인차가 있습니다. 실제 제품 라벨을 확인하고 이상 반응이 있으면 사용을 중단해 주세요.";
+
+    private static final Set<String> INTERNAL_COPY_MARKERS = Set.of(
+            "AI가", "AI는", "AI의", "AI 분석", "추정", "식별", "대표 처방", "서버", "모델", "확신도",
+            "NORMALIZED", "ESTIMATED");
 
     private final RegulationInfoCache regulationInfoCache;
     private final OpenAiRoutineProperties openAiProperties;
@@ -114,18 +120,25 @@ public class ShortformAnalysisAssembler {
         List<StepResult> steps = matchedSteps.stream()
                 .map(matched -> toStepResult(matched, aiSteps.get(matched.source().order())))
                 .toList();
+        int overallScore = steps.isEmpty()
+                ? 0
+                : (int) Math.round(steps.stream().mapToInt(StepResult::matchScore).average().orElse(0));
 
         ShortformAnalysisSnapshot snapshot = new ShortformAnalysisSnapshot(
-                "2.1",
+                "3.0",
                 context.videoId(),
                 context.youtubeUrl(),
-                textOr(ai.title(), "나를 위한 스킨케어 루틴"),
-                textOr(ai.tag(), context.skinType() + " 맞춤"),
-                clamp(ai.overallScore()),
-                safe(ai.highlights()),
-                textOr(ai.coreGoal(), "피부 컨디션에 맞춘 단계별 관리"),
-                textOr(ai.synergyCombo(), "영상 속 제품 조합"),
-                textOr(ai.summary(), "영상 속 스킨케어 단계를 피부 프로필에 맞춰 분석했습니다."),
+                userCopy(ai.title(), "나를 위한 스킨케어 루틴"),
+                userCopy(ai.tag(), context.skinType() + " 맞춤"),
+                overallScore,
+                safe(ai.highlights()).stream()
+                        .map(value -> userCopy(value, "피부 상태에 맞춘 단계별 관리"))
+                        .distinct()
+                        .limit(2)
+                        .toList(),
+                userCopy(ai.coreGoal(), "피부 컨디션에 맞춘 단계별 관리"),
+                userCopy(ai.synergyCombo(), "영상 속 제품 조합"),
+                userCopy(ai.summary(), "영상 속 스킨케어 단계를 피부 프로필에 맞춰 분석했습니다."),
                 mergeWarnings(ai.warnings()),
                 DISCLAIMER,
                 steps,
@@ -164,42 +177,34 @@ public class ShortformAnalysisAssembler {
                         .toList()
                 : List.of();
         IngredientStats ingredientStats = ingredientAvailable ? toIngredientStats(ingredients) : null;
-        SafetyLevel safetyLevel = verifiedSafetyLevel(
-                ingredientAvailable, verificationStatus, ingredientStats, normalized.safetyLevel());
-        List<ReasonCard> reasons = verificationStatus == IngredientVerificationStatus.ESTIMATED
-                ? estimatedReasonCards(normalized)
-                : safe(normalized.reasons()).stream()
+        List<ReasonCard> reasons = safe(normalized.reasons()).stream()
+                .filter(Objects::nonNull)
                 .map(reason -> new ReasonCard(
                         toneOf(reason.assessmentCategory()),
                         reason.assessmentCategory() == null
                                 ? AssessmentCategory.CAUTION
                                 : reason.assessmentCategory(),
-                        textOr(reason.title(), "AI 분석"),
-                        textOr(reason.description(), "확인 가능한 근거가 부족합니다."),
-                        textOr(reason.evidenceSource(), "AI_ESTIMATED")
+                        userCopy(reason.title(), fallbackReasonTitle(reason.assessmentCategory())),
+                        userCopy(reason.description(), fallbackReasonDescription(reason.assessmentCategory())),
+                        textOr(reason.evidenceSource(), "PERSONALIZED_ANALYSIS")
                 ))
+                .limit(3)
                 .toList();
-        if (reasons.isEmpty()) {
-            reasons = List.of(new ReasonCard(
-                    ReasonTone.NEUTRAL,
-                    AssessmentCategory.CAUTION,
-                    "성분 확인 필요",
-                    "제품 라벨의 전성분을 확인한 뒤 피부 반응을 살펴보세요.",
-                    "VIDEO_EVIDENCE"
-            ));
-        }
-        if (safetyLevel == SafetyLevel.CAUTION && normalized.safetyLevel() == SafetyLevel.SAFE) {
-            List<ReasonCard> guarded = new ArrayList<>();
-            guarded.add(new ReasonCard(
-                    ReasonTone.CAUTION,
-                    AssessmentCategory.CAUTION,
-                    "주의 성분을 다시 확인했어요",
-                    "AI의 SAFE 응답과 달리 위험도·알레르기·주의 성분 표시가 있어 서버가 보수적으로 조정했습니다.",
-                    "SERVER_SAFETY_GUARD"
-            ));
-            reasons.stream().limit(2).forEach(guarded::add);
-            reasons = List.copyOf(guarded);
-        }
+        AssessmentCategory primaryCategory = primaryCategory(ingredientStats, reasons);
+        reasons = ensureReasonCards(reasons, primaryCategory);
+        SafetyLevel safetyLevel = safetyLevel(primaryCategory);
+        int skinTypeFit = normalized.scoreBreakdown() == null
+                ? 20
+                : clamp(normalized.scoreBreakdown().skinTypeFit(), 0, 40);
+        int benefitFit = normalized.scoreBreakdown() == null
+                ? 18
+                : clamp(normalized.scoreBreakdown().benefitFit(), 0, 35);
+        int ingredientSafety = ingredientSafety(ingredientAvailable, ingredientStats);
+        ScoreBreakdown scoreBreakdown = new ScoreBreakdown(skinTypeFit, benefitFit, ingredientSafety);
+        int matchScore = skinTypeFit + benefitFit + ingredientSafety;
+        List<String> keyBenefits = normalizeKeyBenefits(normalized.keyBenefits(), source, matched);
+        String matchSummary = String.join(" 및 ", keyBenefits);
+        ReasonCard primaryReason = selectPrimaryReason(reasons, primaryCategory);
 
         return new StepResult(
                 source.order(),
@@ -217,12 +222,14 @@ public class ShortformAnalysisAssembler {
                 matched.productId(),
                 source.confidence(),
                 source.evidenceSummary(),
-                clamp(normalized.matchScore()),
-                textOr(normalized.matchSummary(), "피부 프로필과의 궁합을 확인할 정보가 부족합니다."),
+                matchScore,
+                matchSummary,
+                keyBenefits,
+                scoreBreakdown,
                 safetyLevel,
-                safetyTitle(ingredientAvailable, verificationStatus, safetyLevel, normalized),
-                safetySummary(ingredientAvailable, verificationStatus, safetyLevel, normalized,
-                        matched.ingredientDataStatus()),
+                primaryCategory,
+                categoryTitle(primaryCategory),
+                primaryReason.description(),
                 reasons,
                 matched.ingredientDataStatus(),
                 verificationStatus,
@@ -235,6 +242,146 @@ public class ShortformAnalysisAssembler {
                 ingredientStats,
                 ingredients
         );
+    }
+
+    private List<String> normalizeKeyBenefits(
+            List<String> values,
+            BeautyRoutineAnalysis.Step source,
+            MatchedVideoStep matched
+    ) {
+        List<String> normalized = safe(values).stream()
+                .map(String::trim)
+                .filter(value -> !value.isBlank() && value.length() <= 18)
+                .filter(value -> isUserCopy(value))
+                .filter(value -> !containsIgnoreCase(value, source.productName()))
+                .filter(value -> !containsIgnoreCase(value, source.brand()))
+                .filter(value -> !containsIgnoreCase(value, matched.displayProductName()))
+                .filter(value -> !containsIgnoreCase(value, matched.displayBrand()))
+                .map(this::toBenefitPhrase)
+                .filter(value -> !value.isBlank())
+                .distinct()
+                .limit(2)
+                .toList();
+        if (!normalized.isEmpty()) {
+            return normalized;
+        }
+        String purpose = toBenefitPhrase(userCopy(source.purpose(), "피부 컨디션 관리"));
+        return List.of(purpose.isBlank() ? "피부 컨디션 관리" : purpose);
+    }
+
+    private String toBenefitPhrase(String value) {
+        return value
+                .replaceAll("(에|에 대해)?\\s*(효과적입니다|도움을 줍니다|좋습니다|적합합니다)[.]?$", "")
+                .replaceAll("^(이 제품은|제품은)\\s*", "")
+                .trim();
+    }
+
+    private int ingredientSafety(boolean ingredientAvailable, IngredientStats stats) {
+        if (!ingredientAvailable || stats == null || stats.totalCount() == 0) {
+            return 12;
+        }
+        if (stats.highRiskCount() > 0) {
+            return 5;
+        }
+        if (stats.caution20Count() > 0 || stats.allergenCount() > 0) {
+            return 12;
+        }
+        if (stats.moderateRiskCount() > 0) {
+            return 18;
+        }
+        if (stats.lowRiskCount() == 0 && stats.unknownRiskCount() > 0) {
+            return 12;
+        }
+        return 25;
+    }
+
+    private AssessmentCategory primaryCategory(IngredientStats stats, List<ReasonCard> reasons) {
+        if ((stats != null && stats.highRiskCount() > 0)
+                || hasCategory(reasons, AssessmentCategory.WARNING)) {
+            return AssessmentCategory.WARNING;
+        }
+        if ((stats != null && (stats.caution20Count() > 0 || stats.allergenCount() > 0))
+                || hasCategory(reasons, AssessmentCategory.CAUTION)) {
+            return AssessmentCategory.CAUTION;
+        }
+        if (hasCategory(reasons, AssessmentCategory.BENEFICIAL)) {
+            return AssessmentCategory.BENEFICIAL;
+        }
+        return AssessmentCategory.SAFE;
+    }
+
+    private boolean hasCategory(List<ReasonCard> reasons, AssessmentCategory category) {
+        return reasons.stream().anyMatch(reason -> reason.assessmentCategory() == category);
+    }
+
+    private List<ReasonCard> ensureReasonCards(
+            List<ReasonCard> reasons,
+            AssessmentCategory primaryCategory
+    ) {
+        List<ReasonCard> completed = new ArrayList<>(reasons);
+        if (completed.isEmpty()) {
+            completed.add(fallbackReason(primaryCategory));
+        }
+        if (completed.size() < 2) {
+            AssessmentCategory secondary = primaryCategory == AssessmentCategory.SAFE
+                    ? AssessmentCategory.BENEFICIAL
+                    : AssessmentCategory.SAFE;
+            completed.add(fallbackReason(secondary));
+        }
+        return List.copyOf(completed.stream().limit(3).toList());
+    }
+
+    private ReasonCard fallbackReason(AssessmentCategory category) {
+        AssessmentCategory safeCategory = category == null ? AssessmentCategory.CAUTION : category;
+        return new ReasonCard(
+                toneOf(safeCategory),
+                safeCategory,
+                fallbackReasonTitle(safeCategory),
+                fallbackReasonDescription(safeCategory),
+                "SERVER_FALLBACK"
+        );
+    }
+
+    private String fallbackReasonTitle(AssessmentCategory category) {
+        return switch (category == null ? AssessmentCategory.CAUTION : category) {
+            case SAFE -> "부담이 적은 성분 구성";
+            case BENEFICIAL -> "피부 고민에 맞춘 효능";
+            case CAUTION -> "사용량과 빈도 조절";
+            case WARNING -> "자극 가능 성분 주의";
+        };
+    }
+
+    private String fallbackReasonDescription(AssessmentCategory category) {
+        return switch (category == null ? AssessmentCategory.CAUTION : category) {
+            case SAFE -> "일상적인 스킨케어 단계에서 비교적 부담 없이 사용할 수 있어요.";
+            case BENEFICIAL -> "현재 피부 타입과 고민에 필요한 관리 효과를 기대할 수 있어요.";
+            case CAUTION -> "피부 반응을 살피며 적은 양부터 천천히 사용해 주세요.";
+            case WARNING -> "자극 가능성을 줄이기 위해 사용 빈도와 피부 반응을 확인해 주세요.";
+        };
+    }
+
+    private ReasonCard selectPrimaryReason(List<ReasonCard> reasons, AssessmentCategory primaryCategory) {
+        return reasons.stream()
+                .filter(reason -> reason.assessmentCategory() == primaryCategory)
+                .findFirst()
+                .orElseGet(() -> fallbackReason(primaryCategory));
+    }
+
+    private SafetyLevel safetyLevel(AssessmentCategory category) {
+        return switch (category) {
+            case SAFE, BENEFICIAL -> SafetyLevel.SAFE;
+            case CAUTION -> SafetyLevel.CAUTION;
+            case WARNING -> SafetyLevel.WARNING;
+        };
+    }
+
+    private String categoryTitle(AssessmentCategory category) {
+        return switch (category) {
+            case SAFE -> "성분이 안전함";
+            case BENEFICIAL -> "피부에 좋음";
+            case CAUTION -> "아쉬움·애매";
+            case WARNING -> "경고·위험";
+        };
     }
 
     private IngredientDetail toIngredient(
@@ -280,84 +427,6 @@ public class ShortformAnalysisAssembler {
                 ingredients.size(), low, moderate, high, unknown, caution20, allergen);
     }
 
-    private SafetyLevel verifiedSafetyLevel(
-            boolean ingredientAvailable,
-            IngredientVerificationStatus verificationStatus,
-            IngredientStats stats,
-            SafetyLevel aiSafetyLevel
-    ) {
-        if (!ingredientAvailable || verificationStatus == IngredientVerificationStatus.ESTIMATED) {
-            return SafetyLevel.UNKNOWN;
-        }
-        SafetyLevel safetyLevel = aiSafetyLevel == null ? SafetyLevel.UNKNOWN : aiSafetyLevel;
-        if (safetyLevel == SafetyLevel.SAFE && stats != null
-                && (stats.highRiskCount() > 0 || stats.caution20Count() > 0 || stats.allergenCount() > 0)) {
-            return SafetyLevel.CAUTION;
-        }
-        return safetyLevel;
-    }
-
-    private String safetyTitle(
-            boolean ingredientAvailable,
-            IngredientVerificationStatus verificationStatus,
-            SafetyLevel safetyLevel,
-            RoutinePersonalizationResult.StepAnalysis normalized
-    ) {
-        if (!ingredientAvailable) {
-            return "성분 정보 확인 필요";
-        }
-        if (verificationStatus == IngredientVerificationStatus.ESTIMATED) {
-            return "추정 성분 기준 참고";
-        }
-        if (safetyLevel == SafetyLevel.CAUTION && normalized.safetyLevel() == SafetyLevel.SAFE) {
-            return "주의 성분 확인 필요";
-        }
-        return textOr(normalized.safetyTitle(), "AI 안전도 참고");
-    }
-
-    private String safetySummary(
-            boolean ingredientAvailable,
-            IngredientVerificationStatus verificationStatus,
-            SafetyLevel safetyLevel,
-            RoutinePersonalizationResult.StepAnalysis normalized,
-            IngredientDataStatus ingredientDataStatus
-    ) {
-        if (!ingredientAvailable) {
-            return ingredientUnavailableMessage(ingredientDataStatus);
-        }
-        if (verificationStatus == IngredientVerificationStatus.ESTIMATED) {
-            return "AI가 추정한 제품 또는 대표 처방의 성분입니다. 실제 제품 라벨과 처방 버전을 함께 확인해 주세요.";
-        }
-        if (safetyLevel == SafetyLevel.CAUTION && normalized.safetyLevel() == SafetyLevel.SAFE) {
-            return "AI는 안전하다고 평가했지만 위험도·알레르기·주의 성분 표시가 있어 보수적으로 주의로 조정했습니다.";
-        }
-        return textOr(normalized.safetySummary(), "실제 전성분과 패치 테스트를 함께 확인해 주세요.");
-    }
-
-    private List<ReasonCard> estimatedReasonCards(RoutinePersonalizationResult.StepAnalysis normalized) {
-        List<ReasonCard> cards = new ArrayList<>();
-        cards.add(new ReasonCard(
-                ReasonTone.CAUTION,
-                AssessmentCategory.CAUTION,
-                "추정 제품의 전성분이에요",
-                "영상 단서와 AI 조사 결과로 제품 또는 대표 처방을 추정했습니다. 실제 라벨과 다를 수 있어요.",
-                "AI_ESTIMATED"
-        ));
-        safe(normalized.reasons()).stream()
-                .filter(reason -> reason.assessmentCategory() == AssessmentCategory.CAUTION
-                        || reason.assessmentCategory() == AssessmentCategory.WARNING)
-                .limit(2)
-                .map(reason -> new ReasonCard(
-                        toneOf(reason.assessmentCategory()),
-                        reason.assessmentCategory(),
-                        textOr(reason.title(), "AI 분석"),
-                        textOr(reason.description(), "확인 가능한 근거가 부족합니다."),
-                        textOr(reason.evidenceSource(), "AI_ESTIMATED")
-                ))
-                .forEach(cards::add);
-        return List.copyOf(cards);
-    }
-
     private IngredientRiskLevel riskLevel(Integer score) {
         if (score == null) {
             return IngredientRiskLevel.UNKNOWN;
@@ -380,12 +449,6 @@ public class ShortformAnalysisAssembler {
             case CAUTION -> ReasonTone.CAUTION;
             case WARNING -> ReasonTone.WARNING;
         };
-    }
-
-    private String ingredientUnavailableMessage(IngredientDataStatus status) {
-        return status == IngredientDataStatus.NOT_ELIGIBLE
-                ? "영상에서 제품을 충분히 식별하지 못해 전체 성분 탭을 제공하지 않습니다."
-                : "제품은 식별했지만 확인 가능한 전체 성분 정보를 찾지 못했습니다.";
     }
 
     private String regulationSummary(RegulationInfo info) {
@@ -495,23 +558,38 @@ public class ShortformAnalysisAssembler {
     private RoutinePersonalizationResult.StepAnalysis fallbackStep(int order) {
         return new RoutinePersonalizationResult.StepAnalysis(
                 order,
-                50,
-                "추가 확인이 필요한 단계입니다.",
-                SafetyLevel.UNKNOWN,
-                "성분 확인 필요",
-                "제품 라벨과 피부 반응을 직접 확인해 주세요.",
+                new RoutinePersonalizationResult.ScoreBreakdown(20, 18),
+                List.of("피부 컨디션 관리"),
                 List.of()
         );
     }
 
     private List<String> mergeWarnings(List<String> aiWarnings) {
-        List<String> warnings = new ArrayList<>(safe(aiWarnings));
-        warnings.add("제품 성분은 AI 추정치일 수 있으며 실제 라벨이 우선합니다.");
+        List<String> warnings = new ArrayList<>(safe(aiWarnings).stream()
+                .map(value -> userCopy(value, "제품 라벨과 피부 반응을 함께 확인해 주세요."))
+                .toList());
+        warnings.add("제품 라벨과 피부 반응을 함께 확인해 주세요.");
         return warnings.stream().filter(Objects::nonNull).filter(value -> !value.isBlank()).distinct().toList();
     }
 
-    private int clamp(int score) {
-        return Math.max(0, Math.min(100, score));
+    private int clamp(int score, int minimum, int maximum) {
+        return Math.max(minimum, Math.min(maximum, score));
+    }
+
+    private String userCopy(String value, String fallback) {
+        String normalized = textOr(value, fallback);
+        return isUserCopy(normalized) ? normalized : fallback;
+    }
+
+    private boolean isUserCopy(String value) {
+        return INTERNAL_COPY_MARKERS.stream().noneMatch(marker -> containsIgnoreCase(value, marker));
+    }
+
+    private boolean containsIgnoreCase(String value, String candidate) {
+        return value != null
+                && candidate != null
+                && !candidate.isBlank()
+                && value.toLowerCase().contains(candidate.toLowerCase());
     }
 
     private String textOr(String value, String fallback) {

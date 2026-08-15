@@ -1,11 +1,10 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["title", "tag", "overallScore", "highlights", "coreGoal", "synergyCombo", "summary", "warnings", "steps", "inventoryRecommendations"],
+  "required": ["title", "tag", "highlights", "coreGoal", "synergyCombo", "summary", "warnings", "steps", "inventoryRecommendations"],
   "properties": {
     "title": {"type": "string", "minLength": 1, "maxLength": 40},
     "tag": {"type": "string", "minLength": 1, "maxLength": 30},
-    "overallScore": {"type": "integer", "minimum": 0, "maximum": 100},
     "highlights": {"type": "array", "minItems": 1, "maxItems": 2, "items": {"type": "string", "maxLength": 80}},
     "coreGoal": {"type": "string", "minLength": 1, "maxLength": 80},
     "synergyCombo": {"type": "string", "minLength": 1, "maxLength": 80},
@@ -18,17 +17,27 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["order", "matchScore", "matchSummary", "safetyLevel", "safetyTitle", "safetySummary", "reasons"],
+        "required": ["order", "scoreBreakdown", "keyBenefits", "reasons"],
         "properties": {
           "order": {"type": "integer", "minimum": 1, "maximum": 12},
-          "matchScore": {"type": "integer", "minimum": 0, "maximum": 100},
-          "matchSummary": {"type": "string", "minLength": 1, "maxLength": 120},
-          "safetyLevel": {"type": "string", "enum": ["SAFE", "CAUTION", "WARNING", "UNKNOWN"]},
-          "safetyTitle": {"type": "string", "minLength": 1, "maxLength": 80},
-          "safetySummary": {"type": "string", "minLength": 1, "maxLength": 240},
-          "reasons": {
+          "scoreBreakdown": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["skinTypeFit", "benefitFit"],
+            "properties": {
+              "skinTypeFit": {"type": "integer", "minimum": 0, "maximum": 40},
+              "benefitFit": {"type": "integer", "minimum": 0, "maximum": 35}
+            }
+          },
+          "keyBenefits": {
             "type": "array",
             "minItems": 1,
+            "maxItems": 2,
+            "items": {"type": "string", "minLength": 1, "maxLength": 18}
+          },
+          "reasons": {
+            "type": "array",
+            "minItems": 2,
             "maxItems": 3,
             "items": {
               "type": "object",

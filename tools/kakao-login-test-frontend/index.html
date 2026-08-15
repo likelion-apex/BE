@@ -609,6 +609,7 @@
     }
 
     .safety-box.safe { background: #e6fff3; }
+    .safety-box.beneficial { background: #e6f9ff; color: #16617a; }
     .safety-box.caution { background: #fff9e6; }
     .safety-box.warning { background: #fff5f5; color: #990000; }
     .safety-box.unknown { background: #f7f7f8; }
@@ -682,6 +683,25 @@
       color: #171a1f;
       font-size: 0.74rem;
       text-align: left;
+    }
+
+    .recent-error {
+      display: grid;
+      gap: 8px;
+      padding: 10px;
+      border: 1px solid #ffc9c9;
+      border-radius: 10px;
+      background: #fff2f2;
+      color: #b42318;
+      font-size: 0.74rem;
+    }
+
+    .recent-retry {
+      min-height: 34px;
+      border: 1px solid #ccd1d5;
+      background: #fff;
+      color: #56616b;
+      font-size: 0.72rem;
     }
 
     .routine-modal {
@@ -1017,6 +1037,7 @@
 
 <script type="module">
   import { buildKakaoAuthorizeUrl, normalizeKakaoClientId } from '/src/config.js';
+  import { assessmentLabel, benefitSummary, userFacingApiError } from '/src/analysis-ui.js';
 
   (() => {
     'use strict';
@@ -1227,17 +1248,28 @@
       if (!accessToken) {
         throw new Error('먼저 카카오 로그인을 완료해 주세요.');
       }
-      const response = await fetch(`${backendUrl}${path}`, {
-        ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-          ...(options.headers || {})
-        }
-      });
+      let response;
+      try {
+        response = await fetch(`${backendUrl}${path}`, {
+          ...options,
+          cache: 'no-store',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+            ...(options.headers || {})
+          }
+        });
+      } catch (cause) {
+        const error = new Error('백엔드 서버에 연결하지 못했습니다.', { cause });
+        error.isNetworkError = true;
+        throw error;
+      }
       const payload = await response.json().catch(() => null);
       if (!response.ok || !payload?.success) {
-        throw new Error(payload?.message || `HTTP ${response.status}`);
+        const error = new Error(payload?.message || '백엔드 요청이 실패했습니다.');
+        error.status = response.status;
+        error.code = payload?.code;
+        throw error;
       }
       return payload;
     };
@@ -1410,9 +1442,9 @@
             <span class="step-heading"><span class="step-number">${escapeHtml(step.order)}</span>${escapeHtml(step.category)}</span>
             ${imageMarkup}
             <span class="step-product">${escapeHtml(step.displayProductName || step.productName)}</span>
-            <span class="routine-muted">${escapeHtml(step.matchSummary)}</span>
-            <span class="safety-box ${String(step.safetyLevel || 'UNKNOWN').toLowerCase()}">
-              <strong>${escapeHtml(step.safetyTitle)}</strong><br>${escapeHtml(step.safetySummary)}
+            <span class="routine-muted">${escapeHtml(benefitSummary(step))}</span>
+            <span class="safety-box ${String(step.primaryAssessmentCategory || 'CAUTION').toLowerCase()}">
+              <strong>${escapeHtml(assessmentLabel(step.primaryAssessmentCategory))}</strong><br>${escapeHtml(step.safetySummary)}
             </span>
           </button>
         `;
@@ -1509,9 +1541,7 @@
           </section>` : '';
         const unavailableNotice = ingredientsAvailable ? '' : `
           <div class="ingredient-unavailable">
-            ${result.ingredientDataStatus === 'NOT_ELIGIBLE'
-              ? '영상에서 제품을 충분히 식별하지 못해 전체 성분 탭을 숨겼습니다.'
-              : '제품은 식별했지만 확인 가능한 전체 성분 정보를 찾지 못했습니다.'}
+            전체 성분 정보는 실제 제품 라벨에서 확인해 주세요.
           </div>`;
         document.querySelector('#modal-content').innerHTML = `
           <header class="product-detail-head">
@@ -1519,7 +1549,7 @@
             <div class="product-identity">
               <small>${escapeHtml(result.displayBrand || result.brand || '브랜드 미확인')}</small>
               <h3 id="modal-title">${escapeHtml(result.displayProductName || result.productName)}</h3>
-              <div class="product-badges"><span>${escapeHtml(result.category)}</span><span>${escapeHtml(result.productResolutionStatus)}</span></div>
+              <div class="product-badges"><span>${escapeHtml(result.category)}</span></div>
             </div>
             <button class="inventory-mini" type="button">인벤토리</button>
           </header>
@@ -1631,11 +1661,19 @@
           </button>
         `).join('') : '<p class="routine-muted">아직 분석한 루틴이 없습니다.</p>';
       } catch (error) {
-        document.querySelector('#recent-list').innerHTML = `<p class="routine-muted">${escapeHtml(error.message)}</p>`;
+        document.querySelector('#recent-list').innerHTML = `
+          <div class="recent-error">
+            <span>${escapeHtml(userFacingApiError(error))}</span>
+            <button class="recent-retry" type="button" data-retry-recent>다시 불러오기</button>
+          </div>`;
       }
     };
 
     document.querySelector('#recent-list').addEventListener('click', (event) => {
+      if (event.target.closest('[data-retry-recent]')) {
+        loadRecentAnalyses();
+        return;
+      }
       const item = event.target.closest('[data-analysis-id]');
       if (!item) return;
       currentAnalysisId = Number(item.dataset.analysisId);
