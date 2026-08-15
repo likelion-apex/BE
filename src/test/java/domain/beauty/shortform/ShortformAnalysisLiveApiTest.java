@@ -38,7 +38,7 @@ import org.springframework.test.context.ActiveProfiles;
 @EnabledIfEnvironmentVariable(named = "RUN_LIVE_AI_TEST", matches = "true")
 class ShortformAnalysisLiveApiTest {
 
-    private static final String VIDEO_URL = "https://www.youtube.com/shorts/AsQSwQRW-Eg";
+    private static final String DEFAULT_VIDEO_URL = "https://www.youtube.com/shorts/AsQSwQRW-Eg";
 
     @Autowired
     private MemberRepository memberRepository;
@@ -66,7 +66,8 @@ class ShortformAnalysisLiveApiTest {
         member.updateSkinConcerns(Set.of(SkinConcern.SENSITIVE, SkinConcern.DRYNESS));
         member = memberRepository.saveAndFlush(member);
 
-        Created created = analysisService.create(member.getId(), VIDEO_URL);
+        String videoUrl = System.getenv().getOrDefault("SHORTFORM_LIVE_VIDEO_URL", DEFAULT_VIDEO_URL);
+        Created created = analysisService.create(member.getId(), videoUrl);
         ShortformAnalysis completed = awaitTerminal(created.analysisId());
         if (completed.getStatus() == ShortformAnalysisStatus.FAILED) {
             String extractionSummary = extractionRepository.findAll().stream().findFirst()
@@ -87,12 +88,32 @@ class ShortformAnalysisLiveApiTest {
         Detail detail = analysisService.detail(member.getId(), completed.getId());
         ShortformAnalysisSnapshot snapshot = detail.result();
         assertThat(snapshot.steps()).isNotEmpty();
+        int expectedOverallScore = (int) Math.round(
+                snapshot.steps().stream().mapToInt(ShortformAnalysisSnapshot.StepResult::matchScore)
+                        .average().orElse(0));
+        assertThat(snapshot.overallScore()).isEqualTo(expectedOverallScore);
+        if (snapshot.steps().size() > 1) {
+            assertThat(snapshot.steps().stream()
+                    .map(ShortformAnalysisSnapshot.StepResult::matchScore)
+                    .distinct()
+                    .count()).isGreaterThan(1);
+        }
         assertThat(snapshot.steps()).anyMatch(step -> step.brand() != null && step.productName() != null);
         assertThat(snapshot.steps()).allSatisfy(step -> {
             assertThat(step.matchScore()).isBetween(0, 100);
+            assertThat(step.matchScore()).isEqualTo(
+                    step.scoreBreakdown().skinTypeFit()
+                            + step.scoreBreakdown().benefitFit()
+                            + step.scoreBreakdown().ingredientSafety());
+            assertThat(step.keyBenefits()).hasSizeBetween(1, 2);
+            assertThat(step.primaryAssessmentCategory()).isIn((Object[]) AssessmentCategory.values());
             assertThat(step.safetyLevel()).isIn((Object[]) SafetyLevel.values());
-            assertThat(step.reasons()).allSatisfy(reason ->
-                    assertThat(reason.assessmentCategory()).isIn((Object[]) AssessmentCategory.values()));
+            assertThat(step.reasons()).hasSizeBetween(2, 3).allSatisfy(reason -> {
+                assertThat(reason.assessmentCategory()).isIn((Object[]) AssessmentCategory.values());
+                assertThat(reason.title()).doesNotContain("추정", "AI가", "AI는", "대표 처방", "식별");
+                assertThat(reason.description()).doesNotContain("추정", "AI가", "AI는", "대표 처방", "식별");
+            });
+            assertThat(step.matchSummary()).doesNotContain("효과적입니다", "도움을 줍니다");
             if (step.productResolutionConfidence() >= 0.85) {
                 assertThat(step.displayProductName()).isNotBlank();
             }

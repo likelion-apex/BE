@@ -70,13 +70,14 @@ class ShortformAnalysisAssemblerTest {
         RoutinePersonalizationResult result = new RoutinePersonalizationResult(
                 "수부지 진정 루틴",
                 "민감 피부 맞춤",
-                82,
                 List.of("보습 단계가 균형적입니다."),
                 "장벽 보호",
                 "판테놀 + 히알루론산",
                 "단계별 사용을 권장합니다.",
                 List.of(),
-                List.of(aiStep(1, SafetyLevel.SAFE), aiStep(2, SafetyLevel.SAFE)),
+                List.of(
+                        aiStep(1, 30, 25, AssessmentCategory.BENEFICIAL),
+                        aiStep(2, 20, 18, AssessmentCategory.CAUTION)),
                 List.of(
                         new RoutinePersonalizationResult.InventoryRecommendation(1, 100L, "토너 단계 대체"),
                         new RoutinePersonalizationResult.InventoryRecommendation(2, 999L, "존재하지 않는 추천")
@@ -93,8 +94,13 @@ class ShortformAnalysisAssemblerTest {
                 new ShortformProductEnrichmentService.BatchResult(
                         java.util.Map.of(1, exactEnrichment), "gpt-test", "1.0", 40, 20, 0, 1));
 
-        assertThat(assembled.analysis().steps().get(0).safetyLevel()).isEqualTo(SafetyLevel.SAFE);
-        assertThat(assembled.analysis().steps().get(1).safetyLevel()).isEqualTo(SafetyLevel.UNKNOWN);
+        assertThat(assembled.analysis().steps().get(0).matchScore()).isEqualTo(80);
+        assertThat(assembled.analysis().steps().get(1).matchScore()).isEqualTo(50);
+        assertThat(assembled.analysis().overallScore()).isEqualTo(65);
+        assertThat(assembled.analysis().steps().get(0).scoreBreakdown().ingredientSafety()).isEqualTo(25);
+        assertThat(assembled.analysis().steps().get(0).primaryAssessmentCategory())
+                .isEqualTo(AssessmentCategory.BENEFICIAL);
+        assertThat(assembled.analysis().steps().get(1).safetyLevel()).isEqualTo(SafetyLevel.CAUTION);
         assertThat(assembled.analysis().steps().get(1).ingredients()).isEmpty();
         assertThat(assembled.analysis().steps().get(1).estimatedIngredientCount()).isNull();
         assertThat(assembled.analysis().steps().get(0).ingredientStats().totalCount()).isEqualTo(1);
@@ -105,7 +111,7 @@ class ShortformAnalysisAssemblerTest {
     }
 
     @Test
-    void doesNotPresentEstimatedOrHighRiskIngredientEvidenceAsUnconditionallySafe() {
+    void usesNormalReasonCardsForEstimatedProductsAndGuardsHighRiskIngredients() {
         JobContext context = new JobContext(
                 1L, "video", "https://www.youtube.com/watch?v=video", "테스터", "건성",
                 List.of(), List.of());
@@ -126,8 +132,11 @@ class ShortformAnalysisAssemblerTest {
                 null, null, "테스트", "테스트 크림", ProductResolutionStatus.AI_NORMALIZED,
                 0.95, IngredientDataStatus.AVAILABLE, highRiskEnrichment);
         RoutinePersonalizationResult result = new RoutinePersonalizationResult(
-                "테스트 루틴", "테스트", 80, List.of(), "보습", "없음", "요약", List.of(),
-                List.of(aiStep(1, SafetyLevel.SAFE), aiStep(2, SafetyLevel.SAFE)), List.of());
+                "테스트 루틴", "테스트", List.of(), "보습", "없음", "요약", List.of(),
+                List.of(
+                        aiStep(1, 30, 25, AssessmentCategory.BENEFICIAL),
+                        aiStep(2, 30, 25, AssessmentCategory.SAFE)),
+                List.of());
         VideoRoutineExtraction extraction = new VideoRoutineExtraction(
                 "cache", "video", context.youtubeUrl(), "gemini-test", "1.0", "{}", 10, 5);
 
@@ -140,10 +149,15 @@ class ShortformAnalysisAssemblerTest {
                         java.util.Map.of(1, estimatedEnrichment, 2, highRiskEnrichment),
                         "gpt-test+gemini-test", "2.0+gemini-1.0", 40, 20, 0, 2));
 
-        assertThat(assembled.analysis().steps().get(0).safetyLevel()).isEqualTo(SafetyLevel.UNKNOWN);
-        assertThat(assembled.analysis().steps().get(0).reasons().getFirst().assessmentCategory())
-                .isEqualTo(AssessmentCategory.CAUTION);
-        assertThat(assembled.analysis().steps().get(1).safetyLevel()).isEqualTo(SafetyLevel.CAUTION);
+        assertThat(assembled.analysis().steps().get(0).primaryAssessmentCategory())
+                .isEqualTo(AssessmentCategory.BENEFICIAL);
+        assertThat(assembled.analysis().steps().get(0).reasons()).hasSizeBetween(2, 3);
+        assertThat(assembled.analysis().steps().get(0).reasons())
+                .noneMatch(reason -> reason.title().contains("추정") || reason.description().contains("추정"));
+        assertThat(assembled.analysis().steps().get(1).safetyLevel()).isEqualTo(SafetyLevel.WARNING);
+        assertThat(assembled.analysis().steps().get(1).primaryAssessmentCategory())
+                .isEqualTo(AssessmentCategory.WARNING);
+        assertThat(assembled.analysis().steps().get(1).scoreBreakdown().ingredientSafety()).isEqualTo(5);
     }
 
     private ProductEnrichmentData enrichment(
@@ -185,16 +199,18 @@ class ShortformAnalysisAssemblerTest {
         );
     }
 
-    private RoutinePersonalizationResult.StepAnalysis aiStep(int order, SafetyLevel level) {
+    private RoutinePersonalizationResult.StepAnalysis aiStep(
+            int order,
+            int skinTypeFit,
+            int benefitFit,
+            AssessmentCategory category
+    ) {
         return new RoutinePersonalizationResult.StepAnalysis(
                 order,
-                85,
-                "피부 타입에 잘 맞습니다.",
-                level,
-                "AI 안전도 참고",
-                "사용 전 패치 테스트를 권장합니다.",
+                new RoutinePersonalizationResult.ScoreBreakdown(skinTypeFit, benefitFit),
+                List.of("피부 진정", "수분 공급"),
                 List.of(new RoutinePersonalizationResult.Reason(
-                        AssessmentCategory.BENEFICIAL, "보습", "보습 목적의 단계입니다.", "AI_ESTIMATED"))
+                        category, "보습 균형", "피부 컨디션에 필요한 보습을 채워줘요.", "INGREDIENT_PROFILE"))
         );
     }
 }
