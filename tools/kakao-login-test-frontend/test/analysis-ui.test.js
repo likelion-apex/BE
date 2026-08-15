@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   assessmentLabel,
   benefitSummary,
+  buildRoutineApplyPayload,
   hasInternalProcessingCopy,
   userFacingApiError
 } from '../src/analysis-ui.js';
@@ -30,4 +31,12 @@ test('네트워크 오류 원문을 사용자 문구로 변환한다', () => {
 test('내부 처리 표현을 검출한다', () => {
   assert.equal(hasInternalProcessingCopy('AI가 추정한 대표 처방입니다.'), true);
   assert.equal(hasInternalProcessingCopy('피부 진정과 수분 공급에 도움을 줍니다.'), false);
+});
+
+test('루틴 저장 요청에 DAY/NIGHT 타입을 포함한다', () => {
+  assert.deepEqual(buildRoutineApplyPayload('TODAY', 'night'), {
+    saveType: 'TODAY',
+    routineType: 'NIGHT'
+  });
+  assert.throws(() => buildRoutineApplyPayload('TODAY', ''), /사용 시간대/);
 });

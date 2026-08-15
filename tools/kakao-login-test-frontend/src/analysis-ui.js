@@ -26,6 +26,18 @@ export function userFacingApiError(error) {
   return error?.message || '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.';
 }
 
+export function buildRoutineApplyPayload(saveType, routineType) {
+  const normalizedSaveType = String(saveType || '').toUpperCase();
+  const normalizedRoutineType = String(routineType || '').toUpperCase();
+  if (!['TODAY', 'LIBRARY'].includes(normalizedSaveType)) {
+    throw new Error('유효하지 않은 루틴 저장 방식입니다.');
+  }
+  if (!['DAY', 'NIGHT'].includes(normalizedRoutineType)) {
+    throw new Error('유효하지 않은 루틴 사용 시간대입니다.');
+  }
+  return { saveType: normalizedSaveType, routineType: normalizedRoutineType };
+}
+
 export function hasInternalProcessingCopy(value) {
   return /AI가|AI는|AI의|AI 분석|추정|식별|대표 처방|서버 보정|NORMALIZED|ESTIMATED/i.test(String(value || ''));
 }

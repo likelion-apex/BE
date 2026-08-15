@@ -32,8 +32,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "routines", uniqueConstraints = {
         @UniqueConstraint(
-                name = "uk_routine_member_analysis_save_type",
-                columnNames = {"member_id", "source_analysis_id", "save_type"}
+                name = "uk_routine_member_analysis_save_type_routine_type",
+                columnNames = {"member_id", "source_analysis_id", "save_type", "routine_type"}
         )
 })
 public class Routine {

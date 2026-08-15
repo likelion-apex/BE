@@ -5,6 +5,7 @@ import domain.beauty.shortform.domain.RoutineSaveType;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot;
 import domain.beauty.shortform.domain.ShortformAnalysisStatus;
 import domain.routine.RoutineStatus;
+import domain.routine.RoutineType;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -74,6 +75,7 @@ public final class ShortformAnalysisResponses {
             Long analysisId,
             Long routineId,
             RoutineSaveType saveType,
+            RoutineType routineType,
             RoutineStatus routineStatus,
             boolean reused
     ) {
