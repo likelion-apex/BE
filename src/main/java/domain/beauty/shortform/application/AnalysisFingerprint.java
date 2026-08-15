@@ -10,6 +10,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class AnalysisFingerprint {
 
+    private static final String ANALYSIS_VERSION = "shortform-personalization-v3-web-sources";
+
     public String create(String videoId, AnalysisProfile profile) {
         String concerns = profile.skinConcerns().stream().sorted().reduce((left, right) -> left + "," + right).orElse("");
         String inventory = profile.inventory().stream()
@@ -17,7 +19,7 @@ public class AnalysisFingerprint {
                 .map(item -> item.inventoryId() + ":" + item.productId() + ":" + item.category() + ":" + item.productName())
                 .reduce((left, right) -> left + "|" + right)
                 .orElse("");
-        String source = String.join("#", videoId, profile.skinType(), concerns, inventory, "shortform-personalization-v2");
+        String source = String.join("#", videoId, profile.skinType(), concerns, inventory, ANALYSIS_VERSION);
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(source.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException exception) {
