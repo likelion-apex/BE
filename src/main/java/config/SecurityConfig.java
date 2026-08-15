@@ -28,6 +28,7 @@ public class SecurityConfig {
             "/api/cosmetics/**",
             "/kakao-login-test",
             "/kakao-login-test/",
+            "/kakao-login-test/assets/**",
             "/swagger-ui/**",
             "/swagger-ui.html",
             "/v3/api-docs/**",

@@ -702,30 +702,125 @@
     }
 
     .modal-sheet {
-      width: min(430px, 100%);
-      max-height: 86vh;
+      position: relative;
+      width: min(404px, 100%);
+      max-height: 92vh;
       overflow: auto;
-      padding: 20px;
-      border-radius: 22px 22px 14px 14px;
+      padding: 24px 22px 20px;
+      border-radius: 20px 20px 0 0;
       background: #fff;
       color: #171a1f;
     }
 
-    .modal-sheet h3 { margin-top: 0; }
+    .modal-dismiss {
+      position: absolute;
+      z-index: 2;
+      top: 16px;
+      right: 16px;
+      width: 32px;
+      min-height: 32px;
+      padding: 0;
+      border-radius: 50%;
+      background: #eef0f2;
+      color: #56616b;
+      font-size: 24px;
+      font-weight: 500;
+    }
+
+    .product-detail-head {
+      display: grid;
+      grid-template-columns: 64px minmax(0, 1fr) auto;
+      gap: 16px;
+      align-items: center;
+      padding-right: 30px;
+    }
+
+    .modal-product-image {
+      width: 64px;
+      height: 64px;
+      border-radius: 8px;
+      background: #8e99a4;
+      object-fit: cover;
+    }
+
+    .product-identity small { display: block; color: #56616b; font-size: 0.72rem; font-weight: 800; }
+    .product-identity h3 { margin: 3px 0 6px; font-size: 1rem; line-height: 1.3; }
+    .product-badges { display: flex; flex-wrap: wrap; gap: 5px; }
+    .product-badges span { padding: 3px 7px; border-radius: 4px; background: #e6f9ff; color: #03c1fb; font-size: 0.66rem; font-weight: 800; }
+
+    .inventory-mini { min-height: 34px; padding: 0 10px; border: 1px solid #03c1fb; border-radius: 8px; background: #fff; color: #03c1fb; font-size: 0.7rem; white-space: nowrap; }
+    .inventory-mini::before { width: 16px; height: 16px; content: ''; background: url('/kakao-login-test/assets/inventory-plus.svg') center / contain no-repeat; }
+
+    .personal-score { display: grid; grid-template-columns: 40px 1fr; gap: 10px; align-items: center; margin: 20px 0 14px; padding: 14px 18px; border: 1px solid #03c1fb; border-radius: 18px; background: #e6f9ff; }
+    .personal-score img { width: 40px; height: 40px; }
+    .personal-score small { color: #03c1fb; font-size: 0.7rem; font-weight: 800; }
+    .personal-score strong { display: block; font-size: 1rem; }
+
+    .detail-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-bottom: 1px solid #ccd1d5; }
+    .detail-tabs.single { grid-template-columns: 1fr; }
+    .detail-tab { min-height: 46px; border-radius: 0; background: #fff; color: #56616b; font-size: 0.88rem; }
+    .detail-tab.active { border-bottom: 2px solid #171a1f; color: #171a1f; }
+    .detail-pane { display: none; padding-top: 14px; }
+    .detail-pane.active { display: block; }
+    .detail-pane h4 { margin: 0 0 10px; font-size: 0.9rem; }
 
     .reason-card {
-      margin-top: 9px;
-      padding: 12px;
-      border-radius: 12px;
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 10px;
+      margin-top: 10px;
+      padding: 14px;
+      border: 1px solid #03c1fb;
+      border-radius: 18px;
       background: #e6f9ff;
       font-size: 0.78rem;
     }
 
+    .reason-card img { width: 34px; height: 34px; }
+    .reason-card strong { display: block; margin-bottom: 3px; font-size: 0.82rem; }
+    .reason-card.safe { border-color: #03fb8a; background: #e6fff3; }
+    .reason-card.beneficial { border-color: #03c1fb; background: #e6f9ff; }
+    .reason-card.caution { border-color: #7841f4; background: #f8f4ff; }
+    .reason-card.warning { border-color: #ff3333; background: #fff5f5; color: #990000; }
+
+    .analysis-disclaimer { margin: 12px 0; color: #8e99a4; font-size: 0.7rem; text-align: center; }
+    .ingredient-overview { display: grid; gap: 10px; padding-bottom: 16px; border-bottom: 1px solid #ccd1d5; font-size: 0.74rem; }
+    .risk-legend { display: flex; flex-wrap: wrap; gap: 12px; color: #56616b; }
+    .risk-dot { display: inline-block; width: 7px; height: 7px; margin-right: 4px; border-radius: 50%; }
+    .risk-dot.low { background: #03c1fb; }
+    .risk-dot.moderate { background: #ffb800; }
+    .risk-dot.high { background: #ff3333; }
+    .risk-dot.unknown { background: #ccd1d5; }
+    .risk-bar { display: flex; height: 7px; overflow: hidden; border-radius: 99px; background: #eef0f2; }
+    .risk-bar span { min-width: 0; }
+    .risk-bar .low { background: #03c1fb; }
+    .risk-bar .moderate { background: #ffb800; }
+    .risk-bar .high { background: #ff3333; }
+    .risk-bar .unknown { background: #ccd1d5; }
+    .ingredient-metrics { display: grid; gap: 8px; color: #8e99a4; }
+    .ingredient-metrics div { display: flex; justify-content: space-between; }
+    .ingredient-metrics strong { color: #56616b; }
+    .ingredient-heading { display: flex; justify-content: space-between; margin: 16px 0 4px; font-size: 0.82rem; }
+    .ingredient-heading strong { color: #03c1fb; }
+
     .ingredient-list {
-      padding-left: 18px;
+      display: grid;
+      gap: 0;
+      margin: 0;
+      padding: 0;
+      list-style: none;
       color: #56616b;
       font-size: 0.76rem;
     }
+
+    .ingredient-row { display: grid; grid-template-columns: 28px 1fr; gap: 8px; padding: 11px 0; border-bottom: 1px solid #ccd1d5; }
+    .risk-score { display: inline-flex; width: 24px; height: 24px; align-items: center; justify-content: center; border-radius: 50%; background: #ccd1d5; color: #fff; font-size: 0.68rem; font-weight: 800; }
+    .risk-score.low { background: #03c1fb; }
+    .risk-score.moderate { background: #ffb800; }
+    .risk-score.high { background: #ff3333; }
+    .ingredient-benefits { color: #03c1fb; font-weight: 800; }
+    .ingredient-unavailable { padding: 18px; border-radius: 12px; background: #f7f7f8; color: #56616b; font-size: 0.78rem; text-align: center; }
+    .modal-confirm { width: 100%; min-height: 52px; margin-top: 12px; border-radius: 7px; background: #171a1f; color: #fff; }
 
     @media (max-width: 640px) {
       main {
@@ -917,7 +1012,7 @@
 
 <div id="routine-modal" class="routine-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
   <div class="modal-sheet">
-    <button id="modal-close" class="routine-button ghost" type="button" style="float:right; min-height:36px;">닫기</button>
+    <button id="modal-close" class="modal-dismiss" type="button" aria-label="닫기">×</button>
     <div id="modal-content"></div>
   </div>
 </div>
@@ -1303,7 +1398,7 @@
           <button class="routine-step-card" type="button" data-result-id="${escapeHtml(step.resultId)}">
             <span class="step-heading"><span class="step-number">${escapeHtml(step.order)}</span>${escapeHtml(step.category)}</span>
             ${imageMarkup}
-            <span class="step-product">${escapeHtml(step.productName)}</span>
+            <span class="step-product">${escapeHtml(step.displayProductName || step.productName)}</span>
             <span class="routine-muted">${escapeHtml(step.matchSummary)}</span>
             <span class="safety-box ${String(step.safetyLevel || 'UNKNOWN').toLowerCase()}">
               <strong>${escapeHtml(step.safetyTitle)}</strong><br>${escapeHtml(step.safetySummary)}
@@ -1336,21 +1431,115 @@
       try {
         const payload = await apiFetch(`/api/shortform-analyses/${currentAnalysisId}/results/${card.dataset.resultId}`);
         const result = payload.data.result;
-        const reasons = (result.reasons || []).map((reason) => `
-          <div class="reason-card"><strong>${escapeHtml(reason.title)}</strong><br>${escapeHtml(reason.description)}</div>
-        `).join('');
-        const ingredients = (result.ingredients || []).map((ingredient) => `
-          <li><strong>${escapeHtml(ingredient.name)}</strong> · ${escapeHtml((ingredient.purposes || []).join(', ') || '용도 미확인')}<br>
-          <small>${escapeHtml(ingredient.source)}${ingredient.regulationSummary ? ` · ${escapeHtml(ingredient.regulationSummary)}` : ''}</small></li>
-        `).join('');
+        const assessmentCategory = (reason) => reason.assessmentCategory
+          || ({ POSITIVE: 'BENEFICIAL', CAUTION: 'CAUTION', WARNING: 'WARNING' }[reason.tone])
+          || 'CAUTION';
+        const assessmentIcon = (category) => ({
+          SAFE: '/kakao-login-test/assets/assessment-safe.svg',
+          BENEFICIAL: '/kakao-login-test/assets/assessment-beneficial.svg',
+          CAUTION: '/kakao-login-test/assets/assessment-caution.svg',
+          WARNING: '/kakao-login-test/assets/assessment-warning.svg'
+        }[category]);
+        const reasons = (result.reasons || []).map((reason) => {
+          const category = assessmentCategory(reason);
+          return `
+            <div class="reason-card ${category.toLowerCase()}">
+              <img src="${assessmentIcon(category)}" alt="">
+              <div><strong>${escapeHtml(reason.title)}</strong>${escapeHtml(reason.description)}</div>
+            </div>`;
+        }).join('');
+        const ingredients = (result.ingredients || []).map((ingredient) => {
+          const riskLevel = String(ingredient.riskLevel || 'UNKNOWN').toLowerCase();
+          const riskScore = ingredient.riskScore == null ? '?' : ingredient.riskScore;
+          const purposes = (ingredient.purposes || []).join(', ') || '배합 목적 미확인';
+          const benefits = (ingredient.skinBenefits || []).join(', ');
+          return `
+            <li class="ingredient-row">
+              <span class="risk-score ${riskLevel}">${escapeHtml(riskScore)}</span>
+              <div>
+                <strong>${escapeHtml(ingredient.name)}</strong><br>
+                <small>배합목적: ${escapeHtml(purposes)}</small>
+                ${benefits ? `<br><span class="ingredient-benefits">${escapeHtml(benefits)}</span>` : ''}
+                ${ingredient.regulationSummary ? `<br><small>식약처 확인 · ${escapeHtml(ingredient.regulationSummary)}</small>` : ''}
+              </div>
+            </li>`;
+        }).join('');
+        const image = safeImageUrl(result.imageUrl);
+        const stats = result.ingredientStats;
+        const total = stats?.totalCount || 0;
+        const width = (count) => total ? `${(Number(count || 0) / total) * 100}%` : '0%';
+        const ingredientsAvailable = result.ingredientDataStatus === 'AVAILABLE' && total > 0;
+        const ingredientTab = ingredientsAvailable ? `
+          <button class="detail-tab" type="button" data-detail-tab="ingredients">전체 성분</button>` : '';
+        const ingredientPane = ingredientsAvailable ? `
+          <section class="detail-pane" data-detail-pane="ingredients">
+            <div class="ingredient-overview">
+              <strong>성분 구성</strong>
+              <div class="risk-legend">
+                <span><i class="risk-dot low"></i>1–2 낮은 위험</span>
+                <span><i class="risk-dot moderate"></i>3–6 중간 위험</span>
+                <span><i class="risk-dot high"></i>7–10 높은 위험</span>
+                <span><i class="risk-dot unknown"></i>등급 미상</span>
+              </div>
+              <div class="risk-bar" aria-label="성분 위험도 분포">
+                <span class="low" style="width:${width(stats.lowRiskCount)}"></span>
+                <span class="moderate" style="width:${width(stats.moderateRiskCount)}"></span>
+                <span class="high" style="width:${width(stats.highRiskCount)}"></span>
+                <span class="unknown" style="width:${width(stats.unknownRiskCount)}"></span>
+              </div>
+              <div class="ingredient-metrics">
+                <div><span>전체 성분</span><strong>${escapeHtml(stats.totalCount)}개</strong></div>
+                <div><span>20가지 주의성분</span><strong>${escapeHtml(stats.caution20Count)}개</strong></div>
+                <div><span>알레르기 주의성분</span><strong>${escapeHtml(stats.allergenCount)}개</strong></div>
+              </div>
+            </div>
+            <div class="ingredient-heading"><b>전성분</b><strong>${escapeHtml(stats.totalCount)}개</strong></div>
+            <ul class="ingredient-list">${ingredients}</ul>
+          </section>` : '';
+        const unavailableNotice = ingredientsAvailable ? '' : `
+          <div class="ingredient-unavailable">
+            ${result.ingredientDataStatus === 'NOT_ELIGIBLE'
+              ? '영상에서 제품을 충분히 식별하지 못해 전체 성분 탭을 숨겼습니다.'
+              : '제품은 식별했지만 확인 가능한 전체 성분 정보를 찾지 못했습니다.'}
+          </div>`;
         document.querySelector('#modal-content').innerHTML = `
-          <h3 id="modal-title">${escapeHtml(result.productName)}</h3>
-          <p><strong>AI 매칭 점수 ${escapeHtml(result.matchScore)}점</strong></p>
-          ${reasons}
-          <h4>대표 성분 · 추정 ${escapeHtml(result.estimatedIngredientCount)}개</h4>
-          <ul class="ingredient-list">${ingredients || '<li>확인 가능한 성분 정보가 없습니다.</li>'}</ul>
-          <p class="routine-muted">${escapeHtml(payload.data.disclaimer)}</p>
+          <header class="product-detail-head">
+            ${image ? `<img class="modal-product-image" src="${escapeHtml(image)}" alt="">` : '<div class="modal-product-image"></div>'}
+            <div class="product-identity">
+              <small>${escapeHtml(result.displayBrand || result.brand || '브랜드 미확인')}</small>
+              <h3 id="modal-title">${escapeHtml(result.displayProductName || result.productName)}</h3>
+              <div class="product-badges"><span>${escapeHtml(result.category)}</span><span>${escapeHtml(result.productResolutionStatus)}</span></div>
+            </div>
+            <button class="inventory-mini" type="button">인벤토리</button>
+          </header>
+          <div class="personal-score">
+            <img src="/kakao-login-test/assets/ai-profile.svg" alt="">
+            <div><small>내 피부 프로필 맞춤</small><strong>AI 매칭 점수 ${escapeHtml(result.matchScore)}점</strong></div>
+          </div>
+          <nav class="detail-tabs ${ingredientsAvailable ? '' : 'single'}" aria-label="제품 상세 탭">
+            <button class="detail-tab active" type="button" data-detail-tab="analysis">AI 맞춤 분석</button>
+            ${ingredientTab}
+          </nav>
+          <section class="detail-pane active" data-detail-pane="analysis">
+            <h4>이 제품이 ${escapeHtml(result.matchScore)}점인 이유</h4>
+            ${reasons || unavailableNotice}
+            ${reasons ? unavailableNotice : ''}
+            <p class="analysis-disclaimer">${escapeHtml(payload.data.disclaimer)}</p>
+          </section>
+          ${ingredientPane}
+          <button class="modal-confirm" type="button" data-modal-confirm>확인</button>
         `;
+        document.querySelectorAll('[data-detail-tab]').forEach((tab) => {
+          tab.addEventListener('click', () => {
+            document.querySelectorAll('[data-detail-tab]').forEach((item) => item.classList.toggle('active', item === tab));
+            document.querySelectorAll('[data-detail-pane]').forEach((pane) => {
+              pane.classList.toggle('active', pane.dataset.detailPane === tab.dataset.detailTab);
+            });
+          });
+        });
+        document.querySelector('[data-modal-confirm]').addEventListener('click', () => {
+          document.querySelector('#routine-modal').classList.remove('visible');
+        });
         document.querySelector('#routine-modal').classList.add('visible');
         showDebug(`제품 상세 · #${card.dataset.resultId}`, payload);
       } catch (error) {
