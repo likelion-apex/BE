@@ -104,6 +104,63 @@ class ShortformAnalysisAssemblerTest {
         assertThat(assembled.optimization().missingCount()).isEqualTo(1);
     }
 
+    @Test
+    void doesNotPresentEstimatedOrHighRiskIngredientEvidenceAsUnconditionallySafe() {
+        JobContext context = new JobContext(
+                1L, "video", "https://www.youtube.com/watch?v=video", "테스터", "건성",
+                List.of(), List.of());
+        ProductEnrichmentData estimatedEnrichment = enrichment(
+                IngredientVerificationStatus.ESTIMATED,
+                new ProductEnrichmentResult.Ingredient(
+                        1, "정제수", List.of("용제"), List.of("수분 공급"), 1, false, false));
+        ProductEnrichmentData highRiskEnrichment = enrichment(
+                IngredientVerificationStatus.OFFICIAL,
+                new ProductEnrichmentResult.Ingredient(
+                        1, "테스트 고위험 성분", List.of("향료"), List.of(), 8, true, true));
+        MatchedVideoStep estimated = new MatchedVideoStep(
+                step(1, IdentificationLevel.CATEGORY_ONLY, null),
+                null, null, "추정 브랜드", "추정 수딩 크림", ProductResolutionStatus.AI_NORMALIZED,
+                0.72, IngredientDataStatus.AVAILABLE, estimatedEnrichment);
+        MatchedVideoStep highRisk = new MatchedVideoStep(
+                step(2, IdentificationLevel.EXACT_PRODUCT, "테스트 크림"),
+                null, null, "테스트", "테스트 크림", ProductResolutionStatus.AI_NORMALIZED,
+                0.95, IngredientDataStatus.AVAILABLE, highRiskEnrichment);
+        RoutinePersonalizationResult result = new RoutinePersonalizationResult(
+                "테스트 루틴", "테스트", 80, List.of(), "보습", "없음", "요약", List.of(),
+                List.of(aiStep(1, SafetyLevel.SAFE), aiStep(2, SafetyLevel.SAFE)), List.of());
+        VideoRoutineExtraction extraction = new VideoRoutineExtraction(
+                "cache", "video", context.youtubeUrl(), "gemini-test", "1.0", "{}", 10, 5);
+
+        AssembledResult assembled = assembler.assemble(
+                context,
+                List.of(estimated, highRisk),
+                new Response(result, "gpt-test", 20, 10),
+                extraction,
+                new ShortformProductEnrichmentService.BatchResult(
+                        java.util.Map.of(1, estimatedEnrichment, 2, highRiskEnrichment),
+                        "gpt-test+gemini-test", "2.0+gemini-1.0", 40, 20, 0, 2));
+
+        assertThat(assembled.analysis().steps().get(0).safetyLevel()).isEqualTo(SafetyLevel.UNKNOWN);
+        assertThat(assembled.analysis().steps().get(0).reasons().getFirst().assessmentCategory())
+                .isEqualTo(AssessmentCategory.CAUTION);
+        assertThat(assembled.analysis().steps().get(1).safetyLevel()).isEqualTo(SafetyLevel.CAUTION);
+    }
+
+    private ProductEnrichmentData enrichment(
+            IngredientVerificationStatus status,
+            ProductEnrichmentResult.Ingredient ingredient
+    ) {
+        return new ProductEnrichmentData(
+                "테스트",
+                "테스트 크림",
+                "테스트 처방",
+                status == IngredientVerificationStatus.ESTIMATED ? 0.72 : 0.95,
+                status,
+                List.of(new ProductEnrichmentResult.Source(
+                        "https://example.com/product", "product", IngredientSourceType.OFFICIAL)),
+                List.of(ingredient));
+    }
+
     private Step step(int order, IdentificationLevel level, String productName) {
         return new Step(
                 order,

@@ -32,7 +32,11 @@ public class ShortformProductMatcher {
     }
 
     private MatchedVideoStep match(Step step, ProductEnrichmentData enrichment) {
-        if (step.identificationLevel() != IdentificationLevel.EXACT_PRODUCT || step.productName() == null) {
+        boolean videoHasExactProduct = step.identificationLevel() == IdentificationLevel.EXACT_PRODUCT
+                && step.productName() != null;
+        boolean aiResolvedProduct = enrichment.displayProductName() != null
+                && enrichment.resolutionConfidence() >= 0.60;
+        if (!videoHasExactProduct && !aiResolvedProduct) {
             return new MatchedVideoStep(
                     step, null, null, step.brand(), step.category(), ProductResolutionStatus.UNRESOLVED,
                     0, IngredientDataStatus.NOT_ELIGIBLE, ProductEnrichmentData.unresolved());
@@ -47,15 +51,14 @@ public class ShortformProductMatcher {
                 : textOr(enrichment.displayProductName(), textOr(step.productName(), step.category()));
         ProductResolutionStatus resolutionStatus = product != null
                 ? ProductResolutionStatus.CATALOG_MATCH
-                : enrichment.resolutionConfidence() >= 0.85 && enrichment.displayProductName() != null
+                : aiResolvedProduct
                         ? ProductResolutionStatus.AI_NORMALIZED
                         : ProductResolutionStatus.VIDEO_LITERAL;
         double resolutionConfidence = product != null ? 1 : Math.max(step.confidence(), enrichment.resolutionConfidence());
-        IngredientDataStatus ingredientStatus = enrichment.resolutionConfidence() < 0.85
-                || enrichment.displayProductName() == null
-                ? IngredientDataStatus.NOT_ELIGIBLE
-                : enrichment.hasVerifiedIngredients()
-                        ? IngredientDataStatus.AVAILABLE
+        IngredientDataStatus ingredientStatus = enrichment.hasVerifiedIngredients()
+                ? IngredientDataStatus.AVAILABLE
+                : !videoHasExactProduct || enrichment.displayProductName() == null
+                        ? IngredientDataStatus.NOT_ELIGIBLE
                         : IngredientDataStatus.UNAVAILABLE;
 
         if (product != null) {
@@ -86,10 +89,12 @@ public class ShortformProductMatcher {
     }
 
     private Product findCatalogProduct(Step step, ProductEnrichmentData enrichment) {
-        Product rawMatch = step.brand() == null
-                ? productRepository.findFirstByNameIgnoreCase(step.productName()).orElse(null)
-                : productRepository.findFirstByNameIgnoreCaseAndBrandIgnoreCase(
-                        step.productName(), step.brand()).orElse(null);
+        Product rawMatch = step.productName() == null
+                ? null
+                : step.brand() == null
+                        ? productRepository.findFirstByNameIgnoreCase(step.productName()).orElse(null)
+                        : productRepository.findFirstByNameIgnoreCaseAndBrandIgnoreCase(
+                                step.productName(), step.brand()).orElse(null);
         if (rawMatch != null) {
             return rawMatch;
         }

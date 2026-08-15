@@ -157,9 +157,6 @@ public class ShortformAnalysisAssembler {
         BeautyRoutineAnalysis.Step source = matched.source();
         boolean ingredientAvailable = matched.ingredientDataStatus() == IngredientDataStatus.AVAILABLE;
         RoutinePersonalizationResult.StepAnalysis normalized = aiStep == null ? fallbackStep(source.order()) : aiStep;
-        SafetyLevel safetyLevel = ingredientAvailable && normalized.safetyLevel() != null
-                ? normalized.safetyLevel()
-                : SafetyLevel.UNKNOWN;
         IngredientVerificationStatus verificationStatus = matched.enrichment().ingredientVerificationStatus();
         List<IngredientDetail> ingredients = ingredientAvailable
                 ? safe(matched.enrichment().ingredients()).stream()
@@ -167,7 +164,11 @@ public class ShortformAnalysisAssembler {
                         .toList()
                 : List.of();
         IngredientStats ingredientStats = ingredientAvailable ? toIngredientStats(ingredients) : null;
-        List<ReasonCard> reasons = safe(normalized.reasons()).stream()
+        SafetyLevel safetyLevel = verifiedSafetyLevel(
+                ingredientAvailable, verificationStatus, ingredientStats, normalized.safetyLevel());
+        List<ReasonCard> reasons = verificationStatus == IngredientVerificationStatus.ESTIMATED
+                ? estimatedReasonCards(normalized)
+                : safe(normalized.reasons()).stream()
                 .map(reason -> new ReasonCard(
                         toneOf(reason.assessmentCategory()),
                         reason.assessmentCategory() == null
@@ -186,6 +187,18 @@ public class ShortformAnalysisAssembler {
                     "제품 라벨의 전성분을 확인한 뒤 피부 반응을 살펴보세요.",
                     "VIDEO_EVIDENCE"
             ));
+        }
+        if (safetyLevel == SafetyLevel.CAUTION && normalized.safetyLevel() == SafetyLevel.SAFE) {
+            List<ReasonCard> guarded = new ArrayList<>();
+            guarded.add(new ReasonCard(
+                    ReasonTone.CAUTION,
+                    AssessmentCategory.CAUTION,
+                    "주의 성분을 다시 확인했어요",
+                    "AI의 SAFE 응답과 달리 위험도·알레르기·주의 성분 표시가 있어 서버가 보수적으로 조정했습니다.",
+                    "SERVER_SAFETY_GUARD"
+            ));
+            reasons.stream().limit(2).forEach(guarded::add);
+            reasons = List.copyOf(guarded);
         }
 
         return new StepResult(
@@ -207,10 +220,9 @@ public class ShortformAnalysisAssembler {
                 clamp(normalized.matchScore()),
                 textOr(normalized.matchSummary(), "피부 프로필과의 궁합을 확인할 정보가 부족합니다."),
                 safetyLevel,
-                ingredientAvailable ? textOr(normalized.safetyTitle(), "AI 안전도 참고") : "성분 정보 확인 필요",
-                ingredientAvailable
-                        ? textOr(normalized.safetySummary(), "실제 전성분과 패치 테스트를 함께 확인해 주세요.")
-                        : ingredientUnavailableMessage(matched.ingredientDataStatus()),
+                safetyTitle(ingredientAvailable, verificationStatus, safetyLevel, normalized),
+                safetySummary(ingredientAvailable, verificationStatus, safetyLevel, normalized,
+                        matched.ingredientDataStatus()),
                 reasons,
                 matched.ingredientDataStatus(),
                 verificationStatus,
@@ -239,7 +251,9 @@ public class ShortformAnalysisAssembler {
                 riskLevel(ingredient.riskScore()),
                 ingredient.caution20(),
                 ingredient.allergen(),
-                "OPENAI_WEB_" + verificationStatus.name(),
+                verificationStatus == IngredientVerificationStatus.ESTIMATED
+                        ? "AI_ESTIMATED"
+                        : "AI_WEB_" + verificationStatus.name(),
                 regulation.isPresent(),
                 regulation.map(this::regulationSummary).orElse(null)
         );
@@ -264,6 +278,84 @@ public class ShortformAnalysisAssembler {
         }
         return new IngredientStats(
                 ingredients.size(), low, moderate, high, unknown, caution20, allergen);
+    }
+
+    private SafetyLevel verifiedSafetyLevel(
+            boolean ingredientAvailable,
+            IngredientVerificationStatus verificationStatus,
+            IngredientStats stats,
+            SafetyLevel aiSafetyLevel
+    ) {
+        if (!ingredientAvailable || verificationStatus == IngredientVerificationStatus.ESTIMATED) {
+            return SafetyLevel.UNKNOWN;
+        }
+        SafetyLevel safetyLevel = aiSafetyLevel == null ? SafetyLevel.UNKNOWN : aiSafetyLevel;
+        if (safetyLevel == SafetyLevel.SAFE && stats != null
+                && (stats.highRiskCount() > 0 || stats.caution20Count() > 0 || stats.allergenCount() > 0)) {
+            return SafetyLevel.CAUTION;
+        }
+        return safetyLevel;
+    }
+
+    private String safetyTitle(
+            boolean ingredientAvailable,
+            IngredientVerificationStatus verificationStatus,
+            SafetyLevel safetyLevel,
+            RoutinePersonalizationResult.StepAnalysis normalized
+    ) {
+        if (!ingredientAvailable) {
+            return "성분 정보 확인 필요";
+        }
+        if (verificationStatus == IngredientVerificationStatus.ESTIMATED) {
+            return "추정 성분 기준 참고";
+        }
+        if (safetyLevel == SafetyLevel.CAUTION && normalized.safetyLevel() == SafetyLevel.SAFE) {
+            return "주의 성분 확인 필요";
+        }
+        return textOr(normalized.safetyTitle(), "AI 안전도 참고");
+    }
+
+    private String safetySummary(
+            boolean ingredientAvailable,
+            IngredientVerificationStatus verificationStatus,
+            SafetyLevel safetyLevel,
+            RoutinePersonalizationResult.StepAnalysis normalized,
+            IngredientDataStatus ingredientDataStatus
+    ) {
+        if (!ingredientAvailable) {
+            return ingredientUnavailableMessage(ingredientDataStatus);
+        }
+        if (verificationStatus == IngredientVerificationStatus.ESTIMATED) {
+            return "AI가 추정한 제품 또는 대표 처방의 성분입니다. 실제 제품 라벨과 처방 버전을 함께 확인해 주세요.";
+        }
+        if (safetyLevel == SafetyLevel.CAUTION && normalized.safetyLevel() == SafetyLevel.SAFE) {
+            return "AI는 안전하다고 평가했지만 위험도·알레르기·주의 성분 표시가 있어 보수적으로 주의로 조정했습니다.";
+        }
+        return textOr(normalized.safetySummary(), "실제 전성분과 패치 테스트를 함께 확인해 주세요.");
+    }
+
+    private List<ReasonCard> estimatedReasonCards(RoutinePersonalizationResult.StepAnalysis normalized) {
+        List<ReasonCard> cards = new ArrayList<>();
+        cards.add(new ReasonCard(
+                ReasonTone.CAUTION,
+                AssessmentCategory.CAUTION,
+                "추정 제품의 전성분이에요",
+                "영상 단서와 AI 조사 결과로 제품 또는 대표 처방을 추정했습니다. 실제 라벨과 다를 수 있어요.",
+                "AI_ESTIMATED"
+        ));
+        safe(normalized.reasons()).stream()
+                .filter(reason -> reason.assessmentCategory() == AssessmentCategory.CAUTION
+                        || reason.assessmentCategory() == AssessmentCategory.WARNING)
+                .limit(2)
+                .map(reason -> new ReasonCard(
+                        toneOf(reason.assessmentCategory()),
+                        reason.assessmentCategory(),
+                        textOr(reason.title(), "AI 분석"),
+                        textOr(reason.description(), "확인 가능한 근거가 부족합니다."),
+                        textOr(reason.evidenceSource(), "AI_ESTIMATED")
+                ))
+                .forEach(cards::add);
+        return List.copyOf(cards);
     }
 
     private IngredientRiskLevel riskLevel(Integer score) {

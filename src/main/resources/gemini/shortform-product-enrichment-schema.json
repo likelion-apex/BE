@@ -5,46 +5,42 @@
   "properties": {
     "products": {
       "type": "array",
-      "minItems": 1,
-      "maxItems": 12,
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["requestKey", "displayBrand", "displayProductName", "marketOrVariant", "lookupStatus", "resolutionConfidence", "notes", "sources", "ingredients"],
         "properties": {
-          "requestKey": {"type": "string", "minLength": 1, "maxLength": 64},
-          "displayBrand": {"type": ["string", "null"], "maxLength": 100},
-          "displayProductName": {"type": ["string", "null"], "maxLength": 160},
-          "marketOrVariant": {"type": ["string", "null"], "maxLength": 120},
+          "requestKey": {"type": "string"},
+          "displayBrand": {"type": ["string", "null"]},
+          "displayProductName": {"type": ["string", "null"]},
+          "marketOrVariant": {"type": ["string", "null"]},
           "lookupStatus": {"type": "string", "enum": ["FOUND", "ESTIMATED", "AMBIGUOUS", "NOT_FOUND"]},
           "resolutionConfidence": {"type": "number", "minimum": 0, "maximum": 1},
-          "notes": {"type": ["string", "null"], "maxLength": 500},
+          "notes": {"type": ["string", "null"]},
           "sources": {
             "type": "array",
-            "maxItems": 8,
             "items": {
               "type": "object",
               "additionalProperties": false,
               "required": ["url", "title", "sourceType"],
               "properties": {
-                "url": {"type": "string", "minLength": 8, "maxLength": 2048},
-                "title": {"type": ["string", "null"], "maxLength": 300},
+                "url": {"type": "string"},
+                "title": {"type": ["string", "null"]},
                 "sourceType": {"type": "string", "enum": ["OFFICIAL", "RETAILER", "DATABASE", "OTHER"]}
               }
             }
           },
           "ingredients": {
             "type": "array",
-            "maxItems": 200,
             "items": {
               "type": "object",
               "additionalProperties": false,
               "required": ["order", "name", "purposes", "skinBenefits", "riskScore", "caution20", "allergen"],
               "properties": {
                 "order": {"type": "integer", "minimum": 1, "maximum": 200},
-                "name": {"type": "string", "minLength": 1, "maxLength": 100},
-                "purposes": {"type": "array", "maxItems": 3, "items": {"type": "string", "maxLength": 80}},
-                "skinBenefits": {"type": "array", "maxItems": 3, "items": {"type": "string", "maxLength": 80}},
+                "name": {"type": "string"},
+                "purposes": {"type": "array", "items": {"type": "string"}},
+                "skinBenefits": {"type": "array", "items": {"type": "string"}},
                 "riskScore": {"type": ["integer", "null"], "minimum": 1, "maximum": 10},
                 "caution20": {"type": "boolean"},
                 "allergen": {"type": "boolean"}

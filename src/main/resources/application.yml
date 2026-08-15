@@ -83,6 +83,14 @@ gemini:
   cache-ttl: 30d
   cache-maximum-size: 10000
 
+shortform:
+  product-enrichment:
+    cache-enabled: ${SHORTFORM_PRODUCT_CACHE_ENABLED:true}
+    gemini-fallback-enabled: ${SHORTFORM_GEMINI_FALLBACK_ENABLED:true}
+    gemini-prompt-version: "1.1"
+    gemini-max-output-tokens: 12000
+    estimated-resolution-threshold: 0.60
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
