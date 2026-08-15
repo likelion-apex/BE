@@ -13,6 +13,8 @@ releases_dir="$base_dir/releases"
 current_link="$base_dir/current"
 release_dir="$releases_dir/$release_sha"
 previous_target="$(readlink -f "$current_link" 2>/dev/null || true)"
+health_timeout_seconds=240
+deployment_started_at="$(date --iso-8601=seconds)"
 
 if [[ ! "$release_sha" =~ ^[0-9a-f]{40}$ ]]; then
   echo "invalid release SHA" >&2
@@ -34,7 +36,7 @@ if ! sudo /usr/bin/systemctl restart mutsa.service; then
   health_ok=false
 else
   health_ok=false
-  health_deadline=$((SECONDS + 120))
+  health_deadline=$((SECONDS + health_timeout_seconds))
   while (( SECONDS < health_deadline )); do
     if curl --silent --output /dev/null --connect-timeout 2 --max-time 5 \
       http://127.0.0.1:8082/; then
@@ -52,7 +54,13 @@ else
 fi
 
 if [[ "$health_ok" != true ]]; then
-  echo "new release failed its local HTTP check; rolling back" >&2
+  echo "new release failed its local HTTP check after ${health_timeout_seconds}s; rolling back" >&2
+  echo "new release service status before rollback:" >&2
+  sudo /usr/bin/systemctl status mutsa.service --no-pager >&2 || true
+  echo "new release journal before rollback:" >&2
+  sudo /usr/bin/journalctl -u mutsa.service \
+    --since "$deployment_started_at" --no-pager -n 160 >&2 || true
+
   if [[ -n "$previous_target" && "$previous_target" == "$releases_dir/"* && -d "$previous_target" ]]; then
     ln -sfn "$previous_target" "$base_dir/current.next"
     mv -Tf "$base_dir/current.next" "$current_link"
@@ -60,6 +68,7 @@ if [[ "$health_ok" != true ]]; then
   else
     sudo /usr/bin/systemctl stop mutsa.service
   fi
+  echo "rollback service status:" >&2
   sudo /usr/bin/systemctl status mutsa.service --no-pager >&2 || true
   exit 1
 fi
