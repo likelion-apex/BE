@@ -33,6 +33,11 @@ public class AuthController {
             description = """
                     카카오에서 로그인 인가 후 전달받은 authorization code를 이용해,
                     카카오 사용자 정보를 조회한 뒤 회원가입 또는 로그인 처리를 하고 인증에 사용할 JWT를 발급합니다.
+
+                    카카오 토큰 교환 시 사용하는 redirect_uri는 인가 코드를 발급받을 때 사용한 값과 정확히 일치해야 합니다.
+                    프론트엔드 배포 환경(로컬/운영 등)의 redirect_uri가 서버 기본값(kakao.redirect-uri)과 다르면,
+                    요청 본문의 redirectUri에 실제로 사용한 값을 반드시 함께 보내야 합니다. 그렇지 않으면 카카오가
+                    redirect_uri 불일치로 토큰 발급을 거절하여 502(AUTH-009)가 발생합니다.
                     """
     )
     @ApiResponses({
@@ -47,13 +52,18 @@ public class AuthController {
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "502",
-                    description = "카카오 토큰 발급 또는 사용자 정보 조회 실패",
-                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
+                    description = "카카오 토큰 발급 또는 사용자 정보 조회 실패 (주로 redirect_uri 불일치)",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class),
+                            examples = @ExampleObject(value = """
+                                    {"success":false,"code":"AUTH-009","message":"카카오 토큰 발급 요청에 실패했습니다."}
+                                    """))
             )
     })
     @PostMapping("/kakao/login")
     public ApiResponse<TokenResponse> kakaoLogin(@Valid @RequestBody KakaoLoginRequest request) {
-        return ApiResponse.success("카카오 로그인이 완료되었습니다.", authService.loginWithKakao(request.code()));
+        return ApiResponse.success(
+                "카카오 로그인이 완료되었습니다.",
+                authService.loginWithKakao(request.code(), request.redirectUri()));
     }
 
     @Operation(summary = "Access/Refresh 토큰 재발급", description = "전달받은 refresh token으로 access/refresh 토큰을 재발급합니다.")

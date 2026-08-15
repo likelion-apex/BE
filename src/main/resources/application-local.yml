@@ -6,7 +6,7 @@ spring:
 kakao:
   client-id: ${KAKAO_CLIENT_ID:local-dummy-kakao-client-id}
   client-secret: ${KAKAO_CLIENT_SECRET:local-dummy-kakao-client-secret}
-  redirect-uri: ${KAKAO_REDIRECT_URI:http://localhost:5173/auth/kakao/callback}
+  redirect-uri: ${KAKAO_REDIRECT_URI:http://localhost:3000/onboarding/kakaocallback}
   token-uri: ${KAKAO_TOKEN_URI:http://127.0.0.1:9/oauth/token}
   user-info-uri: ${KAKAO_USER_INFO_URI:http://127.0.0.1:9/user/me}
   image-search-key: ${KAKAO_IMAGE_SEARCH_KEY:local-dummy-kakao-image-key}

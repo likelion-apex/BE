@@ -45,11 +45,11 @@ public class KakaoOAuthClient {
         this.userInfoUri = userInfoUri;
     }
 
-    public KakaoTokenResponse requestToken(String code) {
+    public KakaoTokenResponse requestToken(String code, String redirectUriOverride) {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("grant_type", "authorization_code");
         form.add("client_id", clientId);
-        form.add("redirect_uri", redirectUri);
+        form.add("redirect_uri", StringUtils.hasText(redirectUriOverride) ? redirectUriOverride : redirectUri);
         form.add("code", code);
         if (StringUtils.hasText(clientSecret)) {
             form.add("client_secret", clientSecret);
