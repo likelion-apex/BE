@@ -59,7 +59,6 @@ public class InventoryService {
         Inventory inventory = Inventory.builder()
                 .member(member)
                 .product(product)
-                .ownType(request.ownType())
                 .build();
         return InventoryCreateResponse.from(inventoryRepository.save(inventory));
     }

@@ -34,7 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
  * #3(화장품 제거)과 #7(인벤토리 삭제)은 명세서상 동일한 API(DELETE /api/v1/inventory/{inventoryId})이므로
  * remove() 메서드 하나로 통합되어 있다.
  */
-@Tag(name = "Inventory", description = "사용자 인벤토리(보유 MY / 위시 WISH) 관련 API")
+@Tag(name = "Inventory", description = "사용자 인벤토리 관련 API")
 @RestController
 @RequestMapping("/api/v1/inventory")
 @RequiredArgsConstructor

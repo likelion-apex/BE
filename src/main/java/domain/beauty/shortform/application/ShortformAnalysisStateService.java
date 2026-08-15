@@ -6,7 +6,6 @@ import domain.beauty.shortform.domain.ShortformAnalysisStatus;
 import domain.beauty.shortform.domain.VideoRoutineExtraction;
 import domain.inventory.Inventory;
 import domain.inventory.InventoryRepository;
-import domain.inventory.OwnType;
 import domain.member.Member;
 import domain.member.MemberRepository;
 import global.exception.CustomException;
@@ -49,7 +48,7 @@ public class ShortformAnalysisStateService {
                 member.getNickname(),
                 member.getSkinType().getLabel(),
                 member.getSkinConcerns().stream().map(concern -> concern.getLabel()).sorted().toList(),
-                inventoryRepository.findAllByMemberIdAndOwnTypeOrderByCreatedAtDesc(memberId, OwnType.MY)
+                inventoryRepository.findAllByMemberIdOrderByCreatedAtDesc(memberId)
                         .stream().map(InventoryFact::from).toList()
         );
     }
@@ -93,7 +92,7 @@ public class ShortformAnalysisStateService {
                 member.getNickname(),
                 member.getSkinType() == null ? null : member.getSkinType().getLabel(),
                 member.getSkinConcerns().stream().map(concern -> concern.getLabel()).sorted().toList(),
-                inventoryRepository.findAllByMemberIdAndOwnTypeOrderByCreatedAtDesc(member.getId(), OwnType.MY)
+                inventoryRepository.findAllByMemberIdOrderByCreatedAtDesc(member.getId())
                         .stream().map(InventoryFact::from).toList()
         );
     }
