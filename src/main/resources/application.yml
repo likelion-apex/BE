@@ -20,6 +20,10 @@ spring:
         format_sql: true
     open-in-view: false
 
+  # 운영 DB 마이그레이션은 prod 프로필에서만 활성화한다.
+  flyway:
+    enabled: false
+
   h2:
     console:
       enabled: true

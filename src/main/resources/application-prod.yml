@@ -12,6 +12,11 @@ spring:
     hibernate:
       ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
     open-in-view: false
+  flyway:
+    enabled: ${SPRING_FLYWAY_ENABLED:true}
+    baseline-on-migrate: true
+    baseline-version: "0"
+    clean-disabled: true
 
 kakao:
   client-id: ${KAKAO_CLIENT_ID}

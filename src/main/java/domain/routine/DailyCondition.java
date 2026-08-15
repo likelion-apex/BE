@@ -44,7 +44,7 @@ public class DailyCondition {
     private LocalDate logDate;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(name = "condition_type", nullable = false, length = 20)
     private DailyConditionType condition;
 
     @Column(length = 500)
