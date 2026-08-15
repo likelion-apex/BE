@@ -10,12 +10,29 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["requestKey", "displayBrand", "displayProductName", "resolutionConfidence", "ingredients"],
+        "required": ["requestKey", "displayBrand", "displayProductName", "marketOrVariant", "lookupStatus", "resolutionConfidence", "notes", "sources", "ingredients"],
         "properties": {
           "requestKey": {"type": "string", "minLength": 1, "maxLength": 64},
           "displayBrand": {"type": ["string", "null"], "maxLength": 100},
           "displayProductName": {"type": ["string", "null"], "maxLength": 160},
+          "marketOrVariant": {"type": ["string", "null"], "maxLength": 120},
+          "lookupStatus": {"type": "string", "enum": ["FOUND", "AMBIGUOUS", "NOT_FOUND"]},
           "resolutionConfidence": {"type": "number", "minimum": 0, "maximum": 1},
+          "notes": {"type": ["string", "null"], "maxLength": 500},
+          "sources": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["url", "title", "sourceType"],
+              "properties": {
+                "url": {"type": "string", "minLength": 8, "maxLength": 2048},
+                "title": {"type": ["string", "null"], "maxLength": 300},
+                "sourceType": {"type": "string", "enum": ["OFFICIAL", "RETAILER", "DATABASE", "OTHER"]}
+              }
+            }
+          },
           "ingredients": {
             "type": "array",
             "maxItems": 200,

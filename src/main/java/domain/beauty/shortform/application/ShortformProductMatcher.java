@@ -54,9 +54,9 @@ public class ShortformProductMatcher {
         IngredientDataStatus ingredientStatus = enrichment.resolutionConfidence() < 0.85
                 || enrichment.displayProductName() == null
                 ? IngredientDataStatus.NOT_ELIGIBLE
-                : enrichment.ingredients() == null || enrichment.ingredients().isEmpty()
-                        ? IngredientDataStatus.UNAVAILABLE
-                        : IngredientDataStatus.AVAILABLE;
+                : enrichment.hasVerifiedIngredients()
+                        ? IngredientDataStatus.AVAILABLE
+                        : IngredientDataStatus.UNAVAILABLE;
 
         if (product != null) {
             return new MatchedVideoStep(

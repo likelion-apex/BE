@@ -17,6 +17,8 @@ import domain.beauty.shortform.config.OpenAiRoutineProperties;
 import domain.beauty.shortform.domain.OptimizationStatus;
 import domain.beauty.shortform.domain.AssessmentCategory;
 import domain.beauty.shortform.domain.IngredientDataStatus;
+import domain.beauty.shortform.domain.IngredientSourceType;
+import domain.beauty.shortform.domain.IngredientVerificationStatus;
 import domain.beauty.shortform.domain.ProductResolutionStatus;
 import domain.beauty.shortform.domain.SafetyLevel;
 import domain.beauty.shortform.domain.VideoRoutineExtraction;
@@ -46,7 +48,13 @@ class ShortformAnalysisAssemblerTest {
         ProductEnrichmentData exactEnrichment = new ProductEnrichmentData(
                 "라운드랩",
                 "1025 독도 토너",
+                "한국 판매 처방",
                 0.96,
+                IngredientVerificationStatus.OFFICIAL,
+                List.of(new ProductEnrichmentResult.Source(
+                        "https://roundlab.com/products/1025-dokdo-toner",
+                        "1025 Dokdo Toner",
+                        IngredientSourceType.OFFICIAL)),
                 List.of(new ProductEnrichmentResult.Ingredient(
                         1, "판테놀", List.of("보습제"), List.of("피부 보습"), 1, false, false))
         );

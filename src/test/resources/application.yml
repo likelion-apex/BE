@@ -23,6 +23,7 @@ mfds:
 openai:
   api-key: test-openai-api-key
   api-url: https://api.openai.com/v1/chat/completions
+  product-api-url: https://api.openai.com/v1/responses
   model: gpt-4o-mini
   organization-id: ""
 

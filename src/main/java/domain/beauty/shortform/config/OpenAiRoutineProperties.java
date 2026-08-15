@@ -9,13 +9,19 @@ public class OpenAiRoutineProperties {
 
     private String apiKey = "";
     private URI apiUrl = URI.create("https://api.openai.com/v1/chat/completions");
+    private URI productApiUrl = URI.create("https://api.openai.com/v1/responses");
     private String organizationId = "";
     private String routineModel = "gpt-4o-mini";
     private String routinePromptVersion = "2.0";
-    private String productModel = "gpt-4o-mini";
-    private String productPromptVersion = "1.0";
+    private String productModel = "gpt-5.6-luna";
+    private String productFallbackModel = "gpt-5.4-mini";
+    private String productReasoningEffort = "low";
+    private String productPromptVersion = "2.0";
+    private boolean productFallbackEnabled = true;
     private Duration connectTimeout = Duration.ofSeconds(5);
-    private Duration readTimeout = Duration.ofSeconds(60);
+    private Duration readTimeout = Duration.ofSeconds(120);
+    private Duration productCacheTtl = Duration.ofDays(30);
+    private Duration productNegativeCacheTtl = Duration.ofDays(1);
     private int maxOutputTokens = 6_000;
     private int productMaxOutputTokens = 12_000;
 
@@ -33,6 +39,14 @@ public class OpenAiRoutineProperties {
 
     public void setApiUrl(URI apiUrl) {
         this.apiUrl = apiUrl;
+    }
+
+    public URI getProductApiUrl() {
+        return productApiUrl;
+    }
+
+    public void setProductApiUrl(URI productApiUrl) {
+        this.productApiUrl = productApiUrl;
     }
 
     public String getOrganizationId() {
@@ -67,12 +81,36 @@ public class OpenAiRoutineProperties {
         this.productModel = productModel;
     }
 
+    public String getProductFallbackModel() {
+        return productFallbackModel;
+    }
+
+    public void setProductFallbackModel(String productFallbackModel) {
+        this.productFallbackModel = productFallbackModel;
+    }
+
+    public String getProductReasoningEffort() {
+        return productReasoningEffort;
+    }
+
+    public void setProductReasoningEffort(String productReasoningEffort) {
+        this.productReasoningEffort = productReasoningEffort;
+    }
+
     public String getProductPromptVersion() {
         return productPromptVersion;
     }
 
     public void setProductPromptVersion(String productPromptVersion) {
         this.productPromptVersion = productPromptVersion;
+    }
+
+    public boolean isProductFallbackEnabled() {
+        return productFallbackEnabled;
+    }
+
+    public void setProductFallbackEnabled(boolean productFallbackEnabled) {
+        this.productFallbackEnabled = productFallbackEnabled;
     }
 
     public Duration getConnectTimeout() {
@@ -89,6 +127,22 @@ public class OpenAiRoutineProperties {
 
     public void setReadTimeout(Duration readTimeout) {
         this.readTimeout = readTimeout;
+    }
+
+    public Duration getProductCacheTtl() {
+        return productCacheTtl;
+    }
+
+    public void setProductCacheTtl(Duration productCacheTtl) {
+        this.productCacheTtl = productCacheTtl;
+    }
+
+    public Duration getProductNegativeCacheTtl() {
+        return productNegativeCacheTtl;
+    }
+
+    public void setProductNegativeCacheTtl(Duration productNegativeCacheTtl) {
+        this.productNegativeCacheTtl = productNegativeCacheTtl;
     }
 
     public int getMaxOutputTokens() {

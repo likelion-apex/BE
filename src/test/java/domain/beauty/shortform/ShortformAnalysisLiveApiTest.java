@@ -11,6 +11,7 @@ import domain.beauty.shortform.application.ShortformProductEnrichmentService;
 import domain.beauty.shortform.domain.AssessmentCategory;
 import domain.beauty.shortform.domain.IngredientDataStatus;
 import domain.beauty.shortform.domain.IngredientRiskLevel;
+import domain.beauty.shortform.domain.IngredientVerificationStatus;
 import domain.beauty.shortform.domain.SafetyLevel;
 import domain.beauty.shortform.domain.ShortformAnalysis;
 import domain.beauty.shortform.domain.ShortformAnalysisRepository;
@@ -97,6 +98,12 @@ class ShortformAnalysisLiveApiTest {
             }
             if (step.ingredientDataStatus() == IngredientDataStatus.AVAILABLE) {
                 assertThat(step.ingredients()).isNotEmpty();
+                assertThat(step.ingredientVerificationStatus())
+                        .isIn(
+                                IngredientVerificationStatus.OFFICIAL,
+                                IngredientVerificationStatus.CORROBORATED,
+                                IngredientVerificationStatus.THIRD_PARTY);
+                assertThat(step.ingredientSources()).isNotEmpty();
                 int distribution = step.ingredientStats().lowRiskCount()
                         + step.ingredientStats().moderateRiskCount()
                         + step.ingredientStats().highRiskCount()
@@ -134,7 +141,7 @@ class ShortformAnalysisLiveApiTest {
     private void assertRequiredEnvironment() {
         for (String name : Set.of(
                 "OPENAI_API_KEY", "GEMINI_API_KEY", "YOUTUBE_API_KEY", "MFDS_SERVICE_KEY",
-                "OPENAI_API_URL", "GEMINI_BASE_URL", "YOUTUBE_BASE_URL",
+                "OPENAI_API_URL", "OPENAI_PRODUCT_API_URL", "GEMINI_BASE_URL", "YOUTUBE_BASE_URL",
                 "MFDS_INGREDIENT_INFO_URL", "MFDS_REGULATION_INFO_URL")) {
             assertThat(System.getenv(name)).as(name + " 환경변수").isNotBlank();
         }
