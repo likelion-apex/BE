@@ -10,7 +10,17 @@ cp .env.example .env.local
 npm install
 ```
 
-`.env.local`에서 `VITE_KAKAO_CLIENT_ID`를 실제 카카오 REST API 키로 바꿉니다. 다음 두 위치의 Redirect URI는 반드시 완전히 같아야 합니다.
+`.env.local`에서 `VITE_KAKAO_CLIENT_ID`를 실제 카카오 REST API 키로 바꿉니다. 등호 오른쪽에는 키 값만 입력해야 합니다.
+
+```dotenv
+# 올바름
+VITE_KAKAO_CLIENT_ID=0123456789abcdef0123456789abcdef
+
+# 잘못됨: KAKAO_CLIENT_ID= 접두어까지 값에 포함됨
+VITE_KAKAO_CLIENT_ID=KAKAO_CLIENT_ID=0123456789abcdef0123456789abcdef
+```
+
+다음 두 위치의 Redirect URI는 반드시 완전히 같아야 합니다.
 
 ```text
 http://localhost:3000/onboarding/kakaocallback
