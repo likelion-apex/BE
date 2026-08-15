@@ -27,7 +27,8 @@ SHORTFORM_GEMINI_FALLBACK_ENABLED=true # OpenAI 미확인 제품의 Gemini 보�
 3. `GET /api/shortform-analyses/{analysisId}`
 4. 필요 시 `GET /api/shortform-analyses/{analysisId}/results/{resultId}`
 5. `POST /api/shortform-analyses/{analysisId}/optimize`
-6. `POST /api/shortform-analyses/{analysisId}/apply` with `TODAY` 또는 `LIBRARY`
+6. `POST /api/shortform-analyses/{analysisId}/apply` with `saveType=TODAY|LIBRARY`, `routineType=DAY|NIGHT`
+   - `routineType`을 생략한 기존 요청은 서울 시간 기준 06:00~17:59 `DAY`, 그 외 `NIGHT`로 저장됩니다.
 
 분석 상태는 `PENDING → EXTRACTING_VIDEO → MATCHING_PRODUCTS → PERSONALIZING → OPTIMIZING → COMPLETED` 순서다. 사용자는 진행 중 `POST /cancel`로 취소할 수 있다.
 

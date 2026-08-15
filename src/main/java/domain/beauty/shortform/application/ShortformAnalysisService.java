@@ -21,6 +21,7 @@ import domain.beauty.shortform.domain.ShortformAnalysisStatus;
 import domain.beauty.support.YouTubeUrlNormalizer;
 import domain.routine.RoutineCreationService;
 import domain.routine.RoutineCreationService.RoutineApplyResult;
+import domain.routine.RoutineType;
 import global.exception.CustomException;
 import global.exception.ErrorCode;
 import java.util.List;
@@ -35,6 +36,7 @@ public class ShortformAnalysisService {
     private final AnalysisFingerprint fingerprint;
     private final ShortformAnalysisJsonMapper jsonMapper;
     private final RoutineCreationService routineCreationService;
+    private final ShortformRoutineTypeResolver routineTypeResolver;
 
     public ShortformAnalysisService(
             YouTubeUrlNormalizer urlNormalizer,
@@ -42,7 +44,8 @@ public class ShortformAnalysisService {
             ShortformAnalysisStateService stateService,
             AnalysisFingerprint fingerprint,
             ShortformAnalysisJsonMapper jsonMapper,
-            RoutineCreationService routineCreationService
+            RoutineCreationService routineCreationService,
+            ShortformRoutineTypeResolver routineTypeResolver
     ) {
         this.urlNormalizer = urlNormalizer;
         this.youtubeMetadataClient = youtubeMetadataClient;
@@ -50,6 +53,7 @@ public class ShortformAnalysisService {
         this.fingerprint = fingerprint;
         this.jsonMapper = jsonMapper;
         this.routineCreationService = routineCreationService;
+        this.routineTypeResolver = routineTypeResolver;
     }
 
     public Created create(Long memberId, String videoUrl) {
@@ -109,16 +113,23 @@ public class ShortformAnalysisService {
         );
     }
 
-    public Applied apply(Long memberId, Long analysisId, RoutineSaveType saveType) {
+    public Applied apply(
+            Long memberId,
+            Long analysisId,
+            RoutineSaveType saveType,
+            RoutineType requestedRoutineType
+    ) {
         ShortformAnalysis analysis = stateService.getOwned(memberId, analysisId);
         stateService.requireCompleted(analysis);
         if (analysis.getOptimizedAt() == null) {
             throw new CustomException(ErrorCode.SHORTFORM_OPTIMIZATION_REQUIRED);
         }
+        RoutineType routineType = routineTypeResolver.resolve(requestedRoutineType);
         RoutineApplyResult result = routineCreationService.create(
                 memberId,
                 analysisId,
                 saveType,
+                routineType,
                 readAnalysis(analysis),
                 jsonMapper.read(analysis.getOptimizationJson(), RoutineOptimizationSnapshot.class)
         );
@@ -126,6 +137,7 @@ public class ShortformAnalysisService {
                 analysisId,
                 result.routineId(),
                 result.saveType(),
+                result.routineType(),
                 result.status(),
                 result.reused()
         );

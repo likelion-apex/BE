@@ -1007,6 +1007,11 @@
             <div id="optimization-report" class="optimization-report"></div>
             <div id="apply-actions" class="routine-form" hidden>
               <strong>이 루틴을 어떻게 저장할까요?</strong>
+              <label for="routine-type">루틴 사용 시간대</label>
+              <select id="routine-type" aria-label="루틴 사용 시간대">
+                <option value="DAY">데이 케어 (06:00~18:00)</option>
+                <option value="NIGHT" selected>나이트 케어 (18:00~06:00)</option>
+              </select>
               <button class="routine-button" type="button" data-save-type="TODAY">이 루틴으로 오늘 시작하기</button>
               <button class="routine-button ghost" type="button" data-save-type="LIBRARY">나의 루틴 보관함에 저장</button>
             </div>
@@ -1037,7 +1042,7 @@
 
 <script type="module">
   import { buildKakaoAuthorizeUrl, normalizeKakaoClientId } from '/src/config.js';
-  import { assessmentLabel, benefitSummary, userFacingApiError } from '/src/analysis-ui.js';
+  import { assessmentLabel, benefitSummary, buildRoutineApplyPayload, userFacingApiError } from '/src/analysis-ui.js';
 
   (() => {
     'use strict';
@@ -1637,11 +1642,15 @@
       if (!button || !currentAnalysisId) return;
       button.disabled = true;
       try {
+        const request = buildRoutineApplyPayload(
+          button.dataset.saveType,
+          document.querySelector('#routine-type').value
+        );
         const payload = await apiFetch(`/api/shortform-analyses/${currentAnalysisId}/apply`, {
-          method: 'POST', body: JSON.stringify({ saveType: button.dataset.saveType })
+          method: 'POST', body: JSON.stringify(request)
         });
-        showDebug(`루틴 저장 · ${button.dataset.saveType}`, payload);
-        setStatus(`루틴 저장 완료 · routineId=${payload.data.routineId}${payload.data.reused ? ' (기존 저장 결과 재사용)' : ''}`);
+        showDebug(`루틴 저장 · ${request.saveType}/${request.routineType}`, payload);
+        setStatus(`루틴 저장 완료 · ${payload.data.routineType} · routineId=${payload.data.routineId}${payload.data.reused ? ' (기존 저장 결과 재사용)' : ''}`);
       } catch (error) {
         setStatus(`루틴 저장에 실패했습니다.\n${error.message}`, 'error');
       } finally {

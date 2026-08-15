@@ -7,10 +7,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface RoutineRepository extends JpaRepository<Routine, Long> {
 
-    Optional<Routine> findByMemberIdAndSourceAnalysisIdAndSaveType(
+    Optional<Routine> findByMemberIdAndSourceAnalysisIdAndSaveTypeAndRoutineType(
             Long memberId,
             Long sourceAnalysisId,
-            RoutineSaveType saveType
+            RoutineSaveType saveType,
+            RoutineType routineType
     );
 
     boolean existsByMemberIdAndStatusAndRoutineType(Long memberId, RoutineStatus status, RoutineType routineType);

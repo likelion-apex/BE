@@ -107,7 +107,7 @@ public class ShortformAnalysisController {
     ) {
         return ApiResponse.success(
                 "루틴을 저장했습니다.",
-                service.apply(memberId, analysisId, request.saveType())
+                service.apply(memberId, analysisId, request.saveType(), request.routineType())
         );
     }
 }
