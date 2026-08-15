@@ -46,12 +46,16 @@ public class Routine {
     @JoinColumn(name = "member_id", nullable = false)
     private Member member;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "source_analysis_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "source_analysis_id", nullable = true)
     private ShortformAnalysis sourceAnalysis;
 
     @Column(nullable = false, length = 80)
     private String name;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "routine_type", nullable = false, length = 20)
+    private RoutineType routineType;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -76,12 +80,14 @@ public class Routine {
             Member member,
             ShortformAnalysis sourceAnalysis,
             String name,
+            RoutineType routineType,
             RoutineStatus status,
             RoutineSaveType saveType
     ) {
         this.member = member;
         this.sourceAnalysis = sourceAnalysis;
         this.name = name;
+        this.routineType = routineType;
         this.status = status;
         this.saveType = saveType;
     }
