@@ -16,6 +16,7 @@ import domain.beauty.shortform.domain.RoutineOptimizationSnapshot;
 import domain.beauty.shortform.domain.RoutineSaveType;
 import domain.beauty.shortform.domain.ShortformAnalysis;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot;
+import domain.beauty.shortform.domain.ShortformAnalysisRepository.HistorySummary;
 import domain.beauty.shortform.domain.ShortformAnalysisStatus;
 import domain.beauty.support.YouTubeUrlNormalizer;
 import domain.routine.RoutineCreationService;
@@ -142,18 +143,17 @@ public class ShortformAnalysisService {
         );
     }
 
-    private HistoryItem toHistoryItem(ShortformAnalysis analysis) {
-        if (analysis.getStatus() != ShortformAnalysisStatus.COMPLETED || analysis.getResultJson() == null) {
+    private HistoryItem toHistoryItem(HistorySummary analysis) {
+        if (analysis.getStatus() != ShortformAnalysisStatus.COMPLETED) {
             return new HistoryItem(
-                    analysis.getId(), analysis.getStatus(), null, 0, null, analysis.getCreatedAt());
+                    analysis.getAnalysisId(), analysis.getStatus(), null, 0, null, analysis.getCreatedAt());
         }
-        ShortformAnalysisSnapshot snapshot = readAnalysis(analysis);
         return new HistoryItem(
-                analysis.getId(),
+                analysis.getAnalysisId(),
                 analysis.getStatus(),
-                snapshot.title(),
-                snapshot.steps().size(),
-                snapshot.overallScore(),
+                analysis.getTitle() == null ? "이전 분석 결과" : analysis.getTitle(),
+                analysis.getStepCount() == null ? 0 : analysis.getStepCount(),
+                analysis.getOverallScore(),
                 analysis.getCreatedAt()
         );
     }

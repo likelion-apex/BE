@@ -26,7 +26,7 @@ class ShortformAnalysisTest {
         analysis.moveTo(ShortformAnalysisStatus.EXTRACTING_VIDEO, "추출 중");
         analysis.cancel();
 
-        analysis.complete(null, "{}", "{}", "gpt-test", "1.0", 1, 1);
+        analysis.complete(null, "{}", "{}", "테스트 루틴", 2, 80, "gpt-test", "1.0", 1, 1);
 
         assertThat(analysis.getStatus()).isEqualTo(ShortformAnalysisStatus.CANCELLED);
         assertThat(analysis.getResultJson()).isNull();
