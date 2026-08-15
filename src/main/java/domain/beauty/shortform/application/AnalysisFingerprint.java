@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class AnalysisFingerprint {
 
-    private static final String ANALYSIS_VERSION = "shortform-personalization-v3-web-sources";
+    private static final String ANALYSIS_VERSION = "shortform-personalization-v4-gemini-fallback";
 
     public String create(String videoId, AnalysisProfile profile) {
         String concerns = profile.skinConcerns().stream().sorted().reduce((left, right) -> left + "," + right).orElse("");

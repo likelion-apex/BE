@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -13,11 +14,14 @@ import domain.beauty.domain.BeautyRoutineAnalysis.EvidenceSource;
 import domain.beauty.domain.BeautyRoutineAnalysis.IdentificationLevel;
 import domain.beauty.domain.BeautyRoutineAnalysis.PurposeBasis;
 import domain.beauty.domain.BeautyRoutineAnalysis.Step;
+import domain.beauty.config.GeminiProperties;
+import domain.beauty.shortform.client.GeminiProductEnrichmentClient;
 import domain.beauty.shortform.client.OpenAiProductEnrichmentClient;
 import domain.beauty.shortform.client.ProductEnrichmentInput;
 import domain.beauty.shortform.client.ProductEnrichmentResult;
 import domain.beauty.shortform.client.ProductEnrichmentResult.LookupStatus;
 import domain.beauty.shortform.config.OpenAiRoutineProperties;
+import domain.beauty.shortform.config.ShortformProductEnrichmentProperties;
 import domain.beauty.shortform.domain.IngredientSourceType;
 import domain.beauty.shortform.domain.IngredientVerificationStatus;
 import domain.beauty.shortform.domain.ShortformProductEnrichment;
@@ -39,8 +43,7 @@ class ShortformProductEnrichmentServiceTest {
         OpenAiProductEnrichmentClient client = mock(OpenAiProductEnrichmentClient.class);
         OpenAiRoutineProperties properties = new OpenAiRoutineProperties();
         ShortformAnalysisJsonMapper jsonMapper = new ShortformAnalysisJsonMapper(new ObjectMapper());
-        ShortformProductEnrichmentService service = new ShortformProductEnrichmentService(
-                repository, client, properties, jsonMapper);
+        ShortformProductEnrichmentService service = service(repository, client, properties, jsonMapper);
         List<ShortformProductEnrichment> stored = new ArrayList<>();
         AtomicInteger lookup = new AtomicInteger();
         when(repository.findByCacheKeyIn(any())).thenAnswer(invocation ->
@@ -73,9 +76,8 @@ class ShortformProductEnrichmentServiceTest {
         ShortformProductEnrichmentRepository repository = mock(ShortformProductEnrichmentRepository.class);
         OpenAiProductEnrichmentClient client = mock(OpenAiProductEnrichmentClient.class);
         OpenAiRoutineProperties properties = new OpenAiRoutineProperties();
-        ShortformProductEnrichmentService service = new ShortformProductEnrichmentService(
-                repository, client, properties,
-                new ShortformAnalysisJsonMapper(new ObjectMapper()));
+        ShortformProductEnrichmentService service = service(
+                repository, client, properties, new ShortformAnalysisJsonMapper(new ObjectMapper()));
         when(repository.findByCacheKeyIn(any())).thenReturn(List.of());
         when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(client.enrich(any())).thenAnswer(invocation -> {
@@ -107,9 +109,8 @@ class ShortformProductEnrichmentServiceTest {
         OpenAiProductEnrichmentClient client = mock(OpenAiProductEnrichmentClient.class);
         OpenAiRoutineProperties properties = new OpenAiRoutineProperties();
         properties.setProductFallbackEnabled(false);
-        ShortformProductEnrichmentService service = new ShortformProductEnrichmentService(
-                repository, client, properties,
-                new ShortformAnalysisJsonMapper(new ObjectMapper()));
+        ShortformProductEnrichmentService service = service(
+                repository, client, properties, new ShortformAnalysisJsonMapper(new ObjectMapper()));
         when(repository.findByCacheKeyIn(any())).thenReturn(List.of());
         when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(client.enrich(any())).thenAnswer(invocation -> {
@@ -141,9 +142,8 @@ class ShortformProductEnrichmentServiceTest {
         ShortformProductEnrichmentRepository repository = mock(ShortformProductEnrichmentRepository.class);
         OpenAiProductEnrichmentClient client = mock(OpenAiProductEnrichmentClient.class);
         OpenAiRoutineProperties properties = new OpenAiRoutineProperties();
-        ShortformProductEnrichmentService service = new ShortformProductEnrichmentService(
-                repository, client, properties,
-                new ShortformAnalysisJsonMapper(new ObjectMapper()));
+        ShortformProductEnrichmentService service = service(
+                repository, client, properties, new ShortformAnalysisJsonMapper(new ObjectMapper()));
         when(repository.findByCacheKeyIn(any())).thenReturn(List.of());
         when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(client.enrich(any())).thenAnswer(invocation -> {
@@ -169,9 +169,8 @@ class ShortformProductEnrichmentServiceTest {
         ShortformProductEnrichmentRepository repository = mock(ShortformProductEnrichmentRepository.class);
         OpenAiProductEnrichmentClient client = mock(OpenAiProductEnrichmentClient.class);
         OpenAiRoutineProperties properties = new OpenAiRoutineProperties();
-        ShortformProductEnrichmentService service = new ShortformProductEnrichmentService(
-                repository, client, properties,
-                new ShortformAnalysisJsonMapper(new ObjectMapper()));
+        ShortformProductEnrichmentService service = service(
+                repository, client, properties, new ShortformAnalysisJsonMapper(new ObjectMapper()));
         when(repository.findByCacheKeyIn(any())).thenReturn(List.of());
         when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(client.enrich(any())).thenThrow(new CustomException(
@@ -193,12 +192,137 @@ class ShortformProductEnrichmentServiceTest {
         verify(client, times(0)).enrich(any(), anyString(), anyInt());
     }
 
+    @Test
+    void usesGeminiSearchForOpenAiUnresolvedProductAndKeepsEstimatedIngredients() {
+        ShortformProductEnrichmentRepository repository = mock(ShortformProductEnrichmentRepository.class);
+        OpenAiProductEnrichmentClient openAiClient = mock(OpenAiProductEnrichmentClient.class);
+        GeminiProductEnrichmentClient geminiClient = mock(GeminiProductEnrichmentClient.class);
+        OpenAiRoutineProperties properties = new OpenAiRoutineProperties();
+        properties.setProductFallbackEnabled(false);
+        ShortformProductEnrichmentProperties enrichmentProperties = new ShortformProductEnrichmentProperties();
+        GeminiProperties geminiProperties = new GeminiProperties();
+        ShortformProductEnrichmentService service = new ShortformProductEnrichmentService(
+                repository, openAiClient, geminiClient, properties, enrichmentProperties,
+                geminiProperties, new ShortformAnalysisJsonMapper(new ObjectMapper()));
+        when(repository.findByCacheKeyIn(any())).thenReturn(List.of());
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(openAiClient.enrich(any())).thenReturn(new ProductEnrichmentResult.Response(
+                new ProductEnrichmentResult(List.of()), "gpt-test", 10, 5));
+        when(geminiClient.enrich(any())).thenAnswer(invocation -> {
+            ProductEnrichmentInput input = invocation.getArgument(0);
+            String key = input.products().getFirst().requestKey();
+            ProductEnrichmentResult.Product estimated = new ProductEnrichmentResult.Product(
+                    key,
+                    "토리든",
+                    "다이브인 저분자 히알루론산 수딩 크림",
+                    "한국 판매 처방 추정",
+                    LookupStatus.ESTIMATED,
+                    0.75,
+                    "영상 단서와 검색 결과로 추정",
+                    List.of(source()),
+                    List.of(ingredient())
+            );
+            return new ProductEnrichmentResult.Response(
+                    new ProductEnrichmentResult(List.of(estimated)),
+                    "gemini-3.6-flash", 30, 20, 1, List.of(webSource()));
+        });
+
+        ProductEnrichmentData result = service.getOrEnrich(
+                List.of(categoryStep(1))).productsByOrder().get(1);
+
+        assertThat(result.ingredientVerificationStatus())
+                .isEqualTo(IngredientVerificationStatus.ESTIMATED);
+        assertThat(result.ingredients()).hasSize(1);
+        verify(geminiClient).enrich(any());
+    }
+
+    @Test
+    void bypassesCacheReadsAndWritesWhenEnvironmentSwitchIsOff() {
+        ShortformProductEnrichmentRepository repository = mock(ShortformProductEnrichmentRepository.class);
+        OpenAiProductEnrichmentClient openAiClient = mock(OpenAiProductEnrichmentClient.class);
+        GeminiProductEnrichmentClient geminiClient = mock(GeminiProductEnrichmentClient.class);
+        OpenAiRoutineProperties properties = new OpenAiRoutineProperties();
+        properties.setProductFallbackEnabled(false);
+        ShortformProductEnrichmentProperties enrichmentProperties = new ShortformProductEnrichmentProperties();
+        enrichmentProperties.setCacheEnabled(false);
+        enrichmentProperties.setGeminiFallbackEnabled(false);
+        ShortformProductEnrichmentService service = new ShortformProductEnrichmentService(
+                repository, openAiClient, geminiClient, properties, enrichmentProperties,
+                new GeminiProperties(), new ShortformAnalysisJsonMapper(new ObjectMapper()));
+        when(openAiClient.enrich(any())).thenAnswer(invocation -> responseFor(invocation.getArgument(0)));
+
+        service.getOrEnrich(List.of(exactStep(1, "1025 Dokdo Toner")));
+        service.getOrEnrich(List.of(exactStep(1, "1025 Dokdo Toner")));
+
+        verify(openAiClient, times(2)).enrich(any());
+        verify(repository, never()).findByCacheKeyIn(any());
+        verify(repository, never()).findByCacheKey(anyString());
+        verify(repository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void usesGeminiKnowledgeWhenSearchQuotaIsExhausted() {
+        ShortformProductEnrichmentRepository repository = mock(ShortformProductEnrichmentRepository.class);
+        OpenAiProductEnrichmentClient openAiClient = mock(OpenAiProductEnrichmentClient.class);
+        GeminiProductEnrichmentClient geminiClient = mock(GeminiProductEnrichmentClient.class);
+        OpenAiRoutineProperties properties = new OpenAiRoutineProperties();
+        properties.setProductFallbackEnabled(false);
+        ShortformProductEnrichmentProperties enrichmentProperties = new ShortformProductEnrichmentProperties();
+        ShortformProductEnrichmentService service = new ShortformProductEnrichmentService(
+                repository, openAiClient, geminiClient, properties, enrichmentProperties,
+                new GeminiProperties(), new ShortformAnalysisJsonMapper(new ObjectMapper()));
+        when(repository.findByCacheKeyIn(any())).thenReturn(List.of());
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(openAiClient.enrich(any())).thenReturn(new ProductEnrichmentResult.Response(
+                new ProductEnrichmentResult(List.of()), "gpt-test", 10, 5));
+        when(geminiClient.enrich(any())).thenThrow(new CustomException(
+                ErrorCode.SHORTFORM_EXTERNAL_API_UNAVAILABLE));
+        when(geminiClient.enrichWithoutSearch(any())).thenAnswer(invocation -> {
+            ProductEnrichmentInput input = invocation.getArgument(0);
+            String key = input.products().getFirst().requestKey();
+            return new ProductEnrichmentResult.Response(
+                    new ProductEnrichmentResult(List.of(new ProductEnrichmentResult.Product(
+                            key, "추정 브랜드", "추정 수딩 크림", "모델 지식 기반",
+                            LookupStatus.ESTIMATED, 0.70, "출처 없는 MVP 추정",
+                            List.of(), List.of(ingredient())))),
+                    "gemini-3.6-flash-knowledge-fallback", 20, 15);
+        });
+
+        ProductEnrichmentData result = service.getOrEnrich(
+                List.of(categoryStep(1))).productsByOrder().get(1);
+
+        assertThat(result.ingredientVerificationStatus())
+                .isEqualTo(IngredientVerificationStatus.ESTIMATED);
+        assertThat(result.ingredients()).hasSize(1);
+        assertThat(result.sources()).isEmpty();
+        verify(geminiClient).enrichWithoutSearch(any());
+    }
+
     private ProductEnrichmentResult.Response responseFor(ProductEnrichmentInput input) {
         List<ProductEnrichmentResult.Product> products = input.products().stream()
                 .map(item -> product(item.requestKey(), List.of(ingredient()), List.of(source())))
                 .toList();
         return new ProductEnrichmentResult.Response(
                 new ProductEnrichmentResult(products), "gpt-test", 30, 20, 1, List.of(webSource()));
+    }
+
+    private ShortformProductEnrichmentService service(
+            ShortformProductEnrichmentRepository repository,
+            OpenAiProductEnrichmentClient client,
+            OpenAiRoutineProperties properties,
+            ShortformAnalysisJsonMapper jsonMapper
+    ) {
+        ShortformProductEnrichmentProperties enrichmentProperties = new ShortformProductEnrichmentProperties();
+        enrichmentProperties.setGeminiFallbackEnabled(false);
+        return new ShortformProductEnrichmentService(
+                repository,
+                client,
+                mock(GeminiProductEnrichmentClient.class),
+                properties,
+                enrichmentProperties,
+                new GeminiProperties(),
+                jsonMapper
+        );
     }
 
     private ProductEnrichmentResult.Response response(
@@ -260,5 +384,13 @@ class ShortformProductEnrichmentServiceTest {
                 PurposeBasis.DIRECTLY_STATED, null, IdentificationLevel.EXACT_PRODUCT,
                 "스킨케어", "ROUND LAB", name, null, "ROUND LAB " + name, null,
                 List.of(EvidenceSource.VISUAL_LABEL), "용기 라벨에서 확인", 0.95);
+    }
+
+    private Step categoryStep(int order) {
+        return new Step(
+                order, "00:0" + order, null, "얼굴", "도포", "흡수", "보습",
+                PurposeBasis.GENERAL_INFERENCE, null, IdentificationLevel.CATEGORY_ONLY,
+                "수딩 크림", null, null, null, null, null,
+                List.of(EvidenceSource.VISUAL_USAGE), "파란색 수딩 크림 용기와 DIVE IN 문구", 0.70);
     }
 }

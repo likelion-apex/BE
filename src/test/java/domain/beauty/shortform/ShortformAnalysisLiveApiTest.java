@@ -102,7 +102,8 @@ class ShortformAnalysisLiveApiTest {
                         .isIn(
                                 IngredientVerificationStatus.OFFICIAL,
                                 IngredientVerificationStatus.CORROBORATED,
-                                IngredientVerificationStatus.THIRD_PARTY);
+                                IngredientVerificationStatus.THIRD_PARTY,
+                                IngredientVerificationStatus.ESTIMATED);
                 assertThat(step.ingredientSources()).isNotEmpty();
                 int distribution = step.ingredientStats().lowRiskCount()
                         + step.ingredientStats().moderateRiskCount()

@@ -14,7 +14,11 @@ import org.springframework.web.client.RestClient;
 
 @Configuration
 @EnableAsync
-@EnableConfigurationProperties({YouTubeProperties.class, OpenAiRoutineProperties.class})
+@EnableConfigurationProperties({
+        YouTubeProperties.class,
+        OpenAiRoutineProperties.class,
+        ShortformProductEnrichmentProperties.class
+})
 public class ShortformAnalysisConfiguration {
 
     @Bean

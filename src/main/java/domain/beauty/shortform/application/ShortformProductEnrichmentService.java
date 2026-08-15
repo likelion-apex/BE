@@ -1,13 +1,15 @@
 package domain.beauty.shortform.application;
 
-import domain.beauty.domain.BeautyRoutineAnalysis.IdentificationLevel;
+import domain.beauty.config.GeminiProperties;
 import domain.beauty.domain.BeautyRoutineAnalysis.Step;
+import domain.beauty.shortform.client.GeminiProductEnrichmentClient;
 import domain.beauty.shortform.client.OpenAiProductEnrichmentClient;
 import domain.beauty.shortform.client.ProductEnrichmentInput;
 import domain.beauty.shortform.client.ProductEnrichmentResult;
 import domain.beauty.shortform.client.ProductEnrichmentResult.LookupStatus;
 import domain.beauty.shortform.client.ProductEnrichmentResult.Response;
 import domain.beauty.shortform.config.OpenAiRoutineProperties;
+import domain.beauty.shortform.config.ShortformProductEnrichmentProperties;
 import domain.beauty.shortform.domain.IngredientSourceType;
 import domain.beauty.shortform.domain.IngredientVerificationStatus;
 import domain.beauty.shortform.domain.ShortformProductEnrichment;
@@ -42,37 +44,47 @@ public class ShortformProductEnrichmentService {
     private static final double RESOLUTION_THRESHOLD = 0.85;
 
     private final ShortformProductEnrichmentRepository repository;
-    private final OpenAiProductEnrichmentClient client;
+    private final OpenAiProductEnrichmentClient openAiClient;
+    private final GeminiProductEnrichmentClient geminiClient;
     private final OpenAiRoutineProperties properties;
+    private final ShortformProductEnrichmentProperties enrichmentProperties;
+    private final GeminiProperties geminiProperties;
     private final ShortformAnalysisJsonMapper jsonMapper;
 
     public ShortformProductEnrichmentService(
             ShortformProductEnrichmentRepository repository,
-            OpenAiProductEnrichmentClient client,
+            OpenAiProductEnrichmentClient openAiClient,
+            GeminiProductEnrichmentClient geminiClient,
             OpenAiRoutineProperties properties,
+            ShortformProductEnrichmentProperties enrichmentProperties,
+            GeminiProperties geminiProperties,
             ShortformAnalysisJsonMapper jsonMapper
     ) {
         this.repository = repository;
-        this.client = client;
+        this.openAiClient = openAiClient;
+        this.geminiClient = geminiClient;
         this.properties = properties;
+        this.enrichmentProperties = enrichmentProperties;
+        this.geminiProperties = geminiProperties;
         this.jsonMapper = jsonMapper;
     }
 
     public BatchResult getOrEnrich(List<Step> steps) {
         List<RequestedProduct> requested = steps.stream()
-                .filter(this::eligible)
+                .filter(this::researchable)
                 .map(step -> new RequestedProduct(step, cacheKey(step)))
                 .toList();
         if (requested.isEmpty()) {
-            return BatchResult.empty(properties.getProductModel(), properties.getProductPromptVersion());
+            return BatchResult.empty(properties.getProductModel(), combinedPromptVersion());
         }
 
         LocalDateTime now = LocalDateTime.now();
-        Map<String, ShortformProductEnrichment> cached = repository
-                .findByCacheKeyIn(requested.stream().map(RequestedProduct::cacheKey).toList())
-                .stream()
-                .filter(entity -> !entity.isExpired(now))
-                .collect(Collectors.toMap(ShortformProductEnrichment::getCacheKey, Function.identity()));
+        Map<String, ShortformProductEnrichment> cached = enrichmentProperties.isCacheEnabled()
+                ? repository.findByCacheKeyIn(requested.stream().map(RequestedProduct::cacheKey).toList())
+                        .stream()
+                        .filter(entity -> !entity.isExpired(now))
+                        .collect(Collectors.toMap(ShortformProductEnrichment::getCacheKey, Function.identity()))
+                : Map.of();
         Map<Integer, ProductEnrichmentData> results = new LinkedHashMap<>();
         List<RequestedProduct> misses = new ArrayList<>();
         for (RequestedProduct item : requested) {
@@ -84,27 +96,38 @@ public class ShortformProductEnrichmentService {
             }
         }
 
-        log.info("숏폼 제품 웹 보강 캐시: hit={}, miss={}, model={}, fallbackModel={}, promptVersion={}",
+        log.info("숏폼 제품 웹 보강 캐시: enabled={}, hit={}, miss={}, model={}, fallbackModel={}, promptVersion={}",
+                enrichmentProperties.isCacheEnabled(),
                 requested.size() - misses.size(), misses.size(), properties.getProductModel(),
-                properties.getProductFallbackModel(), properties.getProductPromptVersion());
+                properties.getProductFallbackModel(), combinedPromptVersion());
         if (misses.isEmpty()) {
             return new BatchResult(
-                    Map.copyOf(results), properties.getProductModel(), properties.getProductPromptVersion(),
+                    Map.copyOf(results), properties.getProductModel(), combinedPromptVersion(),
                     0, 0, requested.size(), 0);
         }
 
-        Response primary;
+        Response primary = emptyResponse(properties.getProductModel());
         boolean primaryUsesFallbackModel = false;
         try {
-            primary = client.enrich(toInput(misses, false));
+            primary = openAiClient.enrich(toInput(misses, false));
         } catch (CustomException exception) {
-            if (!properties.isProductFallbackEnabled()) {
+            if (!properties.isProductFallbackEnabled() && !enrichmentProperties.isGeminiFallbackEnabled()) {
                 throw exception;
             }
             log.warn("숏폼 제품 기본 모델 실패로 보완 모델을 사용합니다: primary={}, fallback={}, reason={}",
                     properties.getProductModel(), properties.getProductFallbackModel(), exception.getErrorCode());
-            primary = client.enrich(toInput(misses, true), properties.getProductFallbackModel());
-            primaryUsesFallbackModel = true;
+            if (properties.isProductFallbackEnabled()) {
+                try {
+                    primary = openAiClient.enrich(toInput(misses, true), properties.getProductFallbackModel());
+                    primaryUsesFallbackModel = true;
+                } catch (CustomException fallbackException) {
+                    if (!enrichmentProperties.isGeminiFallbackEnabled()) {
+                        throw fallbackException;
+                    }
+                    log.warn("OpenAI 제품 보완 모델 실패 후 Gemini로 전환합니다: model={}, reason={}",
+                            properties.getProductFallbackModel(), fallbackException.getErrorCode());
+                }
+            }
         }
         Map<String, ProductEnrichmentResult.Product> enriched = indexValid(primary, misses);
         List<RequestedProduct> fallbackTargets = properties.isProductFallbackEnabled() && !primaryUsesFallbackModel
@@ -118,7 +141,7 @@ public class ShortformProductEnrichmentService {
             log.info("숏폼 제품 보완 모델 호출: targets={}, model={}",
                     fallbackTargets.size(), properties.getProductFallbackModel());
             try {
-                Response fallback = client.enrich(
+                Response fallback = openAiClient.enrich(
                         toInput(fallbackTargets, true), properties.getProductFallbackModel(), 1);
                 inputTokens += fallback.inputTokens();
                 outputTokens += fallback.outputTokens();
@@ -138,14 +161,63 @@ public class ShortformProductEnrichmentService {
             }
         }
 
+        List<RequestedProduct> geminiTargets = enrichmentProperties.isGeminiFallbackEnabled()
+                ? misses.stream().filter(item -> needsGeminiFallback(enriched.get(item.cacheKey()))).toList()
+                : List.of();
+        if (!geminiTargets.isEmpty()) {
+            log.info("Gemini 제품 검색 폴백 호출: targets={}, model={}, promptVersion={}",
+                    geminiTargets.size(), geminiProperties.getModel(),
+                    enrichmentProperties.getGeminiPromptVersion());
+            try {
+                Response gemini = geminiClient.enrich(toInput(geminiTargets, true));
+                inputTokens += gemini.inputTokens();
+                outputTokens += gemini.outputTokens();
+                model = appendModel(model, gemini.model());
+                Map<String, ProductEnrichmentResult.Product> geminiProducts = indexValid(
+                        gemini, geminiTargets);
+                for (RequestedProduct target : geminiTargets) {
+                    ProductEnrichmentResult.Product candidate = geminiProducts.get(target.cacheKey());
+                    ProductEnrichmentResult.Product current = enriched.get(target.cacheKey());
+                    if (quality(candidate) > quality(current)) {
+                        enriched.put(target.cacheKey(), candidate);
+                    }
+                }
+            } catch (CustomException exception) {
+                log.warn("Gemini 제품 검색 실패로 모델 지식 폴백을 사용합니다: model={}, targets={}, reason={}",
+                        geminiProperties.getModel(), geminiTargets.size(), exception.getErrorCode());
+                try {
+                    Response knowledge = geminiClient.enrichWithoutSearch(toInput(geminiTargets, true));
+                    inputTokens += knowledge.inputTokens();
+                    outputTokens += knowledge.outputTokens();
+                    model = appendModel(model, knowledge.model());
+                    Map<String, ProductEnrichmentResult.Product> knowledgeProducts = indexValid(
+                            knowledge, geminiTargets);
+                    for (RequestedProduct target : geminiTargets) {
+                        ProductEnrichmentResult.Product candidate = knowledgeProducts.get(target.cacheKey());
+                        ProductEnrichmentResult.Product current = enriched.get(target.cacheKey());
+                        if (quality(candidate) > quality(current)) {
+                            enriched.put(target.cacheKey(), candidate);
+                        }
+                    }
+                } catch (CustomException knowledgeException) {
+                    log.warn("Gemini 모델 지식 폴백도 건너뜁니다: model={}, targets={}, reason={}",
+                            geminiProperties.getModel(), geminiTargets.size(), knowledgeException.getErrorCode());
+                }
+            }
+        }
+
         for (RequestedProduct item : misses) {
             ProductEnrichmentResult.Product product = enriched.getOrDefault(
                     item.cacheKey(), fallbackProduct(item));
             save(item.cacheKey(), model, product, inputTokens, outputTokens);
-            results.put(item.step().order(), toData(product));
+            ProductEnrichmentData data = toData(product);
+            results.put(item.step().order(), data);
+            log.info("제품 보강 결과: order={}, lookupStatus={}, verification={}, confidence={}, sources={}, ingredients={}",
+                    item.step().order(), product.lookupStatus(), data.ingredientVerificationStatus(),
+                    data.resolutionConfidence(), data.sources().size(), data.ingredients().size());
         }
         return new BatchResult(
-                Map.copyOf(results), model, properties.getProductPromptVersion(),
+                Map.copyOf(results), model, combinedPromptVersion(),
                 inputTokens, outputTokens, requested.size() - misses.size(), misses.size());
     }
 
@@ -158,7 +230,7 @@ public class ShortformProductEnrichmentService {
                         item.step().brand(),
                         item.step().productName(),
                         item.step().variant(),
-                        item.step().identityEvidenceText()
+                        textOr(item.step().identityEvidenceText(), item.step().evidenceSummary())
                 )).toList()
         );
     }
@@ -219,10 +291,12 @@ public class ShortformProductEnrichmentService {
                 .limit(200)
                 .toList();
         String displayProductName = trimToNull(product.displayProductName());
-        if (lookupStatus != LookupStatus.FOUND
-                || confidence < RESOLUTION_THRESHOLD
+        boolean verified = lookupStatus == LookupStatus.FOUND && confidence >= RESOLUTION_THRESHOLD;
+        boolean estimated = lookupStatus == LookupStatus.ESTIMATED
+                && confidence >= enrichmentProperties.getEstimatedResolutionThreshold();
+        if ((!verified && !estimated)
                 || displayProductName == null
-                || sources.isEmpty()) {
+                || (verified && sources.isEmpty())) {
             ingredients = List.of();
         }
         return new ProductEnrichmentResult.Product(
@@ -242,6 +316,16 @@ public class ShortformProductEnrichmentService {
         return product == null || !toData(product).hasVerifiedIngredients();
     }
 
+    private boolean needsGeminiFallback(ProductEnrichmentResult.Product product) {
+        if (product == null) {
+            return true;
+        }
+        IngredientVerificationStatus status = toData(product).ingredientVerificationStatus();
+        return status == IngredientVerificationStatus.UNVERIFIED
+                || status == IngredientVerificationStatus.AMBIGUOUS
+                || status == IngredientVerificationStatus.ESTIMATED;
+    }
+
     private int quality(ProductEnrichmentResult.Product product) {
         if (product == null) {
             return -1;
@@ -251,6 +335,7 @@ public class ShortformProductEnrichmentService {
             case OFFICIAL -> 500;
             case CORROBORATED -> 400;
             case THIRD_PARTY -> 300;
+            case ESTIMATED -> 200;
             case AMBIGUOUS -> 100;
             case UNVERIFIED -> 0;
         };
@@ -279,6 +364,9 @@ public class ShortformProductEnrichmentService {
             long inputTokens,
             long outputTokens
     ) {
+        if (!enrichmentProperties.isCacheEnabled()) {
+            return;
+        }
         ProductEnrichmentData data = toData(product);
         LocalDateTime expiresAt = LocalDateTime.now().plus(
                 data.hasVerifiedIngredients()
@@ -289,7 +377,7 @@ public class ShortformProductEnrichmentService {
             entity = new ShortformProductEnrichment(
                     cacheKey,
                     model,
-                    properties.getProductPromptVersion(),
+                    combinedPromptVersion(),
                     jsonMapper.write(product),
                     inputTokens,
                     outputTokens,
@@ -298,7 +386,7 @@ public class ShortformProductEnrichmentService {
         } else {
             entity.refresh(
                     model,
-                    properties.getProductPromptVersion(),
+                    combinedPromptVersion(),
                     jsonMapper.write(product),
                     inputTokens,
                     outputTokens,
@@ -341,6 +429,12 @@ public class ShortformProductEnrichmentService {
         if (product.lookupStatus() == LookupStatus.AMBIGUOUS) {
             return IngredientVerificationStatus.AMBIGUOUS;
         }
+        if (product.lookupStatus() == LookupStatus.ESTIMATED) {
+            return product.resolutionConfidence() >= enrichmentProperties.getEstimatedResolutionThreshold()
+                    && !ingredients.isEmpty()
+                    ? IngredientVerificationStatus.ESTIMATED
+                    : IngredientVerificationStatus.UNVERIFIED;
+        }
         if (product.lookupStatus() != LookupStatus.FOUND
                 || product.resolutionConfidence() < RESOLUTION_THRESHOLD
                 || sources.isEmpty()
@@ -356,11 +450,10 @@ public class ShortformProductEnrichmentService {
         return IngredientVerificationStatus.THIRD_PARTY;
     }
 
-    private boolean eligible(Step step) {
-        return step.identificationLevel() == IdentificationLevel.EXACT_PRODUCT
-                && step.confidence() >= RESOLUTION_THRESHOLD
-                && step.productName() != null
-                && !step.productName().isBlank();
+    private boolean researchable(Step step) {
+        return step != null && ((step.category() != null && !step.category().isBlank())
+                || (step.productName() != null && !step.productName().isBlank())
+                || (step.evidenceSummary() != null && !step.evidenceSummary().isBlank()));
     }
 
     private String cacheKey(Step step) {
@@ -368,6 +461,8 @@ public class ShortformProductEnrichmentService {
                 properties.getProductModel(),
                 properties.getProductFallbackModel(),
                 properties.getProductPromptVersion(),
+                geminiProperties.getModel(),
+                enrichmentProperties.getGeminiPromptVersion(),
                 nullToEmpty(step.category()),
                 nullToEmpty(step.brand()),
                 nullToEmpty(step.productName()),
@@ -417,6 +512,25 @@ public class ShortformProductEnrichmentService {
 
     private String textOr(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private Response emptyResponse(String model) {
+        return new Response(new ProductEnrichmentResult(List.of()), model, 0, 0, 0, List.of());
+    }
+
+    private String appendModel(String current, String next) {
+        if (next == null || next.isBlank()) {
+            return current;
+        }
+        if (current == null || current.isBlank()) {
+            return next;
+        }
+        return current + "+" + next;
+    }
+
+    private String combinedPromptVersion() {
+        return properties.getProductPromptVersion()
+                + "+gemini-" + enrichmentProperties.getGeminiPromptVersion();
     }
 
     private <T> List<T> safe(List<T> value) {

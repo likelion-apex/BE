@@ -20,6 +20,7 @@ public record ProductEnrichmentResult(List<Product> products) {
 
     public enum LookupStatus {
         FOUND,
+        ESTIMATED,
         AMBIGUOUS,
         NOT_FOUND
     }
