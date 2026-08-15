@@ -4,8 +4,6 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
-  <meta name="kakao-client-id" content="__KAKAO_CLIENT_ID_BASE64__">
-  <meta name="kakao-redirect-uri" content="__KAKAO_REDIRECT_URI_BASE64__">
   <title>카카오 로그인 테스트</title>
   <style>
     :root {
@@ -749,7 +747,7 @@
     .product-badges span { padding: 3px 7px; border-radius: 4px; background: #e6f9ff; color: #03c1fb; font-size: 0.66rem; font-weight: 800; }
 
     .inventory-mini { min-height: 34px; padding: 0 10px; border: 1px solid #03c1fb; border-radius: 8px; background: #fff; color: #03c1fb; font-size: 0.7rem; white-space: nowrap; }
-    .inventory-mini::before { width: 16px; height: 16px; content: ''; background: url('/kakao-login-test/assets/inventory-plus.svg') center / contain no-repeat; }
+    .inventory-mini::before { width: 16px; height: 16px; content: ''; background: url('/assets/inventory-plus.svg') center / contain no-repeat; }
 
     .personal-score { display: grid; grid-template-columns: 40px 1fr; gap: 10px; align-items: center; margin: 20px 0 14px; padding: 14px 18px; border: 1px solid #03c1fb; border-radius: 18px; background: #e6f9ff; }
     .personal-score img { width: 40px; height: 40px; }
@@ -861,12 +859,12 @@
   </p>
 
   <section class="card" aria-labelledby="settings-title">
-    <h2 id="settings-title">1. 서버 설정 확인</h2>
+    <h2 id="settings-title">1. 로컬 연동 설정 확인</h2>
 
     <div class="member-grid">
       <div class="member-item">
         <span>카카오 REST API 키</span>
-        <strong id="configured-client-id">서버에서 자동으로 불러옴</strong>
+        <strong id="configured-client-id">Vite 환경변수 확인 중</strong>
       </div>
       <div class="member-item">
         <span>백엔드 주소</span>
@@ -881,14 +879,14 @@
 
     <div class="actions">
       <button id="login-button" class="kakao-button" type="button">카카오로 로그인</button>
-      <a class="button-link" href="/swagger-ui/index.html" target="_blank" rel="noopener">Swagger 열기</a>
+      <a id="swagger-link" class="button-link" href="#" target="_blank" rel="noopener">Swagger 열기</a>
     </div>
 
     <div id="status" class="status" role="status" aria-live="polite"></div>
 
     <ul class="warning">
       <li><strong>실제 사용자 계정으로만 테스트</strong>하고 토큰을 메신저·이슈·스크린샷에 공유하지 마세요.</li>
-      <li>Redirect URI를 테스트 주소로 바꿨다면 검증 후 운영 프론트엔드 주소로 복원하세요.</li>
+      <li>카카오 콘솔 Redirect URI와 로컬 <code>VITE_KAKAO_REDIRECT_URI</code>를 정확히 일치시키세요.</li>
     </ul>
   </section>
 
@@ -1017,7 +1015,7 @@
   </div>
 </div>
 
-<script>
+<script type="module">
   (() => {
     'use strict';
 
@@ -1036,24 +1034,20 @@
     let currentAnalysisId = null;
     let pollTimer = null;
 
-    const decodeServerConfig = (name) => {
-      const encoded = document.querySelector(`meta[name="${name}"]`)?.content || '';
-      if (!encoded) {
-        return '';
-      }
-      const bytes = Uint8Array.from(window.atob(encoded), (character) => character.charCodeAt(0));
-      return new TextDecoder().decode(bytes);
-    };
-
-    const clientId = decodeServerConfig('kakao-client-id');
-    const redirectUri = decodeServerConfig('kakao-redirect-uri');
-    const backendUrl = window.location.origin;
-    const cleanPageUrl = `${window.location.origin}/kakao-login-test`;
+    const env = (value, fallback = '') => String(value || fallback).trim();
+    const clientId = env(import.meta.env.VITE_KAKAO_CLIENT_ID);
+    const redirectUri = env(
+      import.meta.env.VITE_KAKAO_REDIRECT_URI,
+      'http://localhost:3000/onboarding/kakaocallback'
+    );
+    const backendUrl = env(import.meta.env.VITE_BACKEND_URL, 'https://mutsa.dev.me.kr').replace(/\/$/, '');
+    const cleanPageUrl = `${window.location.origin}/`;
     document.querySelector('#configured-backend').textContent = backendUrl;
-    document.querySelector('#configured-redirect').textContent = redirectUri || '(서버 설정 없음)';
+    document.querySelector('#configured-redirect').textContent = redirectUri || '(VITE_KAKAO_REDIRECT_URI 미설정)';
     document.querySelector('#configured-client-id').textContent = clientId
-      ? '서버에서 자동으로 불러옴'
-      : '(서버 설정 없음)';
+      ? 'VITE_KAKAO_CLIENT_ID 설정됨'
+      : '(VITE_KAKAO_CLIENT_ID 미설정)';
+    document.querySelector('#swagger-link').href = `${backendUrl}/swagger-ui/index.html`;
 
     const setStatus = (message, type = 'info') => {
       statusBox.textContent = message;
@@ -1083,7 +1077,7 @@
       resultSection.classList.remove('visible');
 
       if (!clientId || !redirectUri) {
-        setStatus('서버의 KAKAO_CLIENT_ID 또는 KAKAO_REDIRECT_URI 설정이 없습니다.', 'error');
+        setStatus('로컬 Vite의 VITE_KAKAO_CLIENT_ID 또는 VITE_KAKAO_REDIRECT_URI 설정이 없습니다.', 'error');
         return;
       }
 
@@ -1093,7 +1087,7 @@
           throw new Error('unsupported protocol');
         }
       } catch (error) {
-        setStatus('서버의 KAKAO_REDIRECT_URI가 올바른 HTTP 또는 HTTPS URL이 아닙니다.', 'error');
+        setStatus('VITE_KAKAO_REDIRECT_URI가 올바른 HTTP 또는 HTTPS URL이 아닙니다.', 'error');
         return;
       }
 
@@ -1144,7 +1138,7 @@
         const response = await fetch(`${backendUrl}/api/auth/kakao/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code })
+          body: JSON.stringify({ code, redirectUri })
         });
         const payload = await response.json().catch(() => null);
 
@@ -1156,7 +1150,7 @@
         displayTokens(payload.data);
         setStatus('로그인과 JWT 발급이 완료되었습니다. 아래 토큰을 Swagger Authorize에 사용할 수 있습니다.');
       } catch (error) {
-        setStatus(`JWT 발급에 실패했습니다.\n${error.message}\n\n카카오 Redirect URI와 서버 KAKAO_REDIRECT_URI가 정확히 같은지 확인해 주세요.`, 'error');
+        setStatus(`JWT 발급에 실패했습니다.\n${error.message}\n\n카카오 콘솔 Redirect URI와 로컬 VITE_KAKAO_REDIRECT_URI가 같은지 확인해 주세요.`, 'error');
       } finally {
         loginButton.disabled = false;
       }
@@ -1435,10 +1429,10 @@
           || ({ POSITIVE: 'BENEFICIAL', CAUTION: 'CAUTION', WARNING: 'WARNING' }[reason.tone])
           || 'CAUTION';
         const assessmentIcon = (category) => ({
-          SAFE: '/kakao-login-test/assets/assessment-safe.svg',
-          BENEFICIAL: '/kakao-login-test/assets/assessment-beneficial.svg',
-          CAUTION: '/kakao-login-test/assets/assessment-caution.svg',
-          WARNING: '/kakao-login-test/assets/assessment-warning.svg'
+          SAFE: '/assets/assessment-safe.svg',
+          BENEFICIAL: '/assets/assessment-beneficial.svg',
+          CAUTION: '/assets/assessment-caution.svg',
+          WARNING: '/assets/assessment-warning.svg'
         }[category]);
         const reasons = (result.reasons || []).map((reason) => {
           const category = assessmentCategory(reason);
@@ -1513,7 +1507,7 @@
             <button class="inventory-mini" type="button">인벤토리</button>
           </header>
           <div class="personal-score">
-            <img src="/kakao-login-test/assets/ai-profile.svg" alt="">
+            <img src="/assets/ai-profile.svg" alt="">
             <div><small>내 피부 프로필 맞춤</small><strong>AI 매칭 점수 ${escapeHtml(result.matchScore)}점</strong></div>
           </div>
           <nav class="detail-tabs ${ingredientsAvailable ? '' : 'single'}" aria-label="제품 상세 탭">

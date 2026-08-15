@@ -40,3 +40,7 @@ out/
 .env
 .env.*
 !.env.example
+
+### Node / Vite ###
+node_modules/
+tools/kakao-login-test-frontend/dist/

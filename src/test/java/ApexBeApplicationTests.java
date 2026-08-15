@@ -32,9 +32,9 @@ class ApexBeApplicationTests {
 	}
 
 	@Test
-	void disabledKakaoLoginTestPageReturnsNotFound() throws Exception {
+	void removedKakaoLoginTestPageIsNotPubliclyServed() throws Exception {
 		mockMvc.perform(get("/kakao-login-test"))
-			.andExpect(status().isNotFound());
+			.andExpect(status().isUnauthorized());
 	}
 
 }
