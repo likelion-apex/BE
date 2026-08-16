@@ -22,6 +22,15 @@ public final class ShortformAnalysisResponses {
     ) {
     }
 
+    public record VideoPreview(
+            String thumbnailUrl,
+            String title,
+            String publisher,
+            String viewCount,
+            String duration
+    ) {
+    }
+
     public record Status(
             Long analysisId,
             ShortformAnalysisStatus status,

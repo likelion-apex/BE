@@ -22,15 +22,18 @@ SHORTFORM_GEMINI_FALLBACK_ENABLED=true # OpenAI 미확인 제품의 Gemini 보�
 
 ## 호출 순서
 
-1. `POST /api/shortform-analyses`
-2. `GET /api/shortform-analyses/{analysisId}/status`를 `COMPLETED`까지 polling
-3. `GET /api/shortform-analyses/{analysisId}`
-4. 필요 시 `GET /api/shortform-analyses/{analysisId}/results/{resultId}`
-5. `POST /api/shortform-analyses/{analysisId}/optimize`
-6. `POST /api/shortform-analyses/{analysisId}/apply` with `saveType=TODAY|LIBRARY`, `routineType=DAY|NIGHT`
+1. `POST /api/shortform-analyses/preview`로 썸네일, 제목, 게시자, 조회수, 영상 길이 확인
+2. `POST /api/shortform-analyses`로 분석 시작
+3. `GET /api/shortform-analyses/{analysisId}/status`를 `COMPLETED`까지 polling
+4. `GET /api/shortform-analyses/{analysisId}`
+5. 필요 시 `GET /api/shortform-analyses/{analysisId}/results/{resultId}`
+6. `POST /api/shortform-analyses/{analysisId}/optimize`
+7. `POST /api/shortform-analyses/{analysisId}/apply` with `saveType=TODAY|LIBRARY`, `routineType=DAY|NIGHT`
    - `routineType`을 생략한 기존 요청은 서울 시간 기준 06:00~17:59 `DAY`, 그 외 `NIGHT`로 저장됩니다.
 
 분석 상태는 `PENDING → EXTRACTING_VIDEO → MATCHING_PRODUCTS → PERSONALIZING → OPTIMIZING → COMPLETED` 순서다. 사용자는 진행 중 `POST /cancel`로 취소할 수 있다.
+
+미리보기 API는 분석 데이터를 생성하지 않는다. 미리보기와 분석 시작 시점 사이에 영상의 공개 상태나 길이가 바뀔 수 있으므로 분석 요청에서도 YouTube 정보를 다시 검증한다. 게시자는 YouTube 채널 제목이며 채널 핸들은 아니다.
 
 ## AI와 데이터 근거
 
@@ -51,6 +54,7 @@ SHORTFORM_GEMINI_FALLBACK_ENABLED=true # OpenAI 미확인 제품의 Gemini 보�
 
 - 테스트 피부 타입/피부 고민 저장
 - 기본 Shorts 샘플 `https://www.youtube.com/shorts/t1S24pgO2XQ`
+- URL 입력 후 자동으로 조회되는 YouTube 영상 정보 카드
 - 4단계 진행률, 취소, AI 브리핑과 제품 상세 모달
 - 인벤토리 최적화와 TODAY/LIBRARY 저장
 - 모델·토큰·원시 JSON 디버그 패널
