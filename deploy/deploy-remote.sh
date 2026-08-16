@@ -14,6 +14,8 @@ current_link="$base_dir/current"
 release_dir="$releases_dir/$release_sha"
 previous_target="$(readlink -f "$current_link" 2>/dev/null || true)"
 health_timeout_seconds=240
+health_stability_seconds=10
+readiness_url="http://127.0.0.1:8082/internal/health/readiness"
 deployment_started_at="$(date --iso-8601=seconds)"
 
 if [[ ! "$release_sha" =~ ^[0-9a-f]{40}$ ]]; then
@@ -38,8 +40,8 @@ else
   health_ok=false
   health_deadline=$((SECONDS + health_timeout_seconds))
   while (( SECONDS < health_deadline )); do
-    if curl --silent --output /dev/null --connect-timeout 2 --max-time 5 \
-      http://127.0.0.1:8082/; then
+    if curl --fail --silent --show-error --output /dev/null --connect-timeout 2 --max-time 5 \
+      "$readiness_url"; then
       health_ok=true
       break
     fi
@@ -51,10 +53,24 @@ else
 
     sleep 2
   done
+
+  if [[ "$health_ok" == true ]]; then
+    stability_deadline=$((SECONDS + health_stability_seconds))
+    while (( SECONDS < stability_deadline )); do
+      sleep 2
+      if ! /usr/bin/systemctl is-active --quiet mutsa.service \
+        || ! curl --fail --silent --show-error --output /dev/null --connect-timeout 2 --max-time 5 \
+          "$readiness_url"; then
+        echo "mutsa.service became unhealthy during the stability check" >&2
+        health_ok=false
+        break
+      fi
+    done
+  fi
 fi
 
 if [[ "$health_ok" != true ]]; then
-  echo "new release failed its local HTTP check after ${health_timeout_seconds}s; rolling back" >&2
+  echo "new release failed its readiness check; rolling back" >&2
   echo "new release service status before rollback:" >&2
   sudo /usr/bin/systemctl status mutsa.service --no-pager >&2 || true
   echo "new release journal before rollback:" >&2
