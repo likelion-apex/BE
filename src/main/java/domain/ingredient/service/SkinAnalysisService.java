@@ -11,7 +11,7 @@ import domain.ingredient.dto.response.SkinAnalysisResponse.IngredientProfile;
 import domain.ingredient.dto.response.SkinAnalysisResponse.RiskDistribution;
 import domain.ingredient.repository.ProductIngredientRepository;
 import domain.inventory.Product;
-import domain.inventory.ProductRepository;
+import domain.inventory.service.ProductService;
 import domain.inventory.client.OpenAiPersonalizedAnalysisClient;
 import domain.inventory.client.PersonalizedAnalysisResult;
 import domain.member.Member;
@@ -40,14 +40,13 @@ public class SkinAnalysisService {
     private static final String AI_DISCLAIMER = "본 분석은 AI가 제공하는 참고 정보이며 의학적 진단을 대체하지 않습니다.";
     private static final String FALLBACK_DISCLAIMER = "AI 분석에 실패하여 EWG 등급 기반 규칙으로 대체 산출된 결과입니다.";
 
-    private final ProductRepository productRepository;
+    private final ProductService productService;
     private final MemberRepository memberRepository;
     private final ProductIngredientRepository productIngredientRepository;
     private final OpenAiPersonalizedAnalysisClient personalizedAnalysisClient;
 
     public SkinAnalysisResponse analyze(Long memberId, Long productId) {
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
+        Product product = productService.getById(productId);
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
 

@@ -53,6 +53,7 @@ public enum ErrorCode {
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "INVENTORY-001", "화장품 정보를 찾을 수 없습니다."),
     INVENTORY_NOT_FOUND(HttpStatus.NOT_FOUND, "INVENTORY-002", "인벤토리 항목을 찾을 수 없습니다."),
     AI_ANALYSIS_FAILED(HttpStatus.BAD_GATEWAY, "INVENTORY-003", "AI 분석에 실패했습니다. 잠시 후 다시 시도해주세요."),
+    INVENTORY_ALREADY_EXISTS(HttpStatus.CONFLICT, "INVENTORY-004", "이미 인벤토리에 등록된 상품입니다."),
 
     // 성분 궁합 분석
     INGREDIENT_NOT_FOUND(HttpStatus.NOT_FOUND, "INGREDIENT-001", "성분 정보를 찾을 수 없습니다.");

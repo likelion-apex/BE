@@ -29,3 +29,8 @@ openai:
 
 cors:
   allowed-origins: http://localhost:3000
+
+product:
+  seed:
+    enabled: false
+    kakao-delay-ms: 0
