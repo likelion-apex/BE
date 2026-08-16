@@ -11,6 +11,8 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
 
     List<Inventory> findAllByMemberIdAndFavoriteTrueOrderByCreatedAtDesc(Long memberId, Pageable pageable);
 
+    boolean existsByMemberIdAndProductId(Long memberId, Long productId);
+
     long countByMemberIdAndFavoriteTrue(Long memberId);
 
     Optional<Inventory> findByIdAndMemberId(Long id, Long memberId);

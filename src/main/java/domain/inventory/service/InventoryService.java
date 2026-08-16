@@ -56,6 +56,9 @@ public class InventoryService {
     public InventoryCreateResponse create(Long memberId, InventoryCreateRequest request) {
         Member member = findMember(memberId);
         Product product = productService.findOrCreate(request.productName());
+        if (inventoryRepository.existsByMemberIdAndProductId(memberId, product.getId())) {
+            throw new CustomException(ErrorCode.INVENTORY_ALREADY_EXISTS);
+        }
         Inventory inventory = Inventory.builder()
                 .member(member)
                 .product(product)

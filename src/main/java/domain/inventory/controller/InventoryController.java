@@ -13,6 +13,10 @@ import domain.inventory.service.InventoryService;
 import global.common.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -60,8 +64,20 @@ public class InventoryController {
     @Operation(
             summary = "인벤토리 추가",
             description = "productName으로 화장품을 인벤토리에 추가합니다. 마스터 DB에 이미 있는 제품명이면 기존 상품을 재사용하고, "
-                    + "없으면 신규 상품으로 등록하며 이때 이미지 검색과 카테고리 AI 자동 분류가 함께 수행됩니다."
+                    + "없으면 신규 상품으로 등록하며 이때 이미지 검색과 카테고리 AI 자동 분류가 함께 수행됩니다. "
+                    + "이미 같은 상품을 인벤토리에 담아둔 경우 409로 거절됩니다."
     )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "인벤토리 추가 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "409",
+                    description = "이미 인벤토리에 등록된 상품",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class),
+                            examples = @ExampleObject(value = """
+                                    {"success":false,"code":"INVENTORY-004","message":"이미 인벤토리에 등록된 상품입니다."}
+                                    """))
+            )
+    })
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping
     public ApiResponse<InventoryCreateResponse> create(
