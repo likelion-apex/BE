@@ -55,7 +55,7 @@ public class InventoryService {
 
     public InventoryCreateResponse create(Long memberId, InventoryCreateRequest request) {
         Member member = findMember(memberId);
-        Product product = productService.findOrCreate(request.productId(), request.productName());
+        Product product = productService.findOrCreate(request.productName());
         Inventory inventory = Inventory.builder()
                 .member(member)
                 .product(product)

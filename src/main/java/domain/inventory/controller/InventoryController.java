@@ -59,8 +59,8 @@ public class InventoryController {
 
     @Operation(
             summary = "인벤토리 추가",
-            description = "화장품을 인벤토리에 추가합니다. productId(검색으로 조회한 기존 상품) 또는 productName(마스터 DB에 없는 신규 "
-                    + "상품)을 하나 이상 보내야 하며, 신규 상품은 등록 시 이미지 검색과 카테고리 AI 자동 분류가 함께 수행됩니다."
+            description = "productName으로 화장품을 인벤토리에 추가합니다. 마스터 DB에 이미 있는 제품명이면 기존 상품을 재사용하고, "
+                    + "없으면 신규 상품으로 등록하며 이때 이미지 검색과 카테고리 AI 자동 분류가 함께 수행됩니다."
     )
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping

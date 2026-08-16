@@ -1,15 +1,14 @@
 package domain.inventory.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
 
 @Schema(description = "인벤토리 추가 요청")
 public record InventoryCreateRequest(
 
-        @Schema(description = "기존 상품 ID (화장품 검색으로 조회한 상품일 때 사용)", example = "1024")
-        Long productId,
-
-        @Schema(description = "마스터 DB에 없는 신규 상품의 제품명 (productId가 없을 때 사용, 최초 등록 시 카테고리는 AI가 자동 분류)",
+        @Schema(description = "제품명 (마스터 DB에 이미 있으면 재사용하고, 없으면 신규 등록하며 이때 이미지 검색과 카테고리 AI 자동 분류가 함께 수행됩니다)",
                 example = "달바 화이트 트러플 퍼스트 스프레이 세럼")
+        @NotBlank(message = "productName은 필수입니다.")
         String productName
 ) {
 }
