@@ -3,7 +3,10 @@ package domain.beauty.shortform.client;
 import domain.beauty.shortform.config.YouTubeProperties;
 import global.exception.CustomException;
 import global.exception.ErrorCode;
+import java.math.BigInteger;
 import java.time.Duration;
+import java.time.format.DateTimeParseException;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -36,7 +39,7 @@ public class YouTubeMetadataClient {
             JsonNode response = restClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .path("/youtube/v3/videos")
-                            .queryParam("part", "contentDetails,status,snippet")
+                            .queryParam("part", "contentDetails,status,snippet,statistics")
                             .queryParam("id", videoId)
                             .queryParam("key", properties.getApiKey())
                             .build())
@@ -63,22 +66,41 @@ public class YouTubeMetadataClient {
             }
 
             JsonNode snippet = item.path("snippet");
-            String thumbnailUrl = snippet.path("thumbnails").path("high").path("url").stringValue(null);
-            if (thumbnailUrl == null) {
-                thumbnailUrl = snippet.path("thumbnails").path("default").path("url").stringValue(null);
-            }
             return new YouTubeVideoMetadata(
                     videoId,
                     duration,
                     snippet.path("title").stringValue(""),
-                    thumbnailUrl
+                    selectThumbnailUrl(snippet.path("thumbnails")),
+                    snippet.path("channelTitle").stringValue(""),
+                    parseViewCount(item.path("statistics").path("viewCount").stringValue(null))
             );
         } catch (CustomException exception) {
             throw exception;
-        } catch (IllegalArgumentException exception) {
+        } catch (DateTimeParseException exception) {
             throw new CustomException(ErrorCode.SHORTFORM_VIDEO_UNAVAILABLE, "영상 재생 시간을 확인할 수 없습니다.");
         } catch (RestClientException exception) {
             throw new CustomException(ErrorCode.SHORTFORM_EXTERNAL_API_UNAVAILABLE, "YouTube 영상 정보를 확인할 수 없습니다.");
+        }
+    }
+
+    private String selectThumbnailUrl(JsonNode thumbnails) {
+        for (String quality : List.of("maxres", "standard", "high", "medium", "default")) {
+            String url = thumbnails.path(quality).path("url").stringValue(null);
+            if (url != null && !url.isBlank()) {
+                return url;
+            }
+        }
+        return null;
+    }
+
+    private BigInteger parseViewCount(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return new BigInteger(value);
+        } catch (NumberFormatException ignored) {
+            return null;
         }
     }
 }

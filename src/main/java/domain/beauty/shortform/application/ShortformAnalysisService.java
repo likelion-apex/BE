@@ -9,9 +9,11 @@ import domain.beauty.shortform.api.ShortformAnalysisResponses.HistoryItem;
 import domain.beauty.shortform.api.ShortformAnalysisResponses.Optimization;
 import domain.beauty.shortform.api.ShortformAnalysisResponses.ProductDetail;
 import domain.beauty.shortform.api.ShortformAnalysisResponses.Status;
+import domain.beauty.shortform.api.ShortformAnalysisResponses.VideoPreview;
 import domain.beauty.shortform.application.ShortformAnalysisStateService.AnalysisProfile;
 import domain.beauty.shortform.application.ShortformAnalysisStateService.CreateResult;
 import domain.beauty.shortform.client.YouTubeMetadataClient;
+import domain.beauty.shortform.client.YouTubeVideoMetadata;
 import domain.beauty.shortform.domain.RoutineOptimizationSnapshot;
 import domain.beauty.shortform.domain.RoutineSaveType;
 import domain.beauty.shortform.domain.ShortformAnalysis;
@@ -66,6 +68,18 @@ public class ShortformAnalysisService {
         ShortformAnalysis analysis = result.analysis();
         return new Created(
                 analysis.getId(), analysis.getStatus(), analysis.getProgress(), !result.created());
+    }
+
+    public VideoPreview preview(String videoUrl) {
+        NormalizedYouTubeVideo video = urlNormalizer.normalize(videoUrl);
+        YouTubeVideoMetadata metadata = youtubeMetadataClient.validate(video.videoId());
+        return new VideoPreview(
+                metadata.thumbnailUrl(),
+                metadata.title(),
+                metadata.publisher(),
+                YouTubeVideoPreviewFormatter.formatViewCount(metadata.viewCount()),
+                YouTubeVideoPreviewFormatter.formatDuration(metadata.duration())
+        );
     }
 
     public Status status(Long memberId, Long analysisId) {

@@ -325,6 +325,79 @@
       box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
     }
 
+    .video-preview-card {
+      display: grid;
+      grid-template-columns: 128px minmax(0, 1fr);
+      min-height: 150px;
+      overflow: hidden;
+      border: 1px solid #ccd1d5;
+      border-radius: 18px;
+      background: #fff;
+      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.08);
+    }
+
+    .video-preview-card[hidden] {
+      display: none;
+    }
+
+    .video-preview-thumbnail {
+      position: relative;
+      min-height: 150px;
+      overflow: hidden;
+      background: linear-gradient(145deg, #e8f8fd, #dce2e6);
+    }
+
+    .video-preview-thumbnail img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .video-preview-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #8e99a4;
+      font-size: 1.7rem;
+    }
+
+    .video-preview-content {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      justify-content: center;
+      gap: 7px;
+      padding: 18px;
+    }
+
+    .video-preview-title {
+      display: -webkit-box;
+      margin: 0;
+      overflow: hidden;
+      font-size: 0.98rem;
+      font-weight: 800;
+      line-height: 1.45;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+    }
+
+    .video-preview-publisher {
+      margin: 6px 0 0;
+      overflow: hidden;
+      font-size: 0.76rem;
+      font-weight: 700;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .video-preview-stats {
+      margin: 0;
+      color: #8e99a4;
+      font-size: 0.76rem;
+    }
+
     .routine-form input,
     .routine-form select {
       height: 44px;
@@ -866,6 +939,19 @@
       .phone-panel {
         border-radius: 20px;
       }
+
+      .video-preview-card {
+        grid-template-columns: 112px minmax(0, 1fr);
+        min-height: 132px;
+      }
+
+      .video-preview-thumbnail {
+        min-height: 132px;
+      }
+
+      .video-preview-content {
+        padding: 14px;
+      }
     }
   </style>
 </head>
@@ -975,12 +1061,27 @@
             </div>
           </section>
 
+          <section id="video-preview-card" class="video-preview-card" aria-live="polite" hidden>
+            <div class="video-preview-thumbnail">
+              <img id="video-preview-image" alt="" hidden>
+              <span id="video-preview-placeholder" class="video-preview-placeholder" aria-hidden="true">▶</span>
+            </div>
+            <div class="video-preview-content">
+              <p id="video-preview-title" class="video-preview-title"></p>
+              <p id="video-preview-publisher" class="video-preview-publisher"></p>
+              <p class="video-preview-stats">
+                길이 <span id="video-preview-duration">-</span>
+                · 조회수 <span id="video-preview-views">-</span>
+              </p>
+            </div>
+          </section>
+
           <form id="analysis-form" class="routine-form">
             <label for="video-url">YouTube 영상 URL</label>
             <input id="video-url" type="url" required maxlength="2048"
                    value="https://www.youtube.com/shorts/t1S24pgO2XQ">
             <p class="routine-muted">최대 5분 이하의 공개 영상만 분석할 수 있습니다.</p>
-            <button id="analysis-button" class="routine-button" type="submit">AI 전체 루틴 분석 요청하기</button>
+            <button id="analysis-button" class="routine-button" type="submit" disabled>AI 전체 루틴 분석 요청하기</button>
             <p id="analysis-feedback" class="analysis-feedback" role="status" aria-live="polite"></p>
           </form>
 
@@ -1042,7 +1143,14 @@
 
 <script type="module">
   import { buildKakaoAuthorizeUrl, normalizeKakaoClientId } from '/src/config.js';
-  import { assessmentLabel, benefitSummary, buildRoutineApplyPayload, userFacingApiError } from '/src/analysis-ui.js';
+  import {
+    assessmentLabel,
+    benefitSummary,
+    buildRoutineApplyPayload,
+    createVideoPreviewState,
+    safeHttpImageUrl,
+    userFacingApiError
+  } from '/src/analysis-ui.js';
 
   (() => {
     'use strict';
@@ -1058,9 +1166,18 @@
     const progressPanel = document.querySelector('#progress-panel');
     const routineResult = document.querySelector('#routine-result');
     const optimizationReport = document.querySelector('#optimization-report');
+    const videoUrlInput = document.querySelector('#video-url');
+    const analysisButton = document.querySelector('#analysis-button');
+    const videoPreviewCard = document.querySelector('#video-preview-card');
+    const videoPreviewImage = document.querySelector('#video-preview-image');
+    const videoPreviewPlaceholder = document.querySelector('#video-preview-placeholder');
+    const videoPreviewState = createVideoPreviewState();
     let accessToken = '';
     let currentAnalysisId = null;
     let pollTimer = null;
+    let previewTimer = null;
+    let previewAbortController = null;
+    let analysisRequestPending = false;
 
     const env = (value, fallback = '') => String(value || fallback).trim();
     const rawClientId = env(import.meta.env.VITE_KAKAO_CLIENT_ID);
@@ -1170,6 +1287,7 @@
       analysisLab.classList.add('visible');
       hydrateProfile();
       loadRecentAnalyses();
+      scheduleVideoPreview(true);
       resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
@@ -1235,15 +1353,7 @@
       .replaceAll('"', '&quot;')
       .replaceAll("'", '&#039;');
 
-    const safeImageUrl = (value) => {
-      if (!value) return '';
-      try {
-        const parsed = new URL(value);
-        return ['http:', 'https:'].includes(parsed.protocol) ? parsed.toString() : '';
-      } catch (error) {
-        return '';
-      }
-    };
+    const safeImageUrl = safeHttpImageUrl;
 
     const showDebug = (label, payload) => {
       debugBox.textContent = `${label}\n\n${JSON.stringify(payload, null, 2)}`;
@@ -1265,6 +1375,9 @@
           }
         });
       } catch (cause) {
+        if (cause?.name === 'AbortError') {
+          throw cause;
+        }
         const error = new Error('백엔드 서버에 연결하지 못했습니다.', { cause });
         error.isNetworkError = true;
         throw error;
@@ -1278,6 +1391,86 @@
       }
       return payload;
     };
+
+    const hideVideoPreview = () => {
+      videoPreviewCard.hidden = true;
+      videoPreviewImage.hidden = true;
+      videoPreviewImage.removeAttribute('src');
+      videoPreviewPlaceholder.hidden = false;
+    };
+
+    const renderVideoPreview = (preview) => {
+      if (!preview) {
+        hideVideoPreview();
+        return;
+      }
+      document.querySelector('#video-preview-title').textContent = preview.title || '제목 없는 영상';
+      document.querySelector('#video-preview-publisher').textContent = preview.publisher || '게시자 미확인';
+      document.querySelector('#video-preview-duration').textContent = preview.duration || '-';
+      document.querySelector('#video-preview-views').textContent = preview.viewCount || '조회수 비공개';
+      const imageUrl = safeImageUrl(preview.thumbnailUrl);
+      videoPreviewImage.hidden = !imageUrl;
+      videoPreviewPlaceholder.hidden = Boolean(imageUrl);
+      if (imageUrl) {
+        videoPreviewImage.src = imageUrl;
+      } else {
+        videoPreviewImage.removeAttribute('src');
+      }
+      videoPreviewCard.hidden = false;
+    };
+
+    const syncAnalysisButton = () => {
+      analysisButton.disabled = analysisRequestPending || !videoPreviewState.canAnalyze(videoUrlInput.value);
+    };
+
+    const loadVideoPreview = async (ticket) => {
+      previewAbortController = new AbortController();
+      try {
+        const payload = await apiFetch('/api/shortform-analyses/preview', {
+          method: 'POST',
+          body: JSON.stringify({ videoUrl: ticket.url }),
+          signal: previewAbortController.signal
+        });
+        if (!videoPreviewState.accept(ticket, payload.data)) return;
+        renderVideoPreview(payload.data);
+        syncAnalysisButton();
+        setAnalysisFeedback('영상 정보를 확인했습니다. AI 분석을 요청할 수 있습니다.', 'success');
+        showDebug('YouTube 영상 미리보기', payload);
+      } catch (error) {
+        if (error?.name === 'AbortError' || !videoPreviewState.isCurrent(ticket)) return;
+        hideVideoPreview();
+        syncAnalysisButton();
+        setAnalysisFeedback(`영상 정보를 불러오지 못했습니다.\n${userFacingApiError(error)}`, 'error');
+        showDebug('YouTube 영상 미리보기 실패', { error: error.message, code: error.code });
+      }
+    };
+
+    function scheduleVideoPreview(immediate = false) {
+      if (previewTimer) {
+        window.clearTimeout(previewTimer);
+        previewTimer = null;
+      }
+      previewAbortController?.abort();
+      previewAbortController = null;
+      const ticket = videoPreviewState.start(videoUrlInput.value);
+      hideVideoPreview();
+      syncAnalysisButton();
+      if (!ticket.url || !accessToken) {
+        setAnalysisFeedback(ticket.url ? '먼저 카카오 로그인을 완료해 주세요.' : '');
+        return;
+      }
+      setAnalysisFeedback('YouTube 영상 정보를 확인하고 있습니다.');
+      previewTimer = window.setTimeout(() => {
+        previewTimer = null;
+        loadVideoPreview(ticket);
+      }, immediate ? 0 : 400);
+    }
+
+    videoUrlInput.addEventListener('input', () => scheduleVideoPreview(false));
+    videoPreviewImage.addEventListener('error', () => {
+      videoPreviewImage.hidden = true;
+      videoPreviewPlaceholder.hidden = false;
+    });
 
     const hydrateProfile = async () => {
       try {
@@ -1367,9 +1560,15 @@
 
     document.querySelector('#analysis-form').addEventListener('submit', async (event) => {
       event.preventDefault();
-      const button = document.querySelector('#analysis-button');
+      const button = analysisButton;
+      if (!videoPreviewState.canAnalyze(videoUrlInput.value)) {
+        scheduleVideoPreview(true);
+        setAnalysisFeedback('현재 URL의 영상 정보를 먼저 확인해 주세요.', 'error');
+        return;
+      }
       const idleButtonText = button.textContent;
-      button.disabled = true;
+      analysisRequestPending = true;
+      syncAnalysisButton();
       button.textContent = '분석 요청 중…';
       setAnalysisFeedback('서버에 분석 요청을 전송하고 있습니다. 잠시만 기다려 주세요.');
       stopPolling();
@@ -1377,7 +1576,8 @@
       optimizationReport.classList.remove('visible');
       document.querySelector('#apply-actions').hidden = true;
       try {
-        const videoUrl = document.querySelector('#video-url').value.trim();
+        const videoUrl = videoUrlInput.value.trim();
+        renderVideoPreview(videoPreviewState.value());
         const payload = await apiFetch('/api/shortform-analyses', {
           method: 'POST', body: JSON.stringify({ videoUrl })
         });
@@ -1399,7 +1599,8 @@
         setAnalysisFeedback(message, 'error');
         showDebug('분석 요청 실패', { error: error.message });
       } finally {
-        button.disabled = false;
+        analysisRequestPending = false;
+        syncAnalysisButton();
         button.textContent = idleButtonText;
       }
     });
@@ -1685,6 +1886,7 @@
       }
       const item = event.target.closest('[data-analysis-id]');
       if (!item) return;
+      hideVideoPreview();
       currentAnalysisId = Number(item.dataset.analysisId);
       if (item.dataset.analysisStatus === 'COMPLETED') {
         loadAnalysisDetail(currentAnalysisId);

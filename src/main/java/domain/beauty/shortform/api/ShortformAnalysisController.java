@@ -7,6 +7,7 @@ import domain.beauty.shortform.api.ShortformAnalysisResponses.History;
 import domain.beauty.shortform.api.ShortformAnalysisResponses.Optimization;
 import domain.beauty.shortform.api.ShortformAnalysisResponses.ProductDetail;
 import domain.beauty.shortform.api.ShortformAnalysisResponses.Status;
+import domain.beauty.shortform.api.ShortformAnalysisResponses.VideoPreview;
 import domain.beauty.shortform.application.ShortformAnalysisService;
 import global.common.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -33,6 +34,14 @@ public class ShortformAnalysisController {
 
     public ShortformAnalysisController(ShortformAnalysisService service) {
         this.service = service;
+    }
+
+    @PostMapping("/preview")
+    @Operation(summary = "YouTube 영상 정보 미리보기")
+    public ApiResponse<VideoPreview> preview(
+            @Valid @RequestBody CreateShortformAnalysisRequest request
+    ) {
+        return ApiResponse.success("영상 정보를 불러왔습니다.", service.preview(request.videoUrl()));
     }
 
     @PostMapping

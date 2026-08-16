@@ -1,4 +1,6 @@
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -16,6 +18,7 @@ import domain.member.MemberRepository;
 import domain.member.Provider;
 import domain.member.Role;
 import domain.member.SkinType;
+import java.math.BigInteger;
 import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,7 +57,40 @@ class ShortformAnalysisApiIntegrationTest {
         analysisRepository.deleteAll();
         memberRepository.deleteAll();
         when(youtubeMetadataClient.validate(anyString())).thenReturn(new YouTubeVideoMetadata(
-                "t1S24pgO2XQ", Duration.ofSeconds(45), "테스트 영상", null));
+                "t1S24pgO2XQ",
+                Duration.ofSeconds(58),
+                "테스트 영상",
+                "https://img.example.test/video.jpg",
+                "테스트 채널",
+                BigInteger.valueOf(123_456)
+        ));
+    }
+
+    @Test
+    void previewsVideoMetadataWithoutCreatingAnalysis() throws Exception {
+        Member member = saveMember("preview-member");
+
+        mockMvc.perform(post("/api/shortform-analyses/preview")
+                        .with(authentication(memberAuthentication(member.getId())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"videoUrl\":\"https://www.youtube.com/shorts/t1S24pgO2XQ\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.thumbnailUrl").value("https://img.example.test/video.jpg"))
+                .andExpect(jsonPath("$.data.title").value("테스트 영상"))
+                .andExpect(jsonPath("$.data.publisher").value("테스트 채널"))
+                .andExpect(jsonPath("$.data.viewCount").value("12.3만회"))
+                .andExpect(jsonPath("$.data.duration").value("0:58"));
+
+        assertThat(analysisRepository.count()).isZero();
+        verifyNoInteractions(jobHandler);
+    }
+
+    @Test
+    void requiresAuthenticationForVideoPreview() throws Exception {
+        mockMvc.perform(post("/api/shortform-analyses/preview")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"videoUrl\":\"https://www.youtube.com/shorts/t1S24pgO2XQ\"}"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
