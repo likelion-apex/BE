@@ -1,13 +1,18 @@
 import './styles.css';
 import { ApiClient } from './api.js';
 import {
+  buildGeneratedRoutineCreatePayload,
   buildKakaoAuthorizeUrl,
   buildRoutineApplyPayload,
+  buildRoutineLogsPath,
   createOAuthState,
   normalizeKakaoClientId,
 } from './config.js';
 import {
+  createDemoRoutineDateDetail,
   demoAnalysisResult,
+  demoDailyRoutine,
+  demoGeneratedRoutine,
   demoHistory,
   demoHome,
   demoMember,
@@ -15,6 +20,9 @@ import {
   demoPreview,
   demoProductDetail,
   demoProducts,
+  demoRoutineCalendar,
+  demoRoutineDetails,
+  demoRoutineLibrary,
 } from './demo-data.js';
 
 const env = (value, fallback = '') => String(value || fallback).trim();
@@ -55,6 +63,25 @@ const categoryLabels = {
   ETC: '기타',
 };
 
+function createRoutineState() {
+  const now = new Date();
+  return {
+    tab: 'today',
+    daily: null,
+    dailyLoaded: false,
+    library: { totalCount: 0, routines: [] },
+    libraryLoaded: false,
+    period: '3M',
+    calendar: null,
+    calendarLoaded: false,
+    calendarYear: now.getFullYear(),
+    calendarMonth: now.getMonth() + 1,
+    selectedDateDetail: null,
+    generated: null,
+    generateType: now.getHours() >= 6 && now.getHours() < 18 ? 'DAY' : 'NIGHT',
+  };
+}
+
 const state = {
   backendUrl: env(import.meta.env.VITE_BACKEND_URL, 'https://mutsa.dev.me.kr').replace(/\/$/, ''),
   redirectUri: env(import.meta.env.VITE_KAKAO_REDIRECT_URI, defaultRedirectUri),
@@ -67,6 +94,7 @@ const state = {
   onboardingStep: 0,
   onboarding: { skinType: '건성', skinConcerns: ['속건조'], nickname: '' },
   home: null,
+  routine: createRoutineState(),
   inventory: { totalCount: 0, items: [] },
   inventoryTab: 'all',
   inventorySearch: '',
@@ -479,27 +507,131 @@ function renderOptimizedSteps(steps = []) {
 }
 
 function renderRoutine() {
-  const routine = state.home?.todayRoutine;
+  const tabs = [
+    ['today', '오늘'],
+    ['library', '보관함'],
+    ['calendar', '캘린더'],
+    ['generate', 'AI 생성'],
+  ];
   return screen(`
-    ${pageHeader('루틴')}
-    <section class="routine-summary-hero page-section">
-      <span class="eyebrow">${routine ? '오늘의 루틴이 준비됐어요' : '아직 저장된 오늘 루틴이 없어요'}</span>
-      <h1>${routine ? escapeHtml(routine.name) : 'AI가 내 피부에 맞는 순서를 찾아드려요'}</h1>
-      <p>${routine ? `${routine.steps?.length || 0}단계 · ${routine.routineType === 'DAY' ? '데이 케어' : '나이트 케어'}` : '영상 루틴을 분석하고 TODAY로 저장하면 여기에 표시됩니다.'}</p>
-    </section>
-    <section class="page-section">
-      <div class="section-heading"><h2>오늘의 케어 순서</h2><span>${routine?.steps?.length || 0}단계</span></div>
-      ${routine ? renderRoutineTimeline(routine.steps) : '<div class="empty-card"><b>첫 루틴을 만들어 보세요</b><p>유튜브 쇼츠 링크 하나면 분석부터 맞춤 최적화까지 확인할 수 있어요.</p><button class="primary-button" type="button" data-view="analysis">AI 루틴 분석 시작</button></div>'}
-    </section>
-    <section class="page-section">
-      <div class="section-heading"><h2>최근 분석 기록</h2><button type="button" data-view="analysis">전체보기 ›</button></div>
-      <div class="recent-list">${(state.history || []).slice(0, 3).map((item) => `<button class="recent-item" type="button" data-analysis-id="${item.analysisId}" data-analysis-status="${item.status}"><span class="recent-thumb"></span><span><b>${escapeHtml(item.title)}</b><small>${item.stepCount}단계 · ${escapeHtml(item.status)}</small></span><strong>${item.overallScore ?? '-'}점</strong></button>`).join('') || '<div class="empty-inline">최근 분석 내역이 없어요.</div>'}</div>
-    </section>
+    ${pageHeader('루틴', { action: '<button class="header-action" type="button" data-action="reload-routine">새로고침</button>' })}
+    <nav class="routine-tabs" aria-label="루틴 메뉴">
+      ${tabs.map(([tab, label]) => `<button class="${state.routine.tab === tab ? 'active' : ''}" type="button" data-routine-tab="${tab}">${label}</button>`).join('')}
+    </nav>
+    <div class="routine-tab-content">
+      ${state.routine.tab === 'today' ? renderDailyRoutine() : ''}
+      ${state.routine.tab === 'library' ? renderRoutineLibrary() : ''}
+      ${state.routine.tab === 'calendar' ? renderRoutineCalendar() : ''}
+      ${state.routine.tab === 'generate' ? renderRoutineGenerator() : ''}
+    </div>
   `, { active: 'routine' });
 }
 
-function renderRoutineTimeline(steps = []) {
-  return `<div class="routine-timeline">${steps.map((step, index) => `<button class="timeline-step" type="button" data-product-id="${step.productId || ''}"><i>${step.order}</i><img src="${safeImageUrl(step.imageUrl, '/assets/product-jar.png')}" alt=""><span><b>${escapeHtml(step.productName)}</b><small>${escapeHtml(step.category || step.brand || '')}</small></span><em>${index === 0 ? '시작' : '대기'}</em></button>`).join('')}</div>`;
+function renderDailyRoutine() {
+  if (!state.routine.dailyLoaded) return '<section class="page-section routine-loading"><span></span>오늘의 루틴을 불러오고 있어요</section>';
+  const routine = state.routine.daily;
+  if (!routine) {
+    return `<section class="page-section routine-empty-state"><img src="/assets/ai-orb.png" alt=""><h1>아직 오늘의 루틴이 없어요</h1><p>영상 분석 또는 AI 자동생성으로 내 피부에 맞는 루틴을 시작해 보세요.</p><button class="primary-button" type="button" data-routine-tab="generate">AI 루틴 만들기</button><button class="secondary-button" type="button" data-view="analysis">영상 루틴 분석하기</button></section>`;
+  }
+  const rate = Math.max(0, Math.min(100, Number(routine.completionRate || 0)));
+  const allStepsCompleted = rate === 100;
+  return `
+    <section class="routine-summary-hero page-section ${routine.completed ? 'completed' : ''}">
+      <div class="routine-hero-top"><span class="eyebrow">${routine.completed ? '오늘의 케어를 완료했어요' : '피부를 위한 오늘의 순서예요'}</span><strong>${rate}%</strong></div>
+      <h1>${escapeHtml(routine.name)}</h1>
+      <p>${routine.steps?.length || 0}단계 · ${routine.routineType === 'DAY' ? '데이 케어' : '나이트 케어'}</p>
+      <div class="routine-progress" aria-label="루틴 달성률 ${rate}%"><span style="width:${rate}%"></span></div>
+    </section>
+    <section class="page-section daily-routine-section">
+      <div class="section-heading"><h2>오늘의 케어 순서</h2><span>단계를 눌러 완료 체크</span></div>
+      <div class="daily-routine-list">
+        ${(routine.steps || []).map((step) => `<button class="daily-routine-step ${step.completed ? 'completed' : ''}" type="button" data-action="toggle-routine-step" data-step-id="${step.stepId}" data-completed="${step.completed}">
+          <i>${step.completed ? '✓' : step.order}</i><img src="${safeImageUrl(step.imageUrl, '/assets/product-jar.png')}" alt=""><span><b>${escapeHtml(step.productName)}</b><small>${escapeHtml(categoryLabels[step.category] || step.category || step.brand || '')}</small></span><em>${step.completed ? '완료' : '체크'}</em>
+        </button>`).join('')}
+      </div>
+      <div class="routine-action-grid">
+        <button class="secondary-button" type="button" data-action="complete-all-routine-steps" ${allStepsCompleted || routine.completed ? 'disabled' : ''}>모든 단계 체크</button>
+        <button class="primary-button" type="button" data-action="complete-today-routine" ${!allStepsCompleted || routine.completed ? 'disabled' : ''}>${routine.completed ? '오늘 루틴 완료됨' : '오늘 루틴 완료'}</button>
+      </div>
+    </section>`;
+}
+
+function renderRoutineLibrary() {
+  const library = state.routine.library;
+  return `
+    <section class="page-section routine-library-head">
+      <div><span class="eyebrow">나의 루틴 보관함</span><h1>다시 쓰고 싶은 루틴을<br>오늘 케어로 불러오세요</h1></div>
+      <div class="period-filter" aria-label="보관 기간">
+        ${[['3M', '3개월'], ['6M', '6개월'], ['ALL', '전체']].map(([period, label]) => `<button class="${state.routine.period === period ? 'active' : ''}" type="button" data-routine-period="${period}">${label}</button>`).join('')}
+      </div>
+    </section>
+    <section class="page-section routine-library-list">
+      ${!state.routine.libraryLoaded ? '<div class="routine-loading"><span></span>보관함을 불러오고 있어요</div>' : ''}
+      ${state.routine.libraryLoaded && !(library.routines || []).length ? '<div class="empty-card"><b>보관한 루틴이 없어요</b><p>숏폼 분석 결과나 AI 추천 루틴을 LIBRARY로 저장해 보세요.</p></div>' : ''}
+      ${(library.routines || []).map((routine) => `<button class="library-routine-card" type="button" data-action="open-routine-detail" data-routine-id="${routine.routineId}">
+        <span class="routine-type-badge ${String(routine.routineType).toLowerCase()}">${routine.routineType === 'DAY' ? 'DAY' : 'NIGHT'}</span>
+        <span><b>${escapeHtml(routine.name)}</b><small>${Number(routine.stepCount || 0)}단계 · ${formatDateTime(routine.createdAt)}</small></span><strong>›</strong>
+      </button>`).join('')}
+    </section>`;
+}
+
+function renderRoutineCalendar() {
+  const { calendarYear: year, calendarMonth: month, calendar } = state.routine;
+  const firstDay = new Date(year, month - 1, 1).getDay();
+  const dayCount = new Date(year, month, 0).getDate();
+  const entriesByDate = new Map((calendar?.days || []).map((day) => [day.date, day]));
+  const cells = [
+    ...Array.from({ length: firstDay }, () => '<span class="calendar-blank"></span>'),
+    ...Array.from({ length: dayCount }, (_, index) => {
+      const day = index + 1;
+      const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const record = entriesByDate.get(date);
+      const completed = record?.entries?.some((entry) => entry.completed);
+      const selected = state.routine.selectedDateDetail?.date === date;
+      return `<button class="calendar-day ${record ? 'recorded' : ''} ${completed ? 'completed' : ''} ${selected ? 'selected' : ''}" type="button" data-calendar-date="${date}"><span>${day}</span>${record ? `<i>${completed ? '✓' : '•'}</i>` : ''}</button>`;
+    }),
+  ];
+  return `
+    <section class="page-section calendar-card">
+      <header><button type="button" data-action="previous-routine-month" aria-label="이전 달">‹</button><h1>${year}년 ${month}월</h1><button type="button" data-action="next-routine-month" aria-label="다음 달">›</button></header>
+      <p>완료 기록 ${Number(calendar?.completedDaysCount || 0)}일</p>
+      <div class="calendar-weekdays">${['일', '월', '화', '수', '목', '금', '토'].map((day) => `<span>${day}</span>`).join('')}</div>
+      <div class="calendar-grid">${cells.join('')}</div>
+    </section>
+    ${!state.routine.calendarLoaded ? '<section class="page-section routine-loading"><span></span>캘린더를 불러오고 있어요</section>' : ''}
+    ${state.routine.selectedDateDetail ? renderRoutineDateDetail(state.routine.selectedDateDetail) : '<section class="page-section calendar-guide"><b>날짜별 피부 컨디션과 루틴 기록</b><p>확인하고 싶은 날짜를 눌러 주세요.</p></section>'}`;
+}
+
+function renderRoutineDateDetail(detail) {
+  return `<section class="page-section calendar-detail">
+    <span class="eyebrow">${escapeHtml(detail.date)} 기록</span>
+    <h2>${escapeHtml(detail.condition || '컨디션 기록 없음')}</h2>
+    <p>${escapeHtml(detail.memo || '작성한 메모가 없어요.')}</p>
+    <div class="calendar-log-list">${(detail.routineLogs || []).map((log) => `<article><span class="routine-type-badge ${String(log.routineType).toLowerCase()}">${log.routineType}</span><div><b>${escapeHtml(log.name)}</b><small>${Number(log.completionRate || 0)}% 완료 · ${log.steps?.length || 0}단계</small></div><strong>${log.completed ? '완료' : '진행 중'}</strong></article>`).join('') || '<div class="empty-inline">이날의 루틴 기록이 없어요.</div>'}</div>
+  </section>`;
+}
+
+function renderRoutineGenerator() {
+  const generated = state.routine.generated;
+  return `
+    <section class="page-section routine-generator-hero">
+      <img src="/assets/ai-orb.png" alt=""><span class="eyebrow">MY 인벤토리 기반</span><h1>AI가 피부 적합도가 높은<br>제품으로 루틴을 조합해요</h1><p>미리보기 단계에서는 저장하지 않으며 성분 충돌은 경고로 알려드려요.</p>
+      <div class="routine-type-picker">${[['DAY', '데이 케어'], ['NIGHT', '나이트 케어']].map(([type, label]) => `<button class="${state.routine.generateType === type ? 'active' : ''}" type="button" data-generate-type="${type}">${label}</button>`).join('')}</div>
+      <button class="primary-button" type="button" data-action="generate-routine">AI 루틴 미리보기</button>
+    </section>
+    ${generated ? `<section class="page-section generated-routine-card">
+      <div class="section-heading"><h2>${escapeHtml(generated.suggestedName)}</h2><span>${generated.steps?.length || 0}단계</span></div>
+      <div class="generated-step-list">${(generated.steps || []).map((step) => `<article><i>${step.order}</i><span><b>${escapeHtml(step.productName)}</b><small>${escapeHtml(categoryLabels[step.category] || step.category || '')}</small></span><strong>${Number(step.matchScore || 0)}점</strong></article>`).join('')}</div>
+      ${(generated.warnings || []).length ? `<div class="routine-warning"><b>성분 조합 확인</b>${generated.warnings.map((warning) => `<p>• ${escapeHtml(warning)}</p>`).join('')}</div>` : '<div class="routine-safe">✓ 확인된 성분 충돌이 없어요.</div>'}
+      <form id="generated-routine-form" class="stack-form generated-routine-form"><label>루틴 이름<input name="name" maxlength="40" value="${escapeHtml(generated.suggestedName)}" required></label><button class="primary-button" type="submit" name="saveType" value="TODAY">오늘 루틴으로 시작</button><button class="secondary-button" type="submit" name="saveType" value="LIBRARY">보관함에 저장</button></form>
+    </section>` : ''}`;
+}
+
+function formatDateTime(value) {
+  if (!value) return '날짜 미확인';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
+  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
 }
 
 function renderInventory() {
@@ -709,6 +841,7 @@ function renderProductDetailDialog(detail, { inventoryId, ingredients } = {}) {
 }
 
 async function hydrateApp({ forceOnboarding = false } = {}) {
+  state.routine = createRoutineState();
   if (state.isDemo) {
     state.member = structuredClone(demoMember);
     state.home = structuredClone(demoHome);
@@ -765,6 +898,75 @@ async function loadHistory(shouldRender = true) {
   if (state.isDemo) state.history = structuredClone(demoHistory);
   else state.history = (await api.data('/api/shortform-analyses')).items || [];
   if (shouldRender) render();
+}
+
+function syncDailyRoutineToHome(routine) {
+  if (!state.home) return;
+  state.home.todayRoutine = routine
+    ? {
+      routineId: routine.routineId,
+      name: routine.name,
+      routineType: routine.routineType,
+      steps: routine.steps,
+    }
+    : null;
+}
+
+async function loadDailyRoutine(shouldRender = true) {
+  state.routine.daily = state.isDemo
+    ? structuredClone(demoDailyRoutine)
+    : await api.data('/api/v1/routines/daily');
+  state.routine.dailyLoaded = true;
+  syncDailyRoutineToHome(state.routine.daily);
+  if (shouldRender) render();
+}
+
+async function loadRoutineLibrary(shouldRender = true) {
+  state.routine.library = state.isDemo
+    ? structuredClone(demoRoutineLibrary)
+    : await api.data(`/api/v1/routines?period=${encodeURIComponent(state.routine.period)}&sort=LATEST`);
+  state.routine.libraryLoaded = true;
+  if (shouldRender) render();
+}
+
+async function loadRoutineCalendar(shouldRender = true) {
+  const { calendarYear: year, calendarMonth: month } = state.routine;
+  state.routine.calendar = state.isDemo
+    ? { ...structuredClone(demoRoutineCalendar), year, month, days: demoRoutineCalendar.year === year && demoRoutineCalendar.month === month ? structuredClone(demoRoutineCalendar.days) : [], completedDaysCount: demoRoutineCalendar.year === year && demoRoutineCalendar.month === month ? demoRoutineCalendar.completedDaysCount : 0 }
+    : await api.data(buildRoutineLogsPath({ year, month }));
+  state.routine.calendarLoaded = true;
+  state.routine.selectedDateDetail = null;
+  if (shouldRender) render();
+}
+
+async function loadRoutineDate(date) {
+  setBusy(true);
+  try {
+    state.routine.selectedDateDetail = state.isDemo
+      ? createDemoRoutineDateDetail(date)
+      : await api.data(buildRoutineLogsPath({ date }));
+    state.debug = state.routine.selectedDateDetail;
+    render();
+  } catch (error) {
+    toast(`날짜별 루틴 기록을 불러오지 못했어요. ${error.message}`, 'error');
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function loadRoutineTab(tab = state.routine.tab, { force = false } = {}) {
+  if (tab === 'today' && (force || !state.routine.dailyLoaded)) await loadDailyRoutine();
+  else if (tab === 'library' && (force || !state.routine.libraryLoaded)) await loadRoutineLibrary();
+  else if (tab === 'calendar' && (force || !state.routine.calendarLoaded)) await loadRoutineCalendar();
+}
+
+async function reloadCurrentRoutineTab() {
+  try {
+    await loadRoutineTab(state.routine.tab, { force: true });
+    toast('루틴 데이터를 새로 불러왔어요.', 'success');
+  } catch (error) {
+    toast(`루틴 데이터를 불러오지 못했어요. ${error.message}`, 'error');
+  }
 }
 
 async function beginKakaoLogin() {
@@ -986,12 +1188,216 @@ async function saveRoutine(saveType, routineType) {
     state.savedRoutine = data;
     state.debug = data;
     closeDialog();
-    if (!state.isDemo) await loadHome(false);
+    if (!state.isDemo) await Promise.all([loadHome(false), loadDailyRoutine(false), loadRoutineLibrary(false)]);
     toast(saveType === 'TODAY' ? '오늘의 루틴으로 저장했어요.' : '루틴 보관함에 저장했어요.', 'success');
     state.activeView = saveType === 'TODAY' ? 'routine' : 'analysis';
     render();
   } catch (error) {
     toast(`루틴 저장에 실패했습니다. ${error.message}`, 'error');
+  } finally {
+    setBusy(false);
+  }
+}
+
+function setDailyRoutine(routine) {
+  state.routine.daily = routine;
+  state.routine.dailyLoaded = true;
+  syncDailyRoutineToHome(routine);
+  state.debug = routine;
+}
+
+function recalculateDemoDailyRoutine(routine) {
+  const completedCount = (routine.steps || []).filter((step) => step.completed).length;
+  return {
+    ...routine,
+    completionRate: routine.steps?.length ? Math.round((completedCount * 100) / routine.steps.length) : 0,
+  };
+}
+
+async function toggleRoutineStep(stepId, completed) {
+  if (!stepId) return;
+  setBusy(true);
+  try {
+    let routine;
+    if (state.isDemo) {
+      routine = recalculateDemoDailyRoutine({
+        ...state.routine.daily,
+        completed: false,
+        steps: state.routine.daily.steps.map((step) => String(step.stepId) === String(stepId) ? { ...step, completed } : step),
+      });
+    } else {
+      routine = await api.data(`/api/v1/routine-logs/today/steps/${stepId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ completed }),
+      });
+    }
+    setDailyRoutine(routine);
+    render();
+  } catch (error) {
+    toast(`단계 완료 상태를 바꾸지 못했어요. ${error.message}`, 'error');
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function completeAllRoutineSteps() {
+  setBusy(true);
+  try {
+    const routine = state.isDemo
+      ? { ...state.routine.daily, completionRate: 100, steps: state.routine.daily.steps.map((step) => ({ ...step, completed: true })) }
+      : await api.data('/api/v1/routine-logs/today/steps/complete-all', { method: 'POST' });
+    setDailyRoutine(routine);
+    render();
+    toast('모든 단계를 체크했어요.', 'success');
+  } catch (error) {
+    toast(`전체 단계를 완료하지 못했어요. ${error.message}`, 'error');
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function completeTodayRoutine() {
+  setBusy(true);
+  try {
+    const routine = state.isDemo
+      ? { ...state.routine.daily, completed: true, completionRate: 100 }
+      : await api.data('/api/v1/routine-logs/today/complete', { method: 'POST' });
+    setDailyRoutine(routine);
+    state.routine.calendarLoaded = false;
+    render();
+    toast('오늘의 루틴을 완료했어요!', 'success');
+  } catch (error) {
+    toast(`오늘의 루틴을 완료하지 못했어요. ${error.message}`, 'error');
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function showRoutineDetail(routineId) {
+  openDialog(dialogFrame('보관함 루틴', '<div class="modal-loading"><span></span> 루틴을 불러오고 있어요</div>'), 'routine-detail-dialog');
+  try {
+    const detail = state.isDemo
+      ? structuredClone(demoRoutineDetails[routineId])
+      : await api.data(`/api/v1/routines/${routineId}`);
+    if (!detail) throw new Error('루틴 정보를 찾을 수 없습니다.');
+    state.debug = detail;
+    openDialog(dialogFrame('보관함 루틴', `
+      <section class="routine-detail-head"><span class="routine-type-badge ${String(detail.routineType).toLowerCase()}">${detail.routineType}</span><h2>${escapeHtml(detail.name)}</h2><p>${detail.steps?.length || 0}단계 · ${escapeHtml(detail.status)}</p></section>
+      <div class="routine-detail-steps">${(detail.steps || []).map((step) => `<article><i>${step.order}</i><img src="${safeImageUrl(step.imageUrl, '/assets/product-jar.png')}" alt=""><span><b>${escapeHtml(step.productName)}</b><small>${escapeHtml(categoryLabels[step.category] || step.category || step.brand || '')}</small>${step.aiReason ? `<em>${escapeHtml(step.aiReason)}</em>` : ''}</span></article>`).join('')}</div>
+    `, `<div class="dialog-action-stack"><button class="primary-button" type="button" data-action="apply-routine-today" data-routine-id="${detail.routineId}">오늘 루틴으로 적용</button><button class="danger-text" type="button" data-action="delete-routine" data-routine-id="${detail.routineId}">이 루틴 삭제</button></div>`), 'routine-detail-dialog');
+  } catch (error) {
+    openDialog(dialogFrame('보관함 루틴', `<div class="dialog-error"><b>루틴을 불러오지 못했어요.</b><p>${escapeHtml(error.message)}</p></div>`));
+  }
+}
+
+async function applyArchivedRoutine(routineId) {
+  setBusy(true);
+  try {
+    let routine;
+    if (state.isDemo) {
+      const detail = demoRoutineDetails[routineId];
+      routine = {
+        ...structuredClone(detail),
+        completed: false,
+        completionRate: 0,
+        steps: detail.steps.map((step, index) => ({ ...step, stepId: Date.now() + index, completed: false })),
+      };
+      state.routine.library.routines = state.routine.library.routines.filter((item) => String(item.routineId) !== String(routineId));
+      state.routine.library.totalCount = state.routine.library.routines.length;
+    } else {
+      routine = await api.data(`/api/v1/routines/${routineId}/apply-today`, { method: 'POST' });
+      await Promise.all([loadHome(false), loadRoutineLibrary(false)]);
+    }
+    setDailyRoutine(routine);
+    state.routine.tab = 'today';
+    closeDialog();
+    render();
+    toast('보관함 루틴을 오늘 케어로 적용했어요.', 'success');
+  } catch (error) {
+    toast(`루틴을 적용하지 못했어요. ${error.message}`, 'error');
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function deleteArchivedRoutine(routineId) {
+  if (!window.confirm('이 루틴을 보관함에서 삭제할까요?')) return;
+  setBusy(true);
+  try {
+    const data = state.isDemo
+      ? { routineId: Number(routineId) }
+      : await api.data(`/api/v1/routines/${routineId}`, { method: 'DELETE' });
+    state.routine.library.routines = state.routine.library.routines.filter((item) => String(item.routineId) !== String(routineId));
+    state.routine.library.totalCount = state.routine.library.routines.length;
+    state.debug = data;
+    closeDialog();
+    render();
+    toast('보관함에서 루틴을 삭제했어요.', 'success');
+  } catch (error) {
+    toast(`루틴을 삭제하지 못했어요. ${error.message}`, 'error');
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function changeRoutineMonth(offset) {
+  const date = new Date(state.routine.calendarYear, state.routine.calendarMonth - 1 + offset, 1);
+  state.routine.calendarYear = date.getFullYear();
+  state.routine.calendarMonth = date.getMonth() + 1;
+  state.routine.calendarLoaded = false;
+  state.routine.selectedDateDetail = null;
+  render();
+  try {
+    await loadRoutineCalendar();
+  } catch (error) {
+    toast(`캘린더를 불러오지 못했어요. ${error.message}`, 'error');
+  }
+}
+
+async function generateRoutinePreview() {
+  setBusy(true);
+  try {
+    state.routine.generated = state.isDemo
+      ? { ...structuredClone(demoGeneratedRoutine), routineType: state.routine.generateType, suggestedName: state.routine.generateType === 'DAY' ? 'AI 추천 데이 루틴' : 'AI 추천 나이트 루틴' }
+      : await api.data(`/api/v1/routines/generate?routineType=${encodeURIComponent(state.routine.generateType)}`, { method: 'POST' });
+    state.debug = state.routine.generated;
+    render();
+    window.setTimeout(() => root.querySelector('.generated-routine-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+  } catch (error) {
+    toast(`AI 루틴을 생성하지 못했어요. ${error.message}`, 'error');
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function createGeneratedRoutine(name, saveType) {
+  const payload = buildGeneratedRoutineCreatePayload({ generated: state.routine.generated, name, saveType });
+  setBusy(true);
+  try {
+    const data = state.isDemo
+      ? { routineId: Date.now(), name: payload.name, routineType: payload.routineType, status: saveType === 'TODAY' ? 'ACTIVE' : 'ARCHIVED' }
+      : await api.data('/api/v1/routines', { method: 'POST', body: JSON.stringify(payload) });
+    state.debug = data;
+    if (state.isDemo && saveType === 'LIBRARY') {
+      state.routine.library.routines.unshift({ ...data, stepCount: payload.steps.length, createdAt: new Date().toISOString() });
+      state.routine.library.totalCount = state.routine.library.routines.length;
+      state.routine.libraryLoaded = true;
+    } else if (state.isDemo) {
+      setDailyRoutine({
+        ...data,
+        completed: false,
+        completionRate: 0,
+        steps: state.routine.generated.steps.map((step, index) => ({ ...step, stepId: Date.now() + index, completed: false, imageUrl: '/assets/product-jar.png' })),
+      });
+    } else {
+      await Promise.all([loadHome(false), loadDailyRoutine(false), loadRoutineLibrary(false)]);
+    }
+    state.routine.tab = saveType === 'TODAY' ? 'today' : 'library';
+    state.routine.generated = null;
+    render();
+    toast(saveType === 'TODAY' ? 'AI 루틴으로 오늘 케어를 시작했어요.' : 'AI 루틴을 보관함에 저장했어요.', 'success');
+  } catch (error) {
+    toast(`AI 루틴을 저장하지 못했어요. ${error.message}`, 'error');
   } finally {
     setBusy(false);
   }
@@ -1152,6 +1558,7 @@ function logout() {
     state.member = null;
     state.isDemo = false;
     state.home = null;
+    state.routine = createRoutineState();
     state.inventory = { totalCount: 0, items: [] };
     state.history = [];
     state.analysisStatus = null;
@@ -1179,6 +1586,38 @@ root.addEventListener('click', async (event) => {
     render();
     if (view === 'home' && !state.home) loadHome().catch((error) => toast(error.message, 'error'));
     if (view === 'inventory' && !state.inventory.items.length) loadInventory().catch((error) => toast(error.message, 'error'));
+    if (view === 'routine') loadRoutineTab().catch((error) => toast(`루틴을 불러오지 못했어요. ${error.message}`, 'error'));
+    return;
+  }
+
+  const routineTab = target.dataset.routineTab;
+  if (routineTab) {
+    state.routine.tab = routineTab;
+    render();
+    loadRoutineTab(routineTab).catch((error) => toast(`루틴을 불러오지 못했어요. ${error.message}`, 'error'));
+    return;
+  }
+
+  const routinePeriod = target.dataset.routinePeriod;
+  if (routinePeriod) {
+    state.routine.period = routinePeriod;
+    state.routine.libraryLoaded = false;
+    render();
+    loadRoutineLibrary().catch((error) => toast(`보관함을 불러오지 못했어요. ${error.message}`, 'error'));
+    return;
+  }
+
+  const generateType = target.dataset.generateType;
+  if (generateType) {
+    state.routine.generateType = generateType;
+    state.routine.generated = null;
+    render();
+    return;
+  }
+
+  const calendarDate = target.dataset.calendarDate;
+  if (calendarDate) {
+    await loadRoutineDate(calendarDate);
     return;
   }
 
@@ -1210,6 +1649,14 @@ root.addEventListener('click', async (event) => {
       toast('클립보드를 읽지 못했어요. URL을 직접 붙여넣어 주세요.', 'error');
     }
   } else if (action === 'reload-history') loadHistory().catch((error) => toast(error.message, 'error'));
+  else if (action === 'reload-routine') reloadCurrentRoutineTab();
+  else if (action === 'toggle-routine-step') toggleRoutineStep(target.dataset.stepId, target.dataset.completed !== 'true');
+  else if (action === 'complete-all-routine-steps') completeAllRoutineSteps();
+  else if (action === 'complete-today-routine') completeTodayRoutine();
+  else if (action === 'open-routine-detail') showRoutineDetail(target.dataset.routineId);
+  else if (action === 'previous-routine-month') changeRoutineMonth(-1);
+  else if (action === 'next-routine-month') changeRoutineMonth(1);
+  else if (action === 'generate-routine') generateRoutinePreview();
   else if (action === 'cancel-analysis') cancelAnalysis();
   else if (action === 'optimize-analysis') optimizeAnalysis();
   else if (action === 'open-save-routine') showSaveRoutineDialog();
@@ -1287,12 +1734,15 @@ root.addEventListener('input', (event) => {
   }
 });
 
-root.addEventListener('submit', (event) => {
+root.addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.target;
   if (form.id === 'condition-form') updateCondition(new FormData(form).get('memo') || '');
   else if (form.id === 'analysis-form') startAnalysis();
   else if (form.id === 'product-search-form') searchProducts(new FormData(form).get('query') || '');
+  else if (form.id === 'generated-routine-form') {
+    await createGeneratedRoutine(String(new FormData(form).get('name') || ''), event.submitter?.value || 'TODAY');
+  }
 });
 
 dialog.addEventListener('click', (event) => {
@@ -1306,6 +1756,10 @@ dialog.addEventListener('click', (event) => {
   if (deleteButton) deleteInventory(deleteButton.dataset.inventoryId);
   const copyButton = event.target.closest('[data-action="copy-token"]');
   if (copyButton && state.accessToken) navigator.clipboard.writeText(state.accessToken).then(() => toast('토큰을 복사했어요.', 'success'));
+  const applyRoutineButton = event.target.closest('[data-action="apply-routine-today"]');
+  if (applyRoutineButton) applyArchivedRoutine(applyRoutineButton.dataset.routineId);
+  const deleteRoutineButton = event.target.closest('[data-action="delete-routine"]');
+  if (deleteRoutineButton) deleteArchivedRoutine(deleteRoutineButton.dataset.routineId);
 });
 
 dialog.addEventListener('submit', async (event) => {

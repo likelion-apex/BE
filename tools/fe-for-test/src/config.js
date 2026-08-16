@@ -28,6 +28,32 @@ export function buildRoutineApplyPayload(saveType, routineType) {
   return payload;
 }
 
+export function buildRoutineLogsPath({ date, year, month } = {}) {
+  const params = new URLSearchParams();
+  if (date) {
+    params.set('date', String(date));
+  } else {
+    if (!Number.isInteger(year) || !Number.isInteger(month)) {
+      throw new TypeError('루틴 캘린더 조회에는 year와 month가 필요합니다.');
+    }
+    params.set('year', String(year));
+    params.set('month', String(month));
+  }
+  return `/api/v1/routines/logs?${params.toString()}`;
+}
+
+export function buildGeneratedRoutineCreatePayload({ generated, name, saveType }) {
+  return {
+    name: String(name || generated?.suggestedName || '').trim(),
+    routineType: generated?.routineType,
+    saveType,
+    steps: (generated?.steps || []).map((step, index) => ({
+      order: Number(step.order || index + 1),
+      inventoryId: Number(step.inventoryId),
+    })),
+  };
+}
+
 export function createOAuthState(cryptoObject = globalThis.crypto) {
   const bytes = new Uint8Array(24);
   cryptoObject.getRandomValues(bytes);

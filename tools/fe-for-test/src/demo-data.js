@@ -68,16 +68,97 @@ export const demoHome = {
     name: '오늘의 나이트 케어',
     routineType: 'NIGHT',
     steps: [
-      { order: 1, productName: '어성초 진정 패드', category: '결 정돈 및 진정', imageUrl: '/assets/product-jar.png' },
-      { order: 2, productName: '비타민 C 항산화 앰플', category: '미백 및 안티에이징', imageUrl: '/assets/product-jar.png' },
-      { order: 3, productName: '세라마이드 캡슐 크림', category: '장벽 보호 및 보습', imageUrl: '/assets/product-jar.png' },
-      { order: 4, productName: '아이 링클 코어 크림', category: '눈가 주름 집중 케어', imageUrl: '/assets/product-jar.png' },
+      { order: 1, productId: 1, inventoryId: 101, productName: '어성초 진정 패드', category: '결 정돈 및 진정', imageUrl: '/assets/product-jar.png' },
+      { order: 2, productId: 2, inventoryId: 102, productName: '비타민 C 항산화 앰플', category: '미백 및 안티에이징', imageUrl: '/assets/product-jar.png' },
+      { order: 3, productId: 3, inventoryId: 103, productName: '세라마이드 캡슐 크림', category: '장벽 보호 및 보습', imageUrl: '/assets/product-jar.png' },
+      { order: 4, productId: 4, inventoryId: 104, productName: '아이 링클 코어 크림', category: '눈가 주름 집중 케어', imageUrl: '/assets/product-jar.png' },
     ],
   },
   favoriteInventory: {
     totalFavoriteCount: 3,
     items: demoProducts.slice(0, 3),
   },
+};
+
+export const demoDailyRoutine = {
+  ...demoHome.todayRoutine,
+  completed: false,
+  completionRate: 25,
+  steps: demoHome.todayRoutine.steps.map((step, index) => ({
+    ...step,
+    stepId: 2101 + index,
+    completed: index === 0,
+  })),
+};
+
+export const demoRoutineLibrary = {
+  totalCount: 2,
+  routines: [
+    { routineId: 71, name: '출근 전 수분 진정 루틴', routineType: 'DAY', stepCount: 3, createdAt: '2026-08-12T09:30:00' },
+    { routineId: 72, name: '민감성 장벽 회복 루틴', routineType: 'NIGHT', stepCount: 4, createdAt: '2026-07-28T22:10:00' },
+  ],
+};
+
+export const demoRoutineDetails = {
+  71: {
+    routineId: 71,
+    name: '출근 전 수분 진정 루틴',
+    routineType: 'DAY',
+    status: 'ARCHIVED',
+    steps: demoHome.todayRoutine.steps.slice(0, 3),
+  },
+  72: {
+    routineId: 72,
+    name: '민감성 장벽 회복 루틴',
+    routineType: 'NIGHT',
+    status: 'ARCHIVED',
+    steps: demoHome.todayRoutine.steps,
+  },
+};
+
+const demoNow = new Date();
+const demoYear = demoNow.getFullYear();
+const demoMonth = demoNow.getMonth() + 1;
+const toDemoDate = (day) => `${demoYear}-${String(demoMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+const demoTodayDay = demoNow.getDate();
+const demoEarlierDay = Math.max(1, demoTodayDay - 3);
+
+export const demoRoutineCalendar = {
+  year: demoYear,
+  month: demoMonth,
+  completedDaysCount: 1,
+  days: [
+    { date: toDemoDate(demoEarlierDay), entries: [{ routineId: 72, routineType: 'NIGHT', completed: true }] },
+    { date: toDemoDate(demoTodayDay), entries: [{ routineId: 21, routineType: 'NIGHT', completed: false }] },
+  ],
+};
+
+export function createDemoRoutineDateDetail(date) {
+  const isToday = date === toDemoDate(demoTodayDay);
+  return {
+    date,
+    condition: isToday ? '촉촉하고 편안해요' : '평범하고 무난해요',
+    memo: isToday ? '속당김 없이 촉촉했다!' : '자극 없이 무난한 하루',
+    routineLogs: [{
+      ...demoDailyRoutine,
+      routineId: isToday ? 21 : 72,
+      name: isToday ? '오늘의 나이트 케어' : '민감성 장벽 회복 루틴',
+      completed: !isToday,
+      completionRate: isToday ? demoDailyRoutine.completionRate : 100,
+      steps: demoDailyRoutine.steps.map((step) => ({ ...step, completed: isToday ? step.completed : true })),
+    }],
+  };
+}
+
+export const demoGeneratedRoutine = {
+  suggestedName: 'AI 추천 나이트 루틴',
+  routineType: 'NIGHT',
+  steps: [
+    { order: 1, inventoryId: 101, category: 'SKIN_TONER', productName: '어성초 진정 패드', matchScore: 94 },
+    { order: 2, inventoryId: 102, category: 'ESSENCE_SERUM_AMPOULE', productName: '비타민 C 앰플', matchScore: 88 },
+    { order: 3, inventoryId: 103, category: 'CREAM', productName: '시카 장벽 크림', matchScore: 96 },
+  ],
+  warnings: ['비타민 C 앰플은 민감한 날 격일 사용을 권장해요.'],
 };
 
 export const demoHistory = [
