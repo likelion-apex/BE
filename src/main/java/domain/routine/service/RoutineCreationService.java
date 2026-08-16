@@ -1,4 +1,4 @@
-package domain.routine;
+package domain.routine.service;
 
 import domain.beauty.shortform.domain.RoutineOptimizationSnapshot;
 import domain.beauty.shortform.domain.RoutineOptimizationSnapshot.OptimizedStep;
@@ -11,6 +11,9 @@ import domain.inventory.InventoryRepository;
 import domain.inventory.Product;
 import domain.inventory.ProductRepository;
 import domain.member.Member;
+import domain.routine.domain.*;
+import domain.routine.repository.RoutineLogRepository;
+import domain.routine.repository.RoutineRepository;
 import global.exception.CustomException;
 import global.exception.ErrorCode;
 import java.time.LocalDate;

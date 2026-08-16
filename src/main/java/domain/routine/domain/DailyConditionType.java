@@ -1,4 +1,4 @@
-package domain.routine;
+package domain.routine.domain;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;

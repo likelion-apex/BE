@@ -4,8 +4,8 @@ import domain.beauty.shortform.domain.RoutineOptimizationSnapshot;
 import domain.beauty.shortform.domain.RoutineSaveType;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot;
 import domain.beauty.shortform.domain.ShortformAnalysisStatus;
-import domain.routine.RoutineStatus;
-import domain.routine.RoutineType;
+import domain.routine.domain.RoutineStatus;
+import domain.routine.domain.RoutineType;
 import java.time.LocalDateTime;
 import java.util.List;
 
