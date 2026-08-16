@@ -11,8 +11,7 @@ import domain.ingredient.repository.ProductIngredientRepository;
 import domain.ingredient.util.ProductCategoryDisplay;
 import domain.inventory.Product;
 import domain.inventory.ProductRepository;
-import global.exception.CustomException;
-import global.exception.ErrorCode;
+import domain.inventory.service.ProductService;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -34,13 +33,13 @@ public class ProductCompatibilityService {
 
     private static final String NO_INTERACTION_DESCRIPTION = "특별한 상호작용이 확인되지 않았어요.";
 
+    private final ProductService productService;
     private final ProductRepository productRepository;
     private final ProductIngredientRepository productIngredientRepository;
     private final IngredientInteractionRepository ingredientInteractionRepository;
 
     public ProductCompatibilityResponse compare(ProductCompatibilityRequest request) {
-        Product baseProduct = productRepository.findById(request.baseProductId())
-                .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
+        Product baseProduct = productService.getById(request.baseProductId());
 
         Map<Long, Product> compareProductById = productRepository.findAllById(request.compareProductIds()).stream()
                 .collect(Collectors.toMap(Product::getId, product -> product));

@@ -96,11 +96,11 @@ public class IngredientDataSeeder implements ApplicationRunner {
         }
         List<Seed> seeds = List.of(
                 new Seed("레티놀 나이트 크림", ProductCategory.CREAM),
-                new Seed("비타민C 세럼", ProductCategory.ESSENCE_AMPOULE_SERUM),
+                new Seed("비타민C 세럼", ProductCategory.SERUM),
                 new Seed("AHA 필링 토너", ProductCategory.SKIN_TONER),
                 new Seed("저자극 수분 크림", ProductCategory.CREAM),
-                new Seed("판테놀 진정 앰플", ProductCategory.ESSENCE_AMPOULE_SERUM),
-                new Seed("BHA 트러블 세럼", ProductCategory.ESSENCE_AMPOULE_SERUM)
+                new Seed("판테놀 진정 앰플", ProductCategory.SERUM),
+                new Seed("BHA 트러블 세럼", ProductCategory.SERUM)
         );
 
         Map<String, Product> saved = new LinkedHashMap<>();
