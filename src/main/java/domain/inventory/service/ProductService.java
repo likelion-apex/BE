@@ -4,6 +4,7 @@ import domain.cosmetic.client.KakaoImageClient;
 import domain.inventory.Product;
 import domain.inventory.ProductRepository;
 import domain.inventory.client.OpenAiCategoryClassifier;
+import domain.inventory.dto.response.ProductListResponse;
 import domain.inventory.dto.response.ProductSearchResponse;
 import global.exception.CustomException;
 import global.exception.ErrorCode;
@@ -27,6 +28,11 @@ public class ProductService {
             return ProductSearchResponse.from(List.of());
         }
         return ProductSearchResponse.from(productRepository.findByNameContainingIgnoreCase(keyword.trim()));
+    }
+
+    @Transactional(readOnly = true)
+    public ProductListResponse listAll() {
+        return ProductListResponse.from(productRepository.findAllByOrderByIdAsc());
     }
 
     /**

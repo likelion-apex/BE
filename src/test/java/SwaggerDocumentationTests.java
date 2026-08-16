@@ -19,7 +19,7 @@ class SwaggerDocumentationTests {
 	void documentsEveryProductionApiWithExpectedSecurityAndResponses() throws Exception {
 		mockMvc.perform(get("/v3/api-docs"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.paths.length()").value(28))
+			.andExpect(jsonPath("$.paths.length()").value(29))
 			.andExpect(jsonPath("$.paths['/api/auth/kakao/login'].post.summary").value("카카오 로그인/회원가입"))
 			.andExpect(jsonPath("$.paths['/api/auth/kakao/login'].post.security").doesNotExist())
 			.andExpect(jsonPath("$.paths['/api/auth/reissue'].post.responses['401']").exists())
@@ -37,6 +37,8 @@ class SwaggerDocumentationTests {
 			.andExpect(jsonPath("$.paths['/api/v1/beauty-routines/analyze'].post.responses['503']").exists())
 			.andExpect(jsonPath("$.components.schemas.AnalyzeBeautyRoutineRequest.properties.youtubeUrl.example")
 				.value("https://www.youtube.com/shorts/-PC1SkLxtvo"))
+			.andExpect(jsonPath("$.paths['/api/v1/products'].get.summary").value("화장품 마스터 전체 조회"))
+			.andExpect(jsonPath("$.paths['/api/v1/products'].get.security[0].bearerAuth").isArray())
 			.andExpect(jsonPath("$.paths['/api/v1/products/search'].get.summary").value("화장품 검색"))
 			.andExpect(jsonPath("$.paths['/api/v1/products/search'].get.security[0].bearerAuth").isArray())
 			.andExpect(jsonPath("$.paths['/api/v1/inventory'].get.summary").value("인벤토리 전체 조회"))

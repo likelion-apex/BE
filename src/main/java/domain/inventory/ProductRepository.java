@@ -8,6 +8,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     List<Product> findByNameContainingIgnoreCase(String keyword);
 
+    List<Product> findAllByOrderByIdAsc();
+
     Optional<Product> findByName(String name);
 
     Optional<Product> findFirstByNameIgnoreCase(String name);

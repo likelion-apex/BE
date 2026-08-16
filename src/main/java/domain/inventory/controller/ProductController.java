@@ -1,5 +1,6 @@
 package domain.inventory.controller;
 
+import domain.inventory.dto.response.ProductListResponse;
 import domain.inventory.dto.response.ProductSearchResponse;
 import domain.inventory.service.ProductService;
 import global.common.ApiResponse;
@@ -13,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "Product", description = "화장품 마스터 검색 API")
+@Tag(name = "Product", description = "화장품 마스터 조회 API")
 @RestController
 @RequestMapping("/api/v1/products")
 @RequiredArgsConstructor
@@ -21,6 +22,16 @@ import org.springframework.web.bind.annotation.RestController;
 public class ProductController {
 
     private final ProductService productService;
+
+    @Operation(
+            summary = "화장품 마스터 전체 조회",
+            description = "인벤토리가 아니라 마스터 DB(products)에 등록된 화장품 전체를 반환합니다. "
+                    + "항목이 없으면 totalCount 0과 빈 배열을 반환합니다."
+    )
+    @GetMapping
+    public ApiResponse<ProductListResponse> listAll() {
+        return ApiResponse.success(productService.listAll());
+    }
 
     @Operation(
             summary = "화장품 검색",
