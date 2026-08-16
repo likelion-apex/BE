@@ -96,6 +96,14 @@ public class Routine {
         steps.add(step);
     }
 
+    public void activate() {
+        this.status = RoutineStatus.ACTIVE;
+    }
+
+    public void archive() {
+        this.status = RoutineStatus.ARCHIVED;
+    }
+
     public List<RoutineStep> getSteps() {
         return Collections.unmodifiableList(steps);
     }

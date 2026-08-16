@@ -19,4 +19,7 @@ public interface RoutineLogRepository extends JpaRepository<RoutineLog, Long> {
     /** 6.8 특정 날짜 조회용 - routineId 상관없이 그날의 로그 전체(DAY+NIGHT 등). */
     @EntityGraph(attributePaths = "steps")
     List<RoutineLog> findByMemberIdAndLogDate(Long memberId, LocalDate logDate);
+
+    /** 6.11 루틴 삭제 시 연관 RoutineLog를 먼저 정리하기 위한 조회. */
+    List<RoutineLog> findByRoutineId(Long routineId);
 }

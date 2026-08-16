@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,10 +26,12 @@ import org.springframework.transaction.annotation.Transactional;
  * 개발/데모용 성분·제품·궁합 데이터 시딩. 서버 기동 시 1회 실행되며,
  * IngredientInteraction 테이블이 비어있을 때만 동작해 재시작/재배포 시 중복 삽입을 막는다.
  * 운영 DB 오염을 막기 위해 local 프로필에서만 동작한다.
+ * 다른 데모 시더(회원/루틴/인벤토리)가 이 제품 데이터를 전제하므로 가장 먼저 실행되어야 한다.
  */
 @Slf4j
 @Component
 @Profile("local")
+@Order(1)
 @RequiredArgsConstructor
 public class IngredientDataSeeder implements ApplicationRunner {
 

@@ -6,16 +6,19 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 데모/테스트용 회원 시딩. members 테이블이 비어있을 때만 1건 생성해
  * 재시작/재배포 시 중복 삽입을 막는다. 운영 DB 오염을 막기 위해 local 프로필에서만 동작한다.
+ * 인벤토리/루틴 데모 시더가 이 회원을 전제하므로 IngredientDataSeeder 다음, 그 둘보다는 먼저 실행되어야 한다.
  */
 @Slf4j
 @Component
 @Profile("local")
+@Order(2)
 @RequiredArgsConstructor
 public class DemoMemberSeeder implements ApplicationRunner {
 

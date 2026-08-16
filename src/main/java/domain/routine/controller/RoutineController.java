@@ -1,9 +1,14 @@
 package domain.routine.controller;
 
+import domain.routine.domain.RoutineType;
+import domain.routine.dto.request.RoutineCreateRequest;
 import domain.routine.dto.request.RoutineStepCompletionRequest;
 import domain.routine.dto.response.ArchivedRoutineListResponse;
 import domain.routine.dto.response.DailyRoutineResponse;
+import domain.routine.dto.response.RoutineCreateResponse;
+import domain.routine.dto.response.RoutineDeleteResponse;
 import domain.routine.dto.response.RoutineDetailResponse;
+import domain.routine.dto.response.RoutineGenerationResponse;
 import domain.routine.service.RoutineService;
 import global.common.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -12,13 +17,16 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "Routine", description = "루틴 관련 API")
@@ -91,5 +99,49 @@ public class RoutineController {
             @AuthenticationPrincipal Long memberId,
             @PathVariable Long routineId) {
         return ApiResponse.success(routineService.getRoutineDetail(memberId, routineId));
+    }
+
+    @Operation(summary = "보관함 루틴 삭제")
+    @DeleteMapping("/api/v1/routines/{routineId}")
+    public ApiResponse<RoutineDeleteResponse> deleteRoutine(
+            @AuthenticationPrincipal Long memberId,
+            @PathVariable Long routineId) {
+        return ApiResponse.success(routineService.deleteRoutine(memberId, routineId));
+    }
+
+    @Operation(
+            summary = "보관함 루틴 오늘 적용",
+            description = "같은 타입(DAY/NIGHT)의 기존 활성 루틴이 있으면 보관함으로 전환하고, 이 루틴을 오늘의 활성 루틴으로 전환합니다."
+    )
+    @PostMapping("/api/v1/routines/{routineId}/apply-today")
+    public ApiResponse<DailyRoutineResponse> applyToday(
+            @AuthenticationPrincipal Long memberId,
+            @PathVariable Long routineId) {
+        return ApiResponse.success(routineService.applyToday(memberId, routineId));
+    }
+
+    @Operation(
+            summary = "AI 자동생성 루틴 미리보기",
+            description = "내 보유(MY) 인벤토리 중 카테고리별 피부적합도(4.4) 최고점 제품을 골라 조합을 제안합니다. "
+                    + "아무것도 저장하지 않으며, 조합 내부 성분 충돌(4.3)이 있으면 warnings로만 안내합니다."
+    )
+    @PostMapping("/api/v1/routines/generate")
+    public ApiResponse<RoutineGenerationResponse> generateRoutine(
+            @AuthenticationPrincipal Long memberId,
+            @RequestParam RoutineType routineType) {
+        return ApiResponse.success(routineService.generateRoutine(memberId, routineType));
+    }
+
+    @Operation(
+            summary = "루틴 생성",
+            description = "saveType=TODAY면 오늘의 활성 루틴으로(기존 같은 타입 루틴은 보관함으로 전환), "
+                    + "LIBRARY면 보관함에 바로 저장합니다."
+    )
+    @ResponseStatus(HttpStatus.CREATED)
+    @PostMapping("/api/v1/routines")
+    public ApiResponse<RoutineCreateResponse> createRoutine(
+            @AuthenticationPrincipal Long memberId,
+            @Valid @RequestBody RoutineCreateRequest request) {
+        return ApiResponse.success(routineService.createRoutine(memberId, request));
     }
 }

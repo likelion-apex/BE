@@ -13,16 +13,19 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Routine API(6.x) 로컬 검증용 데모 데이터. DAY/NIGHT 활성 루틴을 각각 하나씩 만들어
  * 현재 시각과 무관하게 6.1 조회가 항상 뭔가를 반환하도록 한다.
+ * IngredientDataSeeder(1)/DemoMemberSeeder(2)/DemoInventorySeeder(3) 이후에 실행되어야 한다.
  */
 @Slf4j
 @Component
 @Profile("local")
+@Order(4)
 @RequiredArgsConstructor
 public class DemoRoutineSeeder implements ApplicationRunner {
 
