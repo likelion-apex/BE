@@ -3,6 +3,7 @@ package domain.inventory.service;
 import domain.cosmetic.client.KakaoImageClient;
 import domain.inventory.Product;
 import domain.inventory.ProductRepository;
+import domain.inventory.cache.PopularProductCache;
 import domain.inventory.client.OpenAiCategoryClassifier;
 import domain.inventory.dto.response.ProductSearchResponse;
 import global.exception.CustomException;
@@ -20,6 +21,7 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final KakaoImageClient kakaoImageClient;
     private final OpenAiCategoryClassifier categoryClassifier;
+    private final PopularProductCache popularProductCache;
 
     @Transactional(readOnly = true)
     public ProductSearchResponse search(String keyword) {
@@ -27,6 +29,13 @@ public class ProductService {
             return ProductSearchResponse.from(List.of());
         }
         return ProductSearchResponse.from(productRepository.findByNameContainingIgnoreCase(keyword.trim()));
+    }
+
+    @Transactional(readOnly = true)
+    public Product getById(Long productId) {
+        return popularProductCache.find(productId)
+                .orElseGet(() -> productRepository.findById(productId)
+                        .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND)));
     }
 
     /**

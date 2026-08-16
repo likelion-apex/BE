@@ -102,5 +102,13 @@ springdoc:
   api-docs:
     path: /v3/api-docs
 
+product:
+  seed:
+    enabled: true
+    location: classpath:data/products-seed.csv
+    kakao-delay-ms: 300
+  popular-cache:
+    size: 100
+
 cors:
   allowed-origins: http://localhost:3000

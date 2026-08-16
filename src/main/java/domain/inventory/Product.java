@@ -58,4 +58,10 @@ public class Product {
         this.category = category;
         this.imageUrl = imageUrl;
     }
+
+    public void update(String brand, ProductCategory category, String imageUrl) {
+        this.brand = brand;
+        this.category = category;
+        this.imageUrl = imageUrl;
+    }
 }
