@@ -1,4 +1,4 @@
-package domain.routine;
+package domain.routine.domain;
 
 import domain.beauty.shortform.domain.RoutineSaveType;
 import domain.beauty.shortform.domain.ShortformAnalysis;
@@ -32,8 +32,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "routines", uniqueConstraints = {
         @UniqueConstraint(
-                name = "uk_routine_member_analysis_save_type",
-                columnNames = {"member_id", "source_analysis_id", "save_type"}
+                name = "uk_routine_member_analysis_save_type_routine_type",
+                columnNames = {"member_id", "source_analysis_id", "save_type", "routine_type"}
         )
 })
 public class Routine {
@@ -46,12 +46,16 @@ public class Routine {
     @JoinColumn(name = "member_id", nullable = false)
     private Member member;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "source_analysis_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "source_analysis_id", nullable = true)
     private ShortformAnalysis sourceAnalysis;
 
     @Column(nullable = false, length = 80)
     private String name;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "routine_type", nullable = false, length = 20)
+    private RoutineType routineType;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -76,12 +80,14 @@ public class Routine {
             Member member,
             ShortformAnalysis sourceAnalysis,
             String name,
+            RoutineType routineType,
             RoutineStatus status,
             RoutineSaveType saveType
     ) {
         this.member = member;
         this.sourceAnalysis = sourceAnalysis;
         this.name = name;
+        this.routineType = routineType;
         this.status = status;
         this.saveType = saveType;
     }

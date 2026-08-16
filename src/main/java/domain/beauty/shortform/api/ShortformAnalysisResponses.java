@@ -4,7 +4,8 @@ import domain.beauty.shortform.domain.RoutineOptimizationSnapshot;
 import domain.beauty.shortform.domain.RoutineSaveType;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot;
 import domain.beauty.shortform.domain.ShortformAnalysisStatus;
-import domain.routine.RoutineStatus;
+import domain.routine.domain.RoutineStatus;
+import domain.routine.domain.RoutineType;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -18,6 +19,15 @@ public final class ShortformAnalysisResponses {
             ShortformAnalysisStatus status,
             int progress,
             boolean reused
+    ) {
+    }
+
+    public record VideoPreview(
+            String thumbnailUrl,
+            String title,
+            String publisher,
+            String viewCount,
+            String duration
     ) {
     }
 
@@ -74,6 +84,7 @@ public final class ShortformAnalysisResponses {
             Long analysisId,
             Long routineId,
             RoutineSaveType saveType,
+            RoutineType routineType,
             RoutineStatus routineStatus,
             boolean reused
     ) {

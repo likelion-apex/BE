@@ -26,6 +26,60 @@ export function userFacingApiError(error) {
   return error?.message || '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.';
 }
 
+export function buildRoutineApplyPayload(saveType, routineType) {
+  const normalizedSaveType = String(saveType || '').toUpperCase();
+  const normalizedRoutineType = String(routineType || '').toUpperCase();
+  if (!['TODAY', 'LIBRARY'].includes(normalizedSaveType)) {
+    throw new Error('유효하지 않은 루틴 저장 방식입니다.');
+  }
+  if (!['DAY', 'NIGHT'].includes(normalizedRoutineType)) {
+    throw new Error('유효하지 않은 루틴 사용 시간대입니다.');
+  }
+  return { saveType: normalizedSaveType, routineType: normalizedRoutineType };
+}
+
+export function safeHttpImageUrl(value) {
+  if (!value) return '';
+  try {
+    const parsed = new URL(value);
+    return ['http:', 'https:'].includes(parsed.protocol) ? parsed.toString() : '';
+  } catch (error) {
+    return '';
+  }
+}
+
+export function createVideoPreviewState() {
+  let revision = 0;
+  let currentUrl = '';
+  let previewUrl = '';
+  let preview = null;
+
+  return Object.freeze({
+    start(value) {
+      revision += 1;
+      currentUrl = String(value || '').trim();
+      previewUrl = '';
+      preview = null;
+      return Object.freeze({ revision, url: currentUrl });
+    },
+    isCurrent(ticket) {
+      return ticket?.revision === revision && ticket?.url === currentUrl;
+    },
+    accept(ticket, value) {
+      if (!this.isCurrent(ticket)) return false;
+      previewUrl = ticket.url;
+      preview = value || null;
+      return Boolean(preview);
+    },
+    canAnalyze(value) {
+      return Boolean(preview) && previewUrl === String(value || '').trim();
+    },
+    value() {
+      return preview;
+    }
+  });
+}
+
 export function hasInternalProcessingCopy(value) {
   return /AI가|AI는|AI의|AI 분석|추정|식별|대표 처방|서버 보정|NORMALIZED|ESTIMATED/i.test(String(value || ''));
 }

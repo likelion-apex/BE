@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import {
   assessmentLabel,
   benefitSummary,
+  buildRoutineApplyPayload,
+  createVideoPreviewState,
   hasInternalProcessingCopy,
+  safeHttpImageUrl,
   userFacingApiError
 } from '../src/analysis-ui.js';
 
@@ -30,4 +33,41 @@ test('네트워크 오류 원문을 사용자 문구로 변환한다', () => {
 test('내부 처리 표현을 검출한다', () => {
   assert.equal(hasInternalProcessingCopy('AI가 추정한 대표 처방입니다.'), true);
   assert.equal(hasInternalProcessingCopy('피부 진정과 수분 공급에 도움을 줍니다.'), false);
+});
+
+test('루틴 저장 요청에 DAY/NIGHT 타입을 포함한다', () => {
+  assert.deepEqual(buildRoutineApplyPayload('TODAY', 'night'), {
+    saveType: 'TODAY',
+    routineType: 'NIGHT'
+  });
+  assert.throws(() => buildRoutineApplyPayload('TODAY', ''), /사용 시간대/);
+});
+
+test('현재 URL의 미리보기 성공 후에만 분석할 수 있다', () => {
+  const state = createVideoPreviewState();
+  const ticket = state.start(' https://youtu.be/video-id ');
+
+  assert.equal(state.canAnalyze('https://youtu.be/video-id'), false);
+  assert.equal(state.accept(ticket, { title: '테스트 영상' }), true);
+  assert.equal(state.canAnalyze('https://youtu.be/video-id'), true);
+
+  state.start('https://youtu.be/changed-id');
+  assert.equal(state.canAnalyze('https://youtu.be/video-id'), false);
+  assert.equal(state.canAnalyze('https://youtu.be/changed-id'), false);
+});
+
+test('URL 변경 이전의 늦은 미리보기 응답을 무시한다', () => {
+  const state = createVideoPreviewState();
+  const staleTicket = state.start('https://youtu.be/old-video');
+  const currentTicket = state.start('https://youtu.be/new-video');
+
+  assert.equal(state.accept(staleTicket, { title: '이전 영상' }), false);
+  assert.equal(state.accept(currentTicket, { title: '새 영상' }), true);
+  assert.equal(state.value().title, '새 영상');
+});
+
+test('HTTP와 HTTPS 썸네일 URL만 허용한다', () => {
+  assert.equal(safeHttpImageUrl('https://img.example.test/video.jpg'), 'https://img.example.test/video.jpg');
+  assert.equal(safeHttpImageUrl('javascript:alert(1)'), '');
+  assert.equal(safeHttpImageUrl('not-a-url'), '');
 });

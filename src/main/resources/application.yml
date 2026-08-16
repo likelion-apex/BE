@@ -20,6 +20,10 @@ spring:
         format_sql: true
     open-in-view: false
 
+  # 운영 DB 마이그레이션은 prod 프로필에서만 활성화한다.
+  flyway:
+    enabled: false
+
   h2:
     console:
       enabled: true
@@ -97,6 +101,14 @@ springdoc:
     operations-sorter: method
   api-docs:
     path: /v3/api-docs
+
+product:
+  seed:
+    enabled: true
+    location: classpath:data/products-seed.csv
+    kakao-delay-ms: 300
+  popular-cache:
+    size: 100
 
 cors:
   allowed-origins: http://localhost:3000

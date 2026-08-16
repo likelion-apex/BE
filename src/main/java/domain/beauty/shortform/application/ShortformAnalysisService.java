@@ -9,9 +9,11 @@ import domain.beauty.shortform.api.ShortformAnalysisResponses.HistoryItem;
 import domain.beauty.shortform.api.ShortformAnalysisResponses.Optimization;
 import domain.beauty.shortform.api.ShortformAnalysisResponses.ProductDetail;
 import domain.beauty.shortform.api.ShortformAnalysisResponses.Status;
+import domain.beauty.shortform.api.ShortformAnalysisResponses.VideoPreview;
 import domain.beauty.shortform.application.ShortformAnalysisStateService.AnalysisProfile;
 import domain.beauty.shortform.application.ShortformAnalysisStateService.CreateResult;
 import domain.beauty.shortform.client.YouTubeMetadataClient;
+import domain.beauty.shortform.client.YouTubeVideoMetadata;
 import domain.beauty.shortform.domain.RoutineOptimizationSnapshot;
 import domain.beauty.shortform.domain.RoutineSaveType;
 import domain.beauty.shortform.domain.ShortformAnalysis;
@@ -19,8 +21,9 @@ import domain.beauty.shortform.domain.ShortformAnalysisSnapshot;
 import domain.beauty.shortform.domain.ShortformAnalysisRepository.HistorySummary;
 import domain.beauty.shortform.domain.ShortformAnalysisStatus;
 import domain.beauty.support.YouTubeUrlNormalizer;
-import domain.routine.RoutineCreationService;
-import domain.routine.RoutineCreationService.RoutineApplyResult;
+import domain.routine.service.RoutineCreationService;
+import domain.routine.service.RoutineCreationService.RoutineApplyResult;
+import domain.routine.domain.RoutineType;
 import global.exception.CustomException;
 import global.exception.ErrorCode;
 import java.util.List;
@@ -35,6 +38,7 @@ public class ShortformAnalysisService {
     private final AnalysisFingerprint fingerprint;
     private final ShortformAnalysisJsonMapper jsonMapper;
     private final RoutineCreationService routineCreationService;
+    private final ShortformRoutineTypeResolver routineTypeResolver;
 
     public ShortformAnalysisService(
             YouTubeUrlNormalizer urlNormalizer,
@@ -42,7 +46,8 @@ public class ShortformAnalysisService {
             ShortformAnalysisStateService stateService,
             AnalysisFingerprint fingerprint,
             ShortformAnalysisJsonMapper jsonMapper,
-            RoutineCreationService routineCreationService
+            RoutineCreationService routineCreationService,
+            ShortformRoutineTypeResolver routineTypeResolver
     ) {
         this.urlNormalizer = urlNormalizer;
         this.youtubeMetadataClient = youtubeMetadataClient;
@@ -50,6 +55,7 @@ public class ShortformAnalysisService {
         this.fingerprint = fingerprint;
         this.jsonMapper = jsonMapper;
         this.routineCreationService = routineCreationService;
+        this.routineTypeResolver = routineTypeResolver;
     }
 
     public Created create(Long memberId, String videoUrl) {
@@ -62,6 +68,18 @@ public class ShortformAnalysisService {
         ShortformAnalysis analysis = result.analysis();
         return new Created(
                 analysis.getId(), analysis.getStatus(), analysis.getProgress(), !result.created());
+    }
+
+    public VideoPreview preview(String videoUrl) {
+        NormalizedYouTubeVideo video = urlNormalizer.normalize(videoUrl);
+        YouTubeVideoMetadata metadata = youtubeMetadataClient.validate(video.videoId());
+        return new VideoPreview(
+                metadata.thumbnailUrl(),
+                metadata.title(),
+                metadata.publisher(),
+                YouTubeVideoPreviewFormatter.formatViewCount(metadata.viewCount()),
+                YouTubeVideoPreviewFormatter.formatDuration(metadata.duration())
+        );
     }
 
     public Status status(Long memberId, Long analysisId) {
@@ -109,16 +127,23 @@ public class ShortformAnalysisService {
         );
     }
 
-    public Applied apply(Long memberId, Long analysisId, RoutineSaveType saveType) {
+    public Applied apply(
+            Long memberId,
+            Long analysisId,
+            RoutineSaveType saveType,
+            RoutineType requestedRoutineType
+    ) {
         ShortformAnalysis analysis = stateService.getOwned(memberId, analysisId);
         stateService.requireCompleted(analysis);
         if (analysis.getOptimizedAt() == null) {
             throw new CustomException(ErrorCode.SHORTFORM_OPTIMIZATION_REQUIRED);
         }
+        RoutineType routineType = routineTypeResolver.resolve(requestedRoutineType);
         RoutineApplyResult result = routineCreationService.create(
                 memberId,
                 analysisId,
                 saveType,
+                routineType,
                 readAnalysis(analysis),
                 jsonMapper.read(analysis.getOptimizationJson(), RoutineOptimizationSnapshot.class)
         );
@@ -126,6 +151,7 @@ public class ShortformAnalysisService {
                 analysisId,
                 result.routineId(),
                 result.saveType(),
+                result.routineType(),
                 result.status(),
                 result.reused()
         );

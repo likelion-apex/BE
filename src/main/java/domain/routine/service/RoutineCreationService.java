@@ -1,4 +1,4 @@
-package domain.routine;
+package domain.routine.service;
 
 import domain.beauty.shortform.domain.RoutineOptimizationSnapshot;
 import domain.beauty.shortform.domain.RoutineOptimizationSnapshot.OptimizedStep;
@@ -11,6 +11,9 @@ import domain.inventory.InventoryRepository;
 import domain.inventory.Product;
 import domain.inventory.ProductRepository;
 import domain.member.Member;
+import domain.routine.domain.*;
+import domain.routine.repository.RoutineLogRepository;
+import domain.routine.repository.RoutineRepository;
 import global.exception.CustomException;
 import global.exception.ErrorCode;
 import java.time.LocalDate;
@@ -45,11 +48,13 @@ public class RoutineCreationService {
             Long memberId,
             Long analysisId,
             RoutineSaveType saveType,
+            RoutineType routineType,
             ShortformAnalysisSnapshot analysisSnapshot,
             RoutineOptimizationSnapshot optimization
     ) {
         Routine existing = routineRepository
-                .findByMemberIdAndSourceAnalysisIdAndSaveType(memberId, analysisId, saveType)
+                .findByMemberIdAndSourceAnalysisIdAndSaveTypeAndRoutineType(
+                        memberId, analysisId, saveType, routineType)
                 .orElse(null);
         if (existing != null) {
             return RoutineApplyResult.from(existing, true);
@@ -60,7 +65,8 @@ public class RoutineCreationService {
         Member member = source.getMember();
 
         if (saveType == RoutineSaveType.TODAY
-                && routineRepository.existsByMemberIdAndStatus(memberId, RoutineStatus.ACTIVE)) {
+                && routineRepository.existsByMemberIdAndStatusAndRoutineType(
+                        memberId, RoutineStatus.ACTIVE, routineType)) {
             throw new CustomException(ErrorCode.ROUTINE_TODAY_CONFLICT);
         }
 
@@ -68,6 +74,7 @@ public class RoutineCreationService {
                 member,
                 source,
                 analysisSnapshot.title(),
+                routineType,
                 saveType == RoutineSaveType.TODAY ? RoutineStatus.ACTIVE : RoutineStatus.ARCHIVED,
                 saveType
         );
@@ -103,12 +110,13 @@ public class RoutineCreationService {
     public record RoutineApplyResult(
             Long routineId,
             RoutineSaveType saveType,
+            RoutineType routineType,
             RoutineStatus status,
             boolean reused
     ) {
         static RoutineApplyResult from(Routine routine, boolean reused) {
             return new RoutineApplyResult(
-                    routine.getId(), routine.getSaveType(), routine.getStatus(), reused);
+                    routine.getId(), routine.getSaveType(), routine.getRoutineType(), routine.getStatus(), reused);
         }
     }
 }

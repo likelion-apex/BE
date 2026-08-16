@@ -1,4 +1,4 @@
-package domain.routine;
+package domain.routine.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
