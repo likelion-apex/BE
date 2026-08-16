@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  buildGeneratedRoutineCreatePayload,
   buildKakaoAuthorizeUrl,
   buildRoutineApplyPayload,
+  buildRoutineLogsPath,
   normalizeKakaoClientId,
 } from '../src/config.js';
 
@@ -31,4 +33,39 @@ test('루틴 타입을 선택한 경우에만 저장 요청에 포함한다', ()
     routineType: 'NIGHT',
   });
   assert.deepEqual(buildRoutineApplyPayload('LIBRARY', ''), { saveType: 'LIBRARY' });
+});
+
+test('캘린더와 특정 날짜 루틴 기록 조회 경로를 만든다', () => {
+  assert.equal(
+    buildRoutineLogsPath({ year: 2026, month: 8 }),
+    '/api/v1/routines/logs?year=2026&month=8',
+  );
+  assert.equal(
+    buildRoutineLogsPath({ date: '2026-08-16' }),
+    '/api/v1/routines/logs?date=2026-08-16',
+  );
+  assert.throws(() => buildRoutineLogsPath({ year: 2026 }), /year와 month/);
+});
+
+test('AI 자동생성 미리보기를 루틴 생성 요청으로 변환한다', () => {
+  assert.deepEqual(buildGeneratedRoutineCreatePayload({
+    generated: {
+      suggestedName: 'AI 추천 나이트 루틴',
+      routineType: 'NIGHT',
+      steps: [
+        { order: 1, inventoryId: 101, productName: '토너' },
+        { order: 2, inventoryId: 102, productName: '크림' },
+      ],
+    },
+    name: '  진정 루틴  ',
+    saveType: 'TODAY',
+  }), {
+    name: '진정 루틴',
+    routineType: 'NIGHT',
+    saveType: 'TODAY',
+    steps: [
+      { order: 1, inventoryId: 101 },
+      { order: 2, inventoryId: 102 },
+    ],
+  });
 });

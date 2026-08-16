@@ -56,6 +56,6 @@ export class ApiClient {
 
   async data(path, options = {}) {
     const payload = await this.request(path, options);
-    return payload?.data ?? payload;
+    return payload && Object.hasOwn(payload, 'data') ? payload.data : payload;
   }
 }
