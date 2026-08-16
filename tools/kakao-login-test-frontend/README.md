@@ -41,6 +41,8 @@ npm run dev
 
 브라우저에서 `http://localhost:3000`을 열고 카카오 로그인을 진행합니다. 카카오가 `/onboarding/kakaocallback`으로 돌려보내면 Vite가 같은 앱을 제공하고, 앱이 authorization code를 배포 백엔드의 `/api/auth/kakao/login`으로 전달합니다.
 
+로그인 후 YouTube URL을 입력하면 영상 정보 미리보기를 자동으로 확인합니다. 썸네일, 제목, 게시자, 조회수와 영상 길이가 표시되고, 공개 상태이며 5분 이하인 영상의 미리보기가 성공한 경우에만 AI 전체 루틴 분석을 요청할 수 있습니다.
+
 `VITE_` 환경변수는 브라우저에 공개됩니다. Client Secret, JWT Secret, OpenAI·Gemini·YouTube·MFDS API 키는 이 폴더의 환경변수에 넣지 마세요.
 
 ## 배포 결과만 확인
