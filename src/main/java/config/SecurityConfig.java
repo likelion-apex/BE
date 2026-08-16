@@ -1,5 +1,6 @@
 package config;
 
+import global.health.ReadinessController;
 import security.jwt.JwtAuthenticationEntryPoint;
 import security.jwt.JwtAuthenticationFilter;
 import security.jwt.JwtTokenProvider;
@@ -29,6 +30,7 @@ public class SecurityConfig {
             "/swagger-ui/**",
             "/swagger-ui.html",
             "/v3/api-docs/**",
+            ReadinessController.PATH,
             "/h2-console/**"
     };
 
