@@ -35,6 +35,9 @@ public class ProductService {
     @Transactional(readOnly = true)
     public ProductListResponse listAll() {
         return ProductListResponse.from(productRepository.findAllByOrderByIdAsc());
+    }
+
+    @Transactional(readOnly = true)
     public Product getById(Long productId) {
         return popularProductCache.find(productId)
                 .orElseGet(() -> productRepository.findById(productId)
