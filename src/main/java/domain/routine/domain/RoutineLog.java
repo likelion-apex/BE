@@ -48,6 +48,12 @@ public class RoutineLog {
     @OneToMany(mappedBy = "routineLog", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<RoutineLogStep> steps = new ArrayList<>();
 
+    @Column(nullable = false)
+    private boolean completed;
+
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -60,5 +66,10 @@ public class RoutineLog {
 
     public void addStep(RoutineLogStep step) {
         steps.add(step);
+    }
+
+    public void complete() {
+        this.completed = true;
+        this.completedAt = LocalDateTime.now();
     }
 }

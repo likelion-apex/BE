@@ -48,6 +48,10 @@ public enum ErrorCode {
     SHORTFORM_OPTIMIZATION_REQUIRED(HttpStatus.CONFLICT, "ANALYSIS-010", "인벤토리 최적화를 먼저 확인해 주세요."),
     SHORTFORM_NOT_SKINCARE(HttpStatus.BAD_REQUEST, "ANALYSIS-011", "스킨케어 루틴 영상만 분석할 수 있습니다."),
     ROUTINE_TODAY_CONFLICT(HttpStatus.CONFLICT, "ROUTINE-001", "이미 진행 중인 오늘의 루틴이 있습니다."),
+    ROUTINE_LOG_NOT_FOUND(HttpStatus.NOT_FOUND, "ROUTINE-002", "오늘의 루틴 기록을 찾을 수 없습니다."),
+    ROUTINE_LOG_STEP_NOT_FOUND(HttpStatus.NOT_FOUND, "ROUTINE-003", "루틴 스텝을 찾을 수 없습니다."),
+    ROUTINE_LOG_STEPS_INCOMPLETE(HttpStatus.CONFLICT, "ROUTINE-004", "아직 완료하지 않은 스텝이 있습니다."),
+    ROUTINE_NOT_FOUND(HttpStatus.NOT_FOUND, "ROUTINE-005", "루틴을 찾을 수 없습니다."),
 
     // 인벤토리
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "INVENTORY-001", "화장품 정보를 찾을 수 없습니다."),

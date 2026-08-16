@@ -42,4 +42,8 @@ public class RoutineLogStep {
         this.order = order;
         this.completed = false;
     }
+
+    public void updateCompleted(boolean completed) {
+        this.completed = completed;
+    }
 }

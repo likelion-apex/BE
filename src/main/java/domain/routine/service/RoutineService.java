@@ -1,0 +1,297 @@
+package domain.routine.service;
+
+import domain.beauty.shortform.application.ShortformRoutineTypeResolver;
+import domain.beauty.shortform.domain.RoutineSaveType;
+import domain.ingredient.domain.InteractionType;
+import domain.ingredient.dto.request.ProductCompatibilityRequest;
+import domain.ingredient.dto.response.ProductCompatibilityResponse;
+import domain.ingredient.dto.response.ProductCompatibilityResponse.CompatibilityResult;
+import domain.ingredient.dto.response.SkinAnalysisResponse;
+import domain.ingredient.service.ProductCompatibilityService;
+import domain.ingredient.service.SkinAnalysisService;
+import domain.inventory.Inventory;
+import domain.inventory.InventoryRepository;
+import domain.inventory.Product;
+import domain.inventory.ProductCategory;
+import domain.member.Member;
+import domain.member.MemberRepository;
+import domain.routine.domain.DailyCondition;
+import domain.routine.domain.Routine;
+import domain.routine.domain.RoutineLog;
+import domain.routine.domain.RoutineLogStep;
+import domain.routine.domain.RoutineStatus;
+import domain.routine.domain.RoutineStep;
+import domain.routine.domain.RoutineType;
+import domain.routine.dto.request.RoutineCreateRequest;
+import domain.routine.dto.request.RoutineCreateRequest.RoutineStepCreateRequest;
+import domain.routine.dto.response.ArchivedRoutineListResponse;
+import domain.routine.dto.response.CalendarMonthResponse;
+import domain.routine.dto.response.DailyLogDetailResponse;
+import domain.routine.dto.response.DailyRoutineResponse;
+import domain.routine.dto.response.RoutineCreateResponse;
+import domain.routine.dto.response.RoutineDeleteResponse;
+import domain.routine.dto.response.RoutineDetailResponse;
+import domain.routine.dto.response.RoutineGenerationResponse;
+import domain.routine.dto.response.RoutineGenerationResponse.GeneratedStep;
+import domain.routine.repository.DailyConditionRepository;
+import domain.routine.repository.RoutineLogRepository;
+import domain.routine.repository.RoutineLogStepRepository;
+import domain.routine.repository.RoutineRepository;
+import global.exception.CustomException;
+import global.exception.ErrorCode;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class RoutineService {
+
+    private final ShortformRoutineTypeResolver routineTypeResolver;
+    private final RoutineRepository routineRepository;
+    private final RoutineLogRepository routineLogRepository;
+    private final RoutineLogStepRepository routineLogStepRepository;
+    private final DailyConditionRepository dailyConditionRepository;
+    private final MemberRepository memberRepository;
+    private final InventoryRepository inventoryRepository;
+    private final SkinAnalysisService skinAnalysisService;
+    private final ProductCompatibilityService productCompatibilityService;
+
+    @Transactional
+    public DailyRoutineResponse getDailyRoutine(Long memberId) {
+        RoutineType routineType = routineTypeResolver.resolve(null);
+        Routine routine = routineRepository
+                .findByMemberIdAndStatusAndRoutineType(memberId, RoutineStatus.ACTIVE, routineType)
+                .orElse(null);
+        if (routine == null) {
+            return null;
+        }
+
+        LocalDate today = LocalDate.now();
+        RoutineLog routineLog = routineLogRepository
+                .findByMemberIdAndLogDateAndRoutineId(memberId, today, routine.getId())
+                .orElseGet(() -> createTodayLog(routine, today));
+
+        return DailyRoutineResponse.from(routine, routineLog);
+    }
+
+    @Transactional
+    public DailyRoutineResponse updateStepCompletion(Long memberId, Long stepId, boolean completed) {
+        RoutineLogStep step = routineLogStepRepository.findByIdAndRoutineLog_Member_Id(stepId, memberId)
+                .orElseThrow(() -> new CustomException(ErrorCode.ROUTINE_LOG_STEP_NOT_FOUND));
+        step.updateCompleted(completed);
+
+        RoutineLog routineLog = step.getRoutineLog();
+        return DailyRoutineResponse.from(routineLog.getRoutine(), routineLog);
+    }
+
+    @Transactional
+    public DailyRoutineResponse completeToday(Long memberId) {
+        RoutineLog routineLog = findTodayRoutineLog(memberId);
+        boolean allStepsCompleted = routineLog.getSteps().stream().allMatch(RoutineLogStep::isCompleted);
+        if (!allStepsCompleted) {
+            throw new CustomException(ErrorCode.ROUTINE_LOG_STEPS_INCOMPLETE);
+        }
+        routineLog.complete();
+        return DailyRoutineResponse.from(routineLog.getRoutine(), routineLog);
+    }
+
+    @Transactional
+    public DailyRoutineResponse completeAllSteps(Long memberId) {
+        RoutineLog routineLog = findTodayRoutineLog(memberId);
+        routineLog.getSteps().forEach(step -> step.updateCompleted(true));
+        return DailyRoutineResponse.from(routineLog.getRoutine(), routineLog);
+    }
+
+    public CalendarMonthResponse getCalendarMonth(Long memberId, int year, int month) {
+        LocalDate start = LocalDate.of(year, month, 1);
+        LocalDate end = start.withDayOfMonth(start.lengthOfMonth());
+        List<RoutineLog> logs = routineLogRepository.findByMemberIdAndLogDateBetween(memberId, start, end);
+        return CalendarMonthResponse.from(year, month, logs);
+    }
+
+    public DailyLogDetailResponse getDailyLogDetail(Long memberId, LocalDate date) {
+        DailyCondition dailyCondition = dailyConditionRepository.findByMemberIdAndLogDate(memberId, date).orElse(null);
+        List<RoutineLog> logs = routineLogRepository.findByMemberIdAndLogDate(memberId, date);
+        return DailyLogDetailResponse.from(date, dailyCondition, logs);
+    }
+
+    public ArchivedRoutineListResponse getArchivedRoutines(Long memberId, String period, String sort) {
+        List<Routine> routines = switch (period) {
+            case "3M" -> routineRepository.findByMemberIdAndStatusAndCreatedAtAfterOrderByCreatedAtDesc(
+                    memberId, RoutineStatus.ARCHIVED, LocalDateTime.now().minusMonths(3));
+            case "6M" -> routineRepository.findByMemberIdAndStatusAndCreatedAtAfterOrderByCreatedAtDesc(
+                    memberId, RoutineStatus.ARCHIVED, LocalDateTime.now().minusMonths(6));
+            default -> routineRepository.findByMemberIdAndStatusOrderByCreatedAtDesc(memberId, RoutineStatus.ARCHIVED);
+        };
+        return ArchivedRoutineListResponse.from(routines);
+    }
+
+    public RoutineDetailResponse getRoutineDetail(Long memberId, Long routineId) {
+        Routine routine = routineRepository.findByIdAndMemberId(routineId, memberId)
+                .orElseThrow(() -> new CustomException(ErrorCode.ROUTINE_NOT_FOUND));
+        return RoutineDetailResponse.from(routine);
+    }
+
+    @Transactional
+    public RoutineDeleteResponse deleteRoutine(Long memberId, Long routineId) {
+        Routine routine = routineRepository.findByIdAndMemberId(routineId, memberId)
+                .orElseThrow(() -> new CustomException(ErrorCode.ROUTINE_NOT_FOUND));
+
+        List<RoutineLog> logs = routineLogRepository.findByRoutineId(routineId);
+        routineLogRepository.deleteAll(logs);
+        routineRepository.delete(routine);
+
+        return new RoutineDeleteResponse(routineId);
+    }
+
+    @Transactional
+    public DailyRoutineResponse applyToday(Long memberId, Long routineId) {
+        Routine routine = routineRepository.findByIdAndMemberId(routineId, memberId)
+                .orElseThrow(() -> new CustomException(ErrorCode.ROUTINE_NOT_FOUND));
+
+        RoutineLog routineLog = applyAsTodayActive(memberId, routine);
+        return DailyRoutineResponse.from(routine, routineLog);
+    }
+
+    public RoutineGenerationResponse generateRoutine(Long memberId, RoutineType routineType) {
+        List<Inventory> inventories = inventoryRepository.findAllByMemberIdOrderByCreatedAtDesc(memberId);
+
+        Map<ProductCategory, Inventory> bestInventoryByCategory = new EnumMap<>(ProductCategory.class);
+        Map<ProductCategory, Integer> bestScoreByCategory = new EnumMap<>(ProductCategory.class);
+
+        for (Inventory inventory : inventories) {
+            ProductCategory category = inventory.getProduct().getCategory();
+            if (category == null) {
+                continue;
+            }
+            SkinAnalysisResponse analysis = skinAnalysisService.analyze(memberId, inventory.getProduct().getId());
+            Integer bestSoFar = bestScoreByCategory.get(category);
+            if (bestSoFar == null || analysis.matchScore() > bestSoFar) {
+                bestScoreByCategory.put(category, analysis.matchScore());
+                bestInventoryByCategory.put(category, inventory);
+            }
+        }
+
+        List<GeneratedStep> steps = new ArrayList<>();
+        int order = 1;
+        for (ProductCategory category : ProductCategory.values()) {
+            Inventory inventory = bestInventoryByCategory.get(category);
+            if (inventory == null) {
+                continue;
+            }
+            steps.add(new GeneratedStep(
+                    order++, inventory.getId(), category,
+                    inventory.getProduct().getName(), bestScoreByCategory.get(category)));
+        }
+
+        List<String> warnings = collectConflictWarnings(steps);
+        String suggestedName = routineType == RoutineType.DAY ? "AI 추천 데이 루틴" : "AI 추천 나이트 루틴";
+
+        return new RoutineGenerationResponse(suggestedName, routineType, steps, warnings);
+    }
+
+    @Transactional
+    public RoutineCreateResponse createRoutine(Long memberId, RoutineCreateRequest request) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
+
+        Routine routine = new Routine(
+                member, null, request.name(), request.routineType(), RoutineStatus.ARCHIVED, request.saveType());
+
+        for (RoutineStepCreateRequest stepRequest : request.steps()) {
+            Inventory inventory = inventoryRepository.findByIdAndMemberId(stepRequest.inventoryId(), memberId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.INVENTORY_NOT_FOUND));
+            Product product = inventory.getProduct();
+            routine.addStep(new RoutineStep(
+                    routine, product, inventory, stepRequest.order(),
+                    product.getName(), product.getBrand(),
+                    product.getCategory() != null ? product.getCategory().name() : null,
+                    product.getImageUrl(), null));
+        }
+
+        Routine saved = routineRepository.saveAndFlush(routine);
+
+        if (request.saveType() == RoutineSaveType.TODAY) {
+            applyAsTodayActive(memberId, saved);
+        }
+
+        return new RoutineCreateResponse(saved.getId(), saved.getName(), saved.getRoutineType(), saved.getStatus());
+    }
+
+    private RoutineLog applyAsTodayActive(Long memberId, Routine routine) {
+        routineRepository.findByMemberIdAndStatusAndRoutineType(memberId, RoutineStatus.ACTIVE, routine.getRoutineType())
+                .filter(existing -> !existing.getId().equals(routine.getId()))
+                .ifPresent(Routine::archive);
+        routine.activate();
+
+        LocalDate today = LocalDate.now();
+        return routineLogRepository
+                .findByMemberIdAndLogDateAndRoutineId(memberId, today, routine.getId())
+                .orElseGet(() -> createTodayLog(routine, today));
+    }
+
+    private List<String> collectConflictWarnings(List<GeneratedStep> steps) {
+        List<String> warnings = new ArrayList<>();
+        Set<String> seenPairs = new HashSet<>();
+
+        for (GeneratedStep base : steps) {
+            List<Long> otherProductIds = steps.stream()
+                    .filter(step -> !step.equals(base))
+                    .map(GeneratedStep::inventoryId)
+                    .map(inventoryId -> inventoryRepository.findById(inventoryId).orElseThrow().getProduct().getId())
+                    .toList();
+            if (otherProductIds.isEmpty()) {
+                continue;
+            }
+
+            Long baseProductId = inventoryRepository.findById(base.inventoryId()).orElseThrow().getProduct().getId();
+            ProductCompatibilityResponse result = productCompatibilityService.compare(
+                    new ProductCompatibilityRequest(baseProductId, otherProductIds));
+
+            for (CompatibilityResult compatibilityResult : result.results()) {
+                if (compatibilityResult.interactionType() != InteractionType.CONFLICT) {
+                    continue;
+                }
+                String pairKey = pairKey(baseProductId, compatibilityResult.compareProductId());
+                if (seenPairs.add(pairKey)) {
+                    warnings.add("%s와(과) %s: %s".formatted(
+                            base.productName(), compatibilityResult.compareProductName(), compatibilityResult.description()));
+                }
+            }
+        }
+        return warnings;
+    }
+
+    private String pairKey(Long a, Long b) {
+        return a < b ? a + "-" + b : b + "-" + a;
+    }
+
+    private RoutineLog findTodayRoutineLog(Long memberId) {
+        RoutineType routineType = routineTypeResolver.resolve(null);
+        Routine routine = routineRepository
+                .findByMemberIdAndStatusAndRoutineType(memberId, RoutineStatus.ACTIVE, routineType)
+                .orElseThrow(() -> new CustomException(ErrorCode.ROUTINE_LOG_NOT_FOUND));
+        LocalDate today = LocalDate.now();
+        return routineLogRepository
+                .findByMemberIdAndLogDateAndRoutineId(memberId, today, routine.getId())
+                .orElseGet(() -> createTodayLog(routine, today));
+    }
+
+    private RoutineLog createTodayLog(Routine routine, LocalDate today) {
+        RoutineLog log = new RoutineLog(routine, routine.getMember(), today);
+        for (RoutineStep step : routine.getSteps()) {
+            log.addStep(new RoutineLogStep(log, step.getId(), step.getOrder()));
+        }
+        return routineLogRepository.save(log);
+    }
+}
