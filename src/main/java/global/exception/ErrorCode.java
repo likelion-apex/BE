@@ -51,6 +51,7 @@ public enum ErrorCode {
     ROUTINE_LOG_NOT_FOUND(HttpStatus.NOT_FOUND, "ROUTINE-002", "오늘의 루틴 기록을 찾을 수 없습니다."),
     ROUTINE_LOG_STEP_NOT_FOUND(HttpStatus.NOT_FOUND, "ROUTINE-003", "루틴 스텝을 찾을 수 없습니다."),
     ROUTINE_LOG_STEPS_INCOMPLETE(HttpStatus.CONFLICT, "ROUTINE-004", "아직 완료하지 않은 스텝이 있습니다."),
+    ROUTINE_NOT_FOUND(HttpStatus.NOT_FOUND, "ROUTINE-005", "루틴을 찾을 수 없습니다."),
 
     // 인벤토리
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "INVENTORY-001", "화장품 정보를 찾을 수 없습니다."),

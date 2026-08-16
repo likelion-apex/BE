@@ -41,7 +41,8 @@ public record DailyRoutineResponse(
 
     @Schema(description = "데일리 루틴 단계 한 건")
     public record DailyRoutineStepResponse(
-            @Schema(description = "루틴 로그 스텝 ID (6.2/6.13 API의 stepId)") Long stepId,
+            @Schema(description = "루틴 로그 스텝 ID (6.2/6.13 API의 stepId). "
+                    + "과거 날짜 조회 시에는 참고용입니다 (6.2 토글은 오늘 날짜에서만 유효)") Long stepId,
             @Schema(description = "단계 순서") int order,
             @Schema(description = "제품 ID (마스터 카탈로그, 없으면 null)") Long productId,
             @Schema(description = "인벤토리 ID (내 보유 제품, 없으면 null)") Long inventoryId,
