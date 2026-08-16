@@ -1,7 +1,7 @@
 package domain.beauty.shortform.api;
 
 import domain.beauty.shortform.domain.RoutineSaveType;
-import domain.routine.RoutineType;
+import domain.routine.domain.RoutineType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 

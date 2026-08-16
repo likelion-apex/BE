@@ -2,7 +2,7 @@ package domain.beauty.shortform.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import domain.routine.RoutineType;
+import domain.routine.domain.RoutineType;
 import java.time.LocalTime;
 import org.junit.jupiter.api.Test;
 

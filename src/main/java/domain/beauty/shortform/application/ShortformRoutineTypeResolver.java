@@ -1,6 +1,6 @@
 package domain.beauty.shortform.application;
 
-import domain.routine.RoutineType;
+import domain.routine.domain.RoutineType;
 import java.time.Clock;
 import java.time.LocalTime;
 import java.time.ZoneId;

@@ -18,6 +18,14 @@ import domain.member.Provider;
 import domain.member.Role;
 import java.util.List;
 import java.util.Optional;
+
+import domain.routine.domain.Routine;
+import domain.routine.domain.RoutineLog;
+import domain.routine.domain.RoutineStatus;
+import domain.routine.domain.RoutineType;
+import domain.routine.repository.RoutineLogRepository;
+import domain.routine.repository.RoutineRepository;
+import domain.routine.service.RoutineCreationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

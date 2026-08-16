@@ -2,6 +2,7 @@ package domain.routine;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import domain.routine.domain.DailyCondition;
 import jakarta.persistence.Column;
 import java.lang.reflect.Field;
 import org.junit.jupiter.api.Test;

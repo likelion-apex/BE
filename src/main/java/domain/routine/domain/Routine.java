@@ -1,4 +1,4 @@
-package domain.routine;
+package domain.routine.domain;
 
 import domain.beauty.shortform.domain.RoutineSaveType;
 import domain.beauty.shortform.domain.ShortformAnalysis;

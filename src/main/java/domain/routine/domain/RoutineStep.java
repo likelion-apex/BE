@@ -1,4 +1,4 @@
-package domain.routine;
+package domain.routine.domain;
 
 import domain.inventory.Inventory;
 import domain.inventory.Product;
