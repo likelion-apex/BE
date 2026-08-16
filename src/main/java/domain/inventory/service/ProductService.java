@@ -5,6 +5,7 @@ import domain.inventory.Product;
 import domain.inventory.ProductRepository;
 import domain.inventory.cache.PopularProductCache;
 import domain.inventory.client.OpenAiCategoryClassifier;
+import domain.inventory.dto.response.ProductListResponse;
 import domain.inventory.dto.response.ProductSearchResponse;
 import global.exception.CustomException;
 import global.exception.ErrorCode;
@@ -32,6 +33,8 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
+    public ProductListResponse listAll() {
+        return ProductListResponse.from(productRepository.findAllByOrderByIdAsc());
     public Product getById(Long productId) {
         return popularProductCache.find(productId)
                 .orElseGet(() -> productRepository.findById(productId)
