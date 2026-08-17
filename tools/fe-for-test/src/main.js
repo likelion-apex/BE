@@ -392,7 +392,7 @@ function renderAnalysis() {
       <div class="section-heading"><h2>최근 분석한 루틴</h2><button type="button" data-action="reload-history">새로고침</button></div>
       <div class="recent-list">
         ${recent.length ? recent.map((item) => `<button type="button" class="recent-item" data-analysis-id="${item.analysisId}" data-analysis-status="${item.status}">
-          <span class="recent-thumb"></span><span><b>${escapeHtml(item.title || '분석 중인 루틴')}</b><small>${item.stepCount || 0}단계 · ${escapeHtml(item.status)}</small></span><strong>${item.overallScore == null ? '›' : `${item.overallScore}점`}</strong>
+          <img class="recent-thumb" src="${safeImageUrl(item.thumbnailUrl, '/assets/analysis-face.png')}" alt="" loading="lazy"><span><b>${escapeHtml(item.title || '분석 중인 루틴')}</b><small>${item.stepCount || 0}단계 · ${escapeHtml(item.status)}</small></span><strong>${item.overallScore == null ? '›' : `${item.overallScore}점`}</strong>
         </button>`).join('') : '<div class="empty-inline">아직 분석한 루틴이 없어요.</div>'}
       </div>
     </section>

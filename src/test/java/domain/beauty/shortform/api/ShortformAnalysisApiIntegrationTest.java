@@ -1,5 +1,6 @@
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -105,12 +106,16 @@ class ShortformAnalysisApiIntegrationTest {
                 .andExpect(jsonPath("$.data.status").value("PENDING"))
                 .andExpect(jsonPath("$.data.reused").value(false));
 
-        Long analysisId = analysisRepository.findAll().getFirst().getId();
+        ShortformAnalysis pending = analysisRepository.findAll().getFirst();
+        Long analysisId = pending.getId();
         mockMvc.perform(get("/api/shortform-analyses/{analysisId}/status", analysisId)
                         .with(authentication(memberAuthentication(member.getId()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.analysisId").value(analysisId))
                 .andExpect(jsonPath("$.data.progress").value(0));
+
+        ReflectionTestUtils.setField(pending, "thumbnailUrl", null);
+        analysisRepository.saveAndFlush(pending);
 
         mockMvc.perform(post("/api/shortform-analyses")
                         .with(authentication(memberAuthentication(member.getId())))
@@ -119,6 +124,32 @@ class ShortformAnalysisApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.analysisId").value(analysisId))
                 .andExpect(jsonPath("$.data.reused").value(true));
+
+        assertThat(analysisRepository.findById(analysisId).orElseThrow().getThumbnailUrl())
+                .isEqualTo("https://img.example.test/video.jpg");
+    }
+
+    @Test
+    void returnsCachedThumbnailInHistoryWithoutYouTubeRequest() throws Exception {
+        Member member = saveMember("thumbnail-member");
+
+        mockMvc.perform(post("/api/shortform-analyses")
+                        .with(authentication(memberAuthentication(member.getId())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"videoUrl\":\"https://www.youtube.com/shorts/t1S24pgO2XQ\"}"))
+                .andExpect(status().isAccepted());
+
+        ShortformAnalysis analysis = analysisRepository.findAll().getFirst();
+        assertThat(analysis.getThumbnailUrl()).isEqualTo("https://img.example.test/video.jpg");
+        clearInvocations(youtubeMetadataClient);
+
+        mockMvc.perform(get("/api/shortform-analyses")
+                        .with(authentication(memberAuthentication(member.getId()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].thumbnailUrl")
+                        .value("https://img.example.test/video.jpg"));
+
+        verifyNoInteractions(youtubeMetadataClient);
     }
 
     @Test
@@ -169,8 +200,12 @@ class ShortformAnalysisApiIntegrationTest {
                         .with(authentication(memberAuthentication(member.getId()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items[0].title").value("이전 분석 결과"))
+                .andExpect(jsonPath("$.data.items[0].thumbnailUrl")
+                        .value("https://i.ytimg.com/vi/legacyVideo/hqdefault.jpg"))
                 .andExpect(jsonPath("$.data.items[0].stepCount").value(0))
                 .andExpect(jsonPath("$.data.items[0].overallScore").doesNotExist());
+
+        verifyNoInteractions(youtubeMetadataClient);
     }
 
     private Member saveMember(String providerId) {

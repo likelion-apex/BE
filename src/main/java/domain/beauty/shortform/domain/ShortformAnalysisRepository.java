@@ -26,6 +26,8 @@ public interface ShortformAnalysisRepository extends JpaRepository<ShortformAnal
     @Query("""
             select analysis.id as analysisId,
                    analysis.status as status,
+                   analysis.videoId as videoId,
+                   analysis.thumbnailUrl as thumbnailUrl,
                    analysis.resultTitle as title,
                    analysis.resultStepCount as stepCount,
                    analysis.resultOverallScore as overallScore,
@@ -40,6 +42,10 @@ public interface ShortformAnalysisRepository extends JpaRepository<ShortformAnal
         Long getAnalysisId();
 
         ShortformAnalysisStatus getStatus();
+
+        String getVideoId();
+
+        String getThumbnailUrl();
 
         String getTitle();
 

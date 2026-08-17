@@ -57,7 +57,8 @@ public class ShortformAnalysisStateService {
             Long memberId,
             String videoId,
             String youtubeUrl,
-            String fingerprint
+            String fingerprint,
+            String thumbnailUrl
     ) {
         ShortformAnalysis latest = analysisRepository
                 .findFirstByMemberIdAndAnalysisFingerprintOrderByCreatedAtDesc(memberId, fingerprint)
@@ -65,17 +66,24 @@ public class ShortformAnalysisStateService {
         if (latest != null
                 && latest.getStatus() != ShortformAnalysisStatus.FAILED
                 && latest.getStatus() != ShortformAnalysisStatus.CANCELLED) {
+            latest.cacheThumbnailUrl(thumbnailUrl);
             return new CreateResult(latest, false);
         }
-        return create(memberId, videoId, youtubeUrl, fingerprint);
+        return create(memberId, videoId, youtubeUrl, fingerprint, thumbnailUrl);
     }
 
-    private CreateResult create(Long memberId, String videoId, String youtubeUrl, String fingerprint) {
+    private CreateResult create(
+            Long memberId,
+            String videoId,
+            String youtubeUrl,
+            String fingerprint,
+            String thumbnailUrl
+    ) {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
-        ShortformAnalysis analysis = analysisRepository.save(
-                new ShortformAnalysis(member, videoId, youtubeUrl, fingerprint)
-        );
+        ShortformAnalysis analysis = new ShortformAnalysis(member, videoId, youtubeUrl, fingerprint);
+        analysis.cacheThumbnailUrl(thumbnailUrl);
+        analysisRepository.save(analysis);
         eventPublisher.publishEvent(new ShortformAnalysisRequested(analysis.getId()));
         return new CreateResult(analysis, true);
     }
