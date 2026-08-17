@@ -10,19 +10,19 @@ import org.junit.jupiter.api.Test;
 class ShortformAnalysisTest {
 
     @Test
+    void cachesFirstNonBlankThumbnailUrl() {
+        ShortformAnalysis analysis = analysis();
+
+        analysis.cacheThumbnailUrl("  ");
+        analysis.cacheThumbnailUrl(" https://img.example.test/first.jpg ");
+        analysis.cacheThumbnailUrl("https://img.example.test/second.jpg");
+
+        assertThat(analysis.getThumbnailUrl()).isEqualTo("https://img.example.test/first.jpg");
+    }
+
+    @Test
     void cancelledAnalysisCannotBeCompletedByLateWorkerResponse() {
-        Member member = Member.builder()
-                .nickname("테스터")
-                .provider(Provider.KAKAO)
-                .providerId("provider-id")
-                .role(Role.USER)
-                .build();
-        ShortformAnalysis analysis = new ShortformAnalysis(
-                member,
-                "t1S24pgO2XQ",
-                "https://www.youtube.com/watch?v=t1S24pgO2XQ",
-                "fingerprint"
-        );
+        ShortformAnalysis analysis = analysis();
         analysis.moveTo(ShortformAnalysisStatus.EXTRACTING_VIDEO, "추출 중");
         analysis.cancel();
 
@@ -30,5 +30,20 @@ class ShortformAnalysisTest {
 
         assertThat(analysis.getStatus()).isEqualTo(ShortformAnalysisStatus.CANCELLED);
         assertThat(analysis.getResultJson()).isNull();
+    }
+
+    private ShortformAnalysis analysis() {
+        Member member = Member.builder()
+                .nickname("테스터")
+                .provider(Provider.KAKAO)
+                .providerId("provider-id")
+                .role(Role.USER)
+                .build();
+        return new ShortformAnalysis(
+                member,
+                "t1S24pgO2XQ",
+                "https://www.youtube.com/watch?v=t1S24pgO2XQ",
+                "fingerprint"
+        );
     }
 }

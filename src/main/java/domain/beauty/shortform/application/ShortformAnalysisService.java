@@ -60,11 +60,15 @@ public class ShortformAnalysisService {
 
     public Created create(Long memberId, String videoUrl) {
         NormalizedYouTubeVideo video = urlNormalizer.normalize(videoUrl);
-        youtubeMetadataClient.validate(video.videoId());
+        YouTubeVideoMetadata metadata = youtubeMetadataClient.validate(video.videoId());
         AnalysisProfile profile = stateService.loadProfile(memberId);
         String analysisFingerprint = fingerprint.create(video.videoId(), profile);
         CreateResult result = stateService.createOrReuse(
-                memberId, video.videoId(), video.watchUrl(), analysisFingerprint);
+                memberId,
+                video.videoId(),
+                video.watchUrl(),
+                analysisFingerprint,
+                thumbnailUrl(video.videoId(), metadata.thumbnailUrl()));
         ShortformAnalysis analysis = result.analysis();
         return new Created(
                 analysis.getId(), analysis.getStatus(), analysis.getProgress(), !result.created());
@@ -170,18 +174,28 @@ public class ShortformAnalysisService {
     }
 
     private HistoryItem toHistoryItem(HistorySummary analysis) {
+        String thumbnailUrl = thumbnailUrl(analysis.getVideoId(), analysis.getThumbnailUrl());
         if (analysis.getStatus() != ShortformAnalysisStatus.COMPLETED) {
             return new HistoryItem(
-                    analysis.getAnalysisId(), analysis.getStatus(), null, 0, null, analysis.getCreatedAt());
+                    analysis.getAnalysisId(), analysis.getStatus(), thumbnailUrl,
+                    null, 0, null, analysis.getCreatedAt());
         }
         return new HistoryItem(
                 analysis.getAnalysisId(),
                 analysis.getStatus(),
+                thumbnailUrl,
                 analysis.getTitle() == null ? "이전 분석 결과" : analysis.getTitle(),
                 analysis.getStepCount() == null ? 0 : analysis.getStepCount(),
                 analysis.getOverallScore(),
                 analysis.getCreatedAt()
         );
+    }
+
+    private String thumbnailUrl(String videoId, String cachedUrl) {
+        if (cachedUrl != null && !cachedUrl.isBlank()) {
+            return cachedUrl.trim();
+        }
+        return "https://i.ytimg.com/vi/%s/hqdefault.jpg".formatted(videoId);
     }
 
     private ShortformAnalysisSnapshot readAnalysis(ShortformAnalysis analysis) {

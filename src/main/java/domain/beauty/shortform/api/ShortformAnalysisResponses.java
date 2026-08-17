@@ -50,6 +50,7 @@ public final class ShortformAnalysisResponses {
     public record HistoryItem(
             Long analysisId,
             ShortformAnalysisStatus status,
+            String thumbnailUrl,
             String title,
             int stepCount,
             Integer overallScore,

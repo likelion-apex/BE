@@ -181,7 +181,7 @@ body.is-busy::after { position: fixed; z-index: 999; top: 18px; left: 50%; width
 .recent-section { padding-bottom: 10px; }
 .recent-list { display: grid; gap: 6px; }
 .recent-item { display: grid; width: 100%; padding: 4px 6px; align-items: center; grid-template-columns: 44px 1fr auto; gap: 10px; border: 0; border-radius: 10px; background: #fff; text-align: left; }
-.recent-thumb { width: 44px; height: 44px; border-radius: 6px; background: var(--gray-10); }
+.recent-thumb { display: block; width: 44px; height: 44px; border-radius: 6px; background: var(--gray-10); object-fit: cover; }
 .recent-item > span:nth-child(2) { display: grid; min-width: 0; gap: 4px; }
 .recent-item b { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .recent-item small { color: var(--gray-60); font-size: 10px; }

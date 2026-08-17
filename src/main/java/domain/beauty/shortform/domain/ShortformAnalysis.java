@@ -45,6 +45,9 @@ public class ShortformAnalysis {
     @Column(name = "youtube_url", nullable = false, length = 500)
     private String youtubeUrl;
 
+    @Column(name = "thumbnail_url", length = 1000)
+    private String thumbnailUrl;
+
     @Column(name = "analysis_fingerprint", nullable = false, length = 64)
     private String analysisFingerprint;
 
@@ -123,6 +126,14 @@ public class ShortformAnalysis {
         this.status = ShortformAnalysisStatus.PENDING;
         this.progress = 0;
         this.statusMessage = "분석 요청을 준비하고 있습니다.";
+    }
+
+    public void cacheThumbnailUrl(String thumbnailUrl) {
+        if ((this.thumbnailUrl == null || this.thumbnailUrl.isBlank())
+                && thumbnailUrl != null
+                && !thumbnailUrl.isBlank()) {
+            this.thumbnailUrl = thumbnailUrl.trim();
+        }
     }
 
     public void moveTo(ShortformAnalysisStatus nextStatus, String message) {

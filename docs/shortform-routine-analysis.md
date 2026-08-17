@@ -35,6 +35,8 @@ SHORTFORM_GEMINI_FALLBACK_ENABLED=true # OpenAI 미확인 제품의 Gemini 보�
 
 미리보기 API는 분석 데이터를 생성하지 않는다. 미리보기와 분석 시작 시점 사이에 영상의 공개 상태나 길이가 바뀔 수 있으므로 분석 요청에서도 YouTube 정보를 다시 검증한다. 게시자는 YouTube 채널 제목이며 채널 핸들은 아니다.
 
+분석 생성 시 YouTube 응답의 썸네일 URL을 분석 레코드에 저장한다. 최근 분석 목록은 저장된 URL만 조회하므로 목록을 열거나 새로고침할 때 YouTube Data API를 호출하지 않는다. 기존 분석은 `videoId` 기반 정적 썸네일 URL로 보정한다.
+
 ## AI와 데이터 근거
 
 - 영상 단계·제품 식별: `gemini-3.6-flash`, 기존 프롬프트/검증기/캐시 재사용

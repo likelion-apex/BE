@@ -162,9 +162,9 @@ export const demoGeneratedRoutine = {
 };
 
 export const demoHistory = [
-  { analysisId: 301, status: 'COMPLETED', title: '속건조 타파 루틴', stepCount: 4, overallScore: 88 },
-  { analysisId: 302, status: 'COMPLETED', title: '민감성 진정 3단계 시카 루틴', stepCount: 3, overallScore: 88 },
-  { analysisId: 303, status: 'COMPLETED', title: '여드름 흉터 지우는 레티놀 조합', stepCount: 5, overallScore: 75 },
+  { analysisId: 301, status: 'COMPLETED', thumbnailUrl: '/assets/analysis-face.png', title: '속건조 타파 루틴', stepCount: 4, overallScore: 88 },
+  { analysisId: 302, status: 'COMPLETED', thumbnailUrl: '/assets/analysis-bottles.png', title: '민감성 진정 3단계 시카 루틴', stepCount: 3, overallScore: 88 },
+  { analysisId: 303, status: 'COMPLETED', thumbnailUrl: '/assets/analysis-cream.png', title: '여드름 흉터 지우는 레티놀 조합', stepCount: 5, overallScore: 75 },
 ];
 
 export const demoPreview = {
