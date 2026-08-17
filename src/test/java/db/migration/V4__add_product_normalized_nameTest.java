@@ -14,7 +14,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-class V3__add_product_normalized_nameTest {
+class V4__add_product_normalized_nameTest {
 
     private Connection connection;
 
@@ -62,7 +62,7 @@ class V3__add_product_normalized_nameTest {
     void mergesDuplicateHangulKeysAndIsIdempotent() throws Exception {
         Context context = mock(Context.class);
         when(context.getConnection()).thenReturn(connection);
-        V3__add_product_normalized_name migration = new V3__add_product_normalized_name();
+        V4__add_product_normalized_name migration = new V4__add_product_normalized_name();
 
         migration.migrate(context);
         migration.migrate(context);
