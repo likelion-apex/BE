@@ -35,7 +35,17 @@ class V3__add_product_normalized_nameTest {
                     CREATE TABLE inventories (
                         id BIGINT PRIMARY KEY,
                         member_id BIGINT NOT NULL,
-                        product_id BIGINT NOT NULL
+                        product_id BIGINT NOT NULL,
+                        FOREIGN KEY (product_id) REFERENCES products(id)
+                    )
+                    """);
+            statement.execute("""
+                    CREATE TABLE routine_steps (
+                        id BIGINT PRIMARY KEY,
+                        product_id BIGINT,
+                        inventory_id BIGINT,
+                        FOREIGN KEY (product_id) REFERENCES products(id),
+                        FOREIGN KEY (inventory_id) REFERENCES inventories(id)
                     )
                     """);
             statement.execute("""
@@ -49,6 +59,10 @@ class V3__add_product_normalized_nameTest {
                     (10, 1, 1),
                     (11, 1, 2),
                     (12, 2, 2)
+                    """);
+            statement.execute("""
+                    INSERT INTO routine_steps (id, product_id, inventory_id) VALUES
+                    (20, 2, 11)
                     """);
         }
     }
@@ -74,6 +88,8 @@ class V3__add_product_normalized_nameTest {
         assertThat(inventoryProduct(10)).isEqualTo(1L);
         assertThat(inventoryExists(11)).isFalse();
         assertThat(inventoryProduct(12)).isEqualTo(1L);
+        assertThat(stepProduct(20)).isEqualTo(1L);
+        assertThat(stepInventory(20)).isEqualTo(10L);
     }
 
     private String productName(long id) throws SQLException {
@@ -111,6 +127,22 @@ class V3__add_product_normalized_nameTest {
         try (Statement statement = connection.createStatement();
              ResultSet result = statement.executeQuery("SELECT 1 FROM inventories WHERE id = " + id)) {
             return result.next();
+        }
+    }
+
+    private long stepProduct(long id) throws SQLException {
+        try (Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery("SELECT product_id FROM routine_steps WHERE id = " + id)) {
+            result.next();
+            return result.getLong(1);
+        }
+    }
+
+    private long stepInventory(long id) throws SQLException {
+        try (Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery("SELECT inventory_id FROM routine_steps WHERE id = " + id)) {
+            result.next();
+            return result.getLong(1);
         }
     }
 }

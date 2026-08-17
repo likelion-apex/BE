@@ -12,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
@@ -37,7 +38,7 @@ public class GeminiProductEnrichmentClient {
     private final ObjectMapper objectMapper;
 
     public GeminiProductEnrichmentClient(
-            RestClient geminiRestClient,
+            @Qualifier("geminiRestClient") RestClient geminiRestClient,
             GeminiProperties geminiProperties,
             ShortformProductEnrichmentProperties properties,
             GeminiProductEnrichmentPromptResources promptResources,

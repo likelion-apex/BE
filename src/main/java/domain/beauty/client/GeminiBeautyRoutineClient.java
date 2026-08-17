@@ -17,6 +17,7 @@ import domain.beauty.exception.BeautyRoutineException.GeminiUnavailable;
 import domain.beauty.exception.BeautyRoutineException.InvalidGeminiResponse;
 import domain.beauty.exception.BeautyRoutineException.MissingGeminiConfiguration;
 import domain.beauty.support.BeautyRoutineAnalysisValidator;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
@@ -35,7 +36,7 @@ public class GeminiBeautyRoutineClient implements BeautyRoutineGateway {
 	private final BeautyRoutineAnalysisValidator validator;
 
 	public GeminiBeautyRoutineClient(
-		RestClient geminiRestClient,
+		@Qualifier("geminiRestClient") RestClient geminiRestClient,
 		GeminiProperties properties,
 		GeminiPromptResources promptResources,
 		ObjectMapper objectMapper,

@@ -5,6 +5,7 @@ import java.net.http.HttpClient;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import domain.beauty.domain.BeautyRoutineAnalysisResult;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,6 +17,7 @@ import org.springframework.web.client.RestClient;
 public class GeminiConfiguration {
 
 	@Bean
+	@Qualifier("geminiRestClient")
 	RestClient geminiRestClient(GeminiProperties properties) {
 		HttpClient httpClient = HttpClient.newBuilder()
 			.connectTimeout(properties.getConnectTimeout())

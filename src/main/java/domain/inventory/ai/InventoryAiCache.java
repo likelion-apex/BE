@@ -17,11 +17,11 @@ import lombok.NoArgsConstructor;
 public class InventoryAiCache {
 
     @Id
-    @Column(name = "cache_key", length = 512)
+    @Column(name = "cache_key", length = 255)
     private String cacheKey;
 
     @Lob
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String payload;
 
     @Column(name = "expires_at", nullable = false)

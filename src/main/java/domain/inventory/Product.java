@@ -8,7 +8,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -25,10 +24,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(
-        name = "products",
-        uniqueConstraints = @UniqueConstraint(name = "uk_products_normalized_name", columnNames = "normalized_name")
-)
+@Table(name = "products")
 public class Product {
 
     @Id
