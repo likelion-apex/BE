@@ -87,6 +87,14 @@ class ShortformAnalysisLiveApiTest {
 
         Detail detail = analysisService.detail(member.getId(), completed.getId());
         ShortformAnalysisSnapshot snapshot = detail.result();
+        assertThat(snapshot.title()).doesNotContain(member.getNickname(), "님", "분석");
+        assertThat(snapshot.summary()).doesNotContain(member.getNickname(), "님");
+        assertThat(snapshot.steps()).anyMatch(step ->
+                containsKnownDetail(snapshot.summary(), step.displayProductName())
+                        || containsKnownDetail(snapshot.summary(), step.productName())
+                        || step.ingredients().stream()
+                                .anyMatch(ingredient -> containsKnownDetail(
+                                        snapshot.summary(), ingredient.name())));
         assertThat(snapshot.steps()).isNotEmpty();
         int expectedOverallScore = (int) Math.round(
                 snapshot.steps().stream().mapToInt(ShortformAnalysisSnapshot.StepResult::matchScore)
@@ -168,5 +176,12 @@ class ShortformAnalysisLiveApiTest {
             assertThat(System.getenv(name)).as(name + " 환경변수").isNotBlank();
         }
         assertThat(System.getenv("MFDS_ENABLED")).isEqualToIgnoringCase("true");
+    }
+
+    private boolean containsKnownDetail(String summary, String candidate) {
+        return summary != null
+                && candidate != null
+                && !candidate.isBlank()
+                && summary.contains(candidate);
     }
 }

@@ -9,7 +9,7 @@ public record RoutinePersonalizationInput(
         List<VideoStep> steps,
         List<InventoryProduct> inventory
 ) {
-    public record MemberProfile(String nickname, String skinType, List<String> skinConcerns) {
+    public record MemberProfile(String skinType, List<String> skinConcerns) {
     }
 
     public record VideoContext(String videoId, String summary, List<String> warnings) {

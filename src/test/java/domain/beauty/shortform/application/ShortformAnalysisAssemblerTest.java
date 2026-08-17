@@ -3,6 +3,7 @@ package domain.beauty.shortform.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
+import domain.beauty.domain.BeautyRoutineAnalysis;
 import domain.beauty.domain.BeautyRoutineAnalysis.EvidenceSource;
 import domain.beauty.domain.BeautyRoutineAnalysis.IdentificationLevel;
 import domain.beauty.domain.BeautyRoutineAnalysis.PurposeBasis;
@@ -12,6 +13,7 @@ import domain.beauty.shortform.application.ShortformAnalysisStateService.Invento
 import domain.beauty.shortform.application.ShortformAnalysisStateService.JobContext;
 import domain.beauty.shortform.client.RoutinePersonalizationResult;
 import domain.beauty.shortform.client.ProductEnrichmentResult;
+import domain.beauty.shortform.client.RoutinePersonalizationInput;
 import domain.beauty.shortform.client.RoutinePersonalizationResult.Response;
 import domain.beauty.shortform.config.OpenAiRoutineProperties;
 import domain.beauty.shortform.domain.OptimizationStatus;
@@ -26,6 +28,7 @@ import domain.cosmetic.cache.RegulationInfoCache;
 import domain.cosmetic.client.CsmtcsReglMaterialClient;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
 
 class ShortformAnalysisAssemblerTest {
 
@@ -40,7 +43,6 @@ class ShortformAnalysisAssemblerTest {
                 1L,
                 "t1S24pgO2XQ",
                 "https://www.youtube.com/watch?v=t1S24pgO2XQ",
-                "테스터",
                 "수부지",
                 List.of("민감성"),
                 List.of(new InventoryFact(100L, 20L, "진정 토너", "테스트", "TONER", null))
@@ -113,7 +115,7 @@ class ShortformAnalysisAssemblerTest {
     @Test
     void usesNormalReasonCardsForEstimatedProductsAndGuardsHighRiskIngredients() {
         JobContext context = new JobContext(
-                1L, "video", "https://www.youtube.com/watch?v=video", "테스터", "건성",
+                1L, "video", "https://www.youtube.com/watch?v=video", "건성",
                 List.of(), List.of());
         ProductEnrichmentData estimatedEnrichment = enrichment(
                 IngredientVerificationStatus.ESTIMATED,
@@ -160,6 +162,153 @@ class ShortformAnalysisAssemblerTest {
         assertThat(assembled.analysis().steps().get(1).scoreBreakdown().ingredientSafety()).isEqualTo(5);
     }
 
+    @Test
+    void omitsNicknameFromPersonalizationInput() throws Exception {
+        JobContext context = new JobContext(
+                1L, "video", "https://www.youtube.com/watch?v=video", "수부지",
+                List.of("속건조"), List.of());
+        ProductEnrichmentData product = enrichment(
+                IngredientVerificationStatus.OFFICIAL,
+                new ProductEnrichmentResult.Ingredient(
+                        1, "판테놀", List.of("보습제"), List.of("장벽 보호"), 1, false, false));
+        MatchedVideoStep matched = new MatchedVideoStep(
+                step(1, IdentificationLevel.EXACT_PRODUCT, "테스트 크림"),
+                10L, null, "테스트", "테스트 크림", ProductResolutionStatus.CATALOG_MATCH,
+                0.95, IngredientDataStatus.AVAILABLE, product);
+        BeautyRoutineAnalysis extraction = new BeautyRoutineAnalysis(
+                "1.0",
+                BeautyRoutineAnalysis.AnalysisStatus.COMPLETE,
+                BeautyRoutineAnalysis.RoutineType.SKINCARE,
+                "수분 공급과 장벽 보호를 위한 루틴",
+                List.of(matched.source()),
+                List.of());
+
+        RoutinePersonalizationInput input = assembler.toInput(context, extraction, List.of(matched));
+        String json = new ObjectMapper().writeValueAsString(input);
+
+        assertThat(json).doesNotContain("nickname");
+        assertThat(json).contains("\"skinType\":\"수부지\"");
+    }
+
+    @Test
+    void replacesOwnedRoutineCopyWithVideoFocusedTitleAndConcreteSummary() {
+        JobContext context = new JobContext(
+                1L, "video", "https://www.youtube.com/watch?v=video", "수부지",
+                List.of("속건조"), List.of());
+        ProductEnrichmentData product = enrichment(
+                IngredientVerificationStatus.OFFICIAL,
+                new ProductEnrichmentResult.Ingredient(
+                        1, "판테놀", List.of("보습제"), List.of("장벽 보호"), 1, false, false));
+        MatchedVideoStep matched = new MatchedVideoStep(
+                step(1, IdentificationLevel.EXACT_PRODUCT, "테스트 크림"),
+                10L, null, "테스트", "테스트 크림", ProductResolutionStatus.CATALOG_MATCH,
+                0.95, IngredientDataStatus.AVAILABLE, product);
+        RoutinePersonalizationResult result = new RoutinePersonalizationResult(
+                "장선우님의 나이트 스킨케어 루틴 분석",
+                "수부지 맞춤",
+                List.of("수분 공급"),
+                "속건조 해결",
+                "판테놀 + 보습 성분",
+                "장선우님의 나이트 스킨케어 루틴은 피부 진정에 적합합니다.",
+                List.of(),
+                List.of(aiStep(1, 30, 25, AssessmentCategory.BENEFICIAL)),
+                List.of());
+
+        AssembledResult assembled = assembleOneStep(context, matched, result);
+
+        assertThat(assembled.analysis().title()).isEqualTo("속건조 해결 루틴");
+        assertThat(assembled.analysis().title()).doesNotContain("장선우", "님", "분석");
+        assertThat(assembled.analysis().summary()).contains("피부 진정", "테스트 크림");
+        assertThat(assembled.analysis().summary()).doesNotContain("장선우", "님");
+    }
+
+    @Test
+    void preservesValidFigmaStyleTitleAndConcreteSummary() {
+        JobContext context = new JobContext(
+                1L, "video", "https://www.youtube.com/watch?v=video", "수부지",
+                List.of("속건조"), List.of());
+        ProductEnrichmentData product = enrichment(
+                IngredientVerificationStatus.OFFICIAL,
+                new ProductEnrichmentResult.Ingredient(
+                        1, "판테놀", List.of("보습제"), List.of("장벽 보호"), 1, false, false));
+        MatchedVideoStep matched = new MatchedVideoStep(
+                step(1, IdentificationLevel.EXACT_PRODUCT, "테스트 크림"),
+                10L, null, "테스트", "테스트 크림", ProductResolutionStatus.CATALOG_MATCH,
+                0.95, IngredientDataStatus.AVAILABLE, product);
+        String summary = "수분 공급(테스트 크림)과 판테놀 성분을 중심으로 피부 장벽을 관리하는 루틴입니다.";
+        RoutinePersonalizationResult result = new RoutinePersonalizationResult(
+                "속건조 타파 루틴",
+                "수부지 맞춤",
+                List.of("수분 공급"),
+                "속건조 해결",
+                "판테놀 + 보습 성분",
+                summary,
+                List.of(),
+                List.of(aiStep(1, 30, 25, AssessmentCategory.BENEFICIAL)),
+                List.of());
+
+        AssembledResult assembled = assembleOneStep(context, matched, result);
+
+        assertThat(assembled.analysis().title()).isEqualTo("속건조 타파 루틴");
+        assertThat(assembled.analysis().summary()).isEqualTo(summary);
+    }
+
+    @Test
+    void fallsBackToKnownCategoryWhenProductAndIngredientsAreUnresolved() {
+        JobContext context = new JobContext(
+                1L, "video", "https://www.youtube.com/watch?v=video", "민감성",
+                List.of(), List.of());
+        MatchedVideoStep unresolved = new MatchedVideoStep(
+                step(1, IdentificationLevel.CATEGORY_ONLY, null),
+                null, null, null, "토너", ProductResolutionStatus.UNRESOLVED,
+                0, IngredientDataStatus.NOT_ELIGIBLE, ProductEnrichmentData.unresolved());
+        RoutinePersonalizationResult result = new RoutinePersonalizationResult(
+                "피부 진정 루틴",
+                "민감 피부 맞춤",
+                List.of("피부 진정"),
+                "피부 진정",
+                "영상 속 제품 조합",
+                "피부를 편안하게 정돈하는 루틴입니다.",
+                List.of(),
+                List.of(aiStep(1, 20, 18, AssessmentCategory.CAUTION)),
+                List.of());
+
+        AssembledResult assembled = assembleOneStep(context, unresolved, result);
+
+        assertThat(assembled.analysis().summary()).contains("토너 단계를 포함해");
+        assertThat(assembled.analysis().summary()).doesNotContain("null");
+    }
+
+    @Test
+    void includesKnownCautionIngredientInGeneratedSummary() {
+        JobContext context = new JobContext(
+                1L, "video", "https://www.youtube.com/watch?v=video", "민감성",
+                List.of(), List.of());
+        ProductEnrichmentData product = enrichment(
+                IngredientVerificationStatus.OFFICIAL,
+                new ProductEnrichmentResult.Ingredient(
+                        1, "살리실산", List.of("각질 제거"), List.of(), 4, true, false));
+        MatchedVideoStep matched = new MatchedVideoStep(
+                step(1, IdentificationLevel.EXACT_PRODUCT, "테스트 크림"),
+                10L, null, "테스트", "테스트 크림", ProductResolutionStatus.CATALOG_MATCH,
+                0.95, IngredientDataStatus.AVAILABLE, product);
+        RoutinePersonalizationResult result = new RoutinePersonalizationResult(
+                "각질 케어 루틴",
+                "민감 피부 맞춤",
+                List.of("각질 케어"),
+                "피부결 정돈",
+                "각질 케어 + 보습",
+                "피부결을 정돈하는 단계로 구성되어 있습니다.",
+                List.of(),
+                List.of(aiStep(1, 20, 18, AssessmentCategory.CAUTION)),
+                List.of());
+
+        AssembledResult assembled = assembleOneStep(context, matched, result);
+
+        assertThat(assembled.analysis().summary())
+                .contains("테스트 크림", "살리실산", "사용량과 빈도");
+    }
+
     private ProductEnrichmentData enrichment(
             IngredientVerificationStatus status,
             ProductEnrichmentResult.Ingredient ingredient
@@ -197,6 +346,23 @@ class ShortformAnalysisAssemblerTest {
                 "영상 자막에서 확인",
                 level == IdentificationLevel.EXACT_PRODUCT ? 0.95 : 0.7
         );
+    }
+
+    private AssembledResult assembleOneStep(
+            JobContext context,
+            MatchedVideoStep matched,
+            RoutinePersonalizationResult result
+    ) {
+        VideoRoutineExtraction extraction = new VideoRoutineExtraction(
+                "cache", context.videoId(), context.youtubeUrl(), "gemini-test", "1.0", "{}", 10, 5);
+        return assembler.assemble(
+                context,
+                List.of(matched),
+                new Response(result, "gpt-test", 20, 10),
+                extraction,
+                new ShortformProductEnrichmentService.BatchResult(
+                        java.util.Map.of(1, matched.enrichment()),
+                        "gpt-test", "1.0", 40, 20, 0, 1));
     }
 
     private RoutinePersonalizationResult.StepAnalysis aiStep(
