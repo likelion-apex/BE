@@ -110,5 +110,10 @@ product:
   popular-cache:
     size: 100
 
+inventory:
+  ai-cache-ttl: 30d
+  connect-timeout: 5s
+  read-timeout: 20s
+
 cors:
   allowed-origins: http://localhost:3000

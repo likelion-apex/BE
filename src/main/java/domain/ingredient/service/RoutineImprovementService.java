@@ -1,6 +1,6 @@
 package domain.ingredient.service;
 
-import domain.cosmetic.client.OpenAiIngredientClient;
+import domain.inventory.ai.IngredientAiClient;
 import domain.ingredient.client.OpenAiRoutineImprovementClient;
 import domain.ingredient.client.OwnedProductCandidate;
 import domain.ingredient.client.RoutineImprovementResult;
@@ -35,7 +35,7 @@ public class RoutineImprovementService {
     private static final String NO_DUPLICATE_MESSAGE = "보유 제품과 겹치는 제품은 없어요.";
 
     private final InventoryRepository inventoryRepository;
-    private final OpenAiIngredientClient openAiIngredientClient;
+    private final IngredientAiClient ingredientAiClient;
     private final OpenAiRoutineImprovementClient routineImprovementClient;
 
     public RoutineImprovementResponse analyze(Long memberId, String productName) {
@@ -57,7 +57,7 @@ public class RoutineImprovementService {
         Map<Long, String> productNameById = candidates.stream()
                 .collect(Collectors.toMap(OwnedProductCandidate::productId, OwnedProductCandidate::productName));
 
-        List<String> ingredientNames = openAiIngredientClient.fetchIngredientNames(trimmedName);
+        List<String> ingredientNames = ingredientAiClient.fetchIngredientNames(trimmedName);
 
         RoutineImprovementResult result = routineImprovementClient.analyze(trimmedName, ingredientNames, candidates);
         if (result == null) {

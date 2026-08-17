@@ -2,6 +2,7 @@ package domain.inventory.service;
 
 import domain.cosmetic.client.KakaoImageClient;
 import domain.inventory.Product;
+import domain.inventory.ProductNameNormalizer;
 import domain.inventory.ProductRepository;
 import domain.inventory.cache.PopularProductCache;
 import domain.inventory.client.OpenAiCategoryClassifier;
@@ -53,7 +54,9 @@ public class ProductService {
             throw new CustomException(ErrorCode.INVALID_INPUT_VALUE, "productName은 필수입니다.");
         }
         String trimmedName = productName.trim();
-        return productRepository.findByName(trimmedName)
+        String normalizedName = ProductNameNormalizer.canonicalKey(trimmedName);
+        return productRepository.findByNormalizedName(normalizedName)
+                .or(() -> productRepository.findByName(trimmedName))
                 .orElseGet(() -> createProduct(trimmedName));
     }
 

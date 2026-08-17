@@ -42,7 +42,7 @@ class ProductFileSeederTest {
                 라운드랩 1025 독도 토너,라운드랩,SKIN_TONER,
                 """;
         ProductFileSeeder seeder = newSeeder(csv);
-        when(productRepository.findByName("라운드랩 1025 독도 토너")).thenReturn(Optional.empty());
+        when(productRepository.findByNormalizedName("라운드랩독도토너")).thenReturn(Optional.empty());
         when(kakaoImageClient.searchImageUrl("라운드랩 1025 독도 토너")).thenReturn("https://img.example/toner.jpg");
 
         seeder.seed();
@@ -71,7 +71,7 @@ class ProductFileSeederTest {
                 .build();
         ReflectionTestUtils.setField(existing, "id", 1L);
         ProductFileSeeder seeder = newSeeder(csv);
-        when(productRepository.findByName("라운드랩 1025 독도 토너")).thenReturn(Optional.of(existing));
+        when(productRepository.findByNormalizedName("라운드랩독도토너")).thenReturn(Optional.of(existing));
 
         seeder.seed();
 
@@ -92,7 +92,7 @@ class ProductFileSeederTest {
 
         seeder.seed();
 
-        verify(productRepository, never()).findByName(any());
+        verify(productRepository, never()).findByNormalizedName(any());
         verify(productRepository, never()).save(any());
     }
 
@@ -110,7 +110,7 @@ class ProductFileSeederTest {
                 .imageUrl("https://img.example/kept.jpg")
                 .build();
         ProductFileSeeder seeder = newSeeder(csv);
-        when(productRepository.findByName("라운드랩 1025 독도 토너")).thenReturn(Optional.of(existing));
+        when(productRepository.findByNormalizedName("라운드랩독도토너")).thenReturn(Optional.of(existing));
 
         seeder.seed();
 

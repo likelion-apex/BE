@@ -3,6 +3,7 @@ package domain.inventory.seed;
 import domain.cosmetic.client.KakaoImageClient;
 import domain.inventory.Product;
 import domain.inventory.ProductCategory;
+import domain.inventory.ProductNameNormalizer;
 import domain.inventory.ProductRepository;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -21,7 +22,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 
 /**
- * classpath CSV를 읽어 상품 마스터를 name 기준으로 upsert한다.
+ * classpath CSV를 읽어 상품 마스터를 정규화 키 기준으로 upsert한다.
  * 기동 헬스체크를 막지 않도록 ApplicationReadyEvent 이후 가상 스레드에서 실행한다.
  */
 @Slf4j
@@ -101,7 +102,8 @@ public class ProductFileSeeder {
     }
 
     private boolean upsert(SeedRow row) {
-        Optional<Product> existing = productRepository.findByName(row.name());
+        Optional<Product> existing = productRepository.findByNormalizedName(
+                ProductNameNormalizer.canonicalKey(row.name()));
         String imageUrl = resolveImageUrl(row, existing.orElse(null));
         if (existing.isPresent()) {
             existing.get().update(row.brand(), row.category(), imageUrl);

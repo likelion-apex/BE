@@ -1,6 +1,6 @@
 package domain.ingredient.service;
 
-import domain.cosmetic.client.OpenAiIngredientClient;
+import domain.inventory.ai.IngredientAiClient;
 import domain.ingredient.client.GradeAnalysisResult;
 import domain.ingredient.client.OpenAiGradeAnalysisClient;
 import domain.ingredient.dto.response.AiRoutineAnalysisResponse;
@@ -23,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AiAnalysisService {
 
     private final MemberRepository memberRepository;
-    private final OpenAiIngredientClient openAiIngredientClient;
+    private final IngredientAiClient ingredientAiClient;
     private final OpenAiGradeAnalysisClient gradeAnalysisClient;
 
     public AiRoutineAnalysisResponse analyze(Long memberId, String productName) {
@@ -34,7 +34,7 @@ public class AiAnalysisService {
                 .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
 
         String trimmedName = productName.trim();
-        List<String> ingredientNames = openAiIngredientClient.fetchIngredientNames(trimmedName);
+        List<String> ingredientNames = ingredientAiClient.fetchIngredientNames(trimmedName);
 
         GradeAnalysisResult result = gradeAnalysisClient.analyze(
                 trimmedName, ingredientNames, member.getSkinType(), member.getSkinConcerns());

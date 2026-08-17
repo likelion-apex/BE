@@ -4,7 +4,7 @@ import domain.cosmetic.cache.RegulationInfoCache;
 import domain.cosmetic.client.CsmtcsIngdCpntClient;
 import domain.cosmetic.client.IngredientInfo;
 import domain.cosmetic.client.KakaoImageClient;
-import domain.cosmetic.client.OpenAiIngredientClient;
+import domain.inventory.ai.IngredientAiClient;
 import domain.cosmetic.client.RegulationInfo;
 import domain.cosmetic.dto.CosmeticInfoRequestDto;
 import domain.cosmetic.dto.CosmeticInfoResponseDto;
@@ -25,7 +25,7 @@ public class CosmeticInfoService {
     private final KakaoImageClient kakaoImageClient;
     private final CsmtcsIngdCpntClient ingdCpntClient;
     private final RegulationInfoCache regulationInfoCache;
-    private final OpenAiIngredientClient openAiIngredientClient;
+    private final IngredientAiClient ingredientAiClient;
 
     public CosmeticInfoResponseDto getCosmeticInfo(CosmeticInfoRequestDto request) {
         String imageUrl = kakaoImageClient.searchImageUrl(request.getProductName());
@@ -33,7 +33,7 @@ public class CosmeticInfoService {
         boolean userProvidedIngredients = request.getIngredientNames() != null && !request.getIngredientNames().isEmpty();
         List<String> ingredientNames = userProvidedIngredients
                 ? request.getIngredientNames()
-                : openAiIngredientClient.fetchIngredientNames(request.getProductName());
+                : ingredientAiClient.fetchIngredientNames(request.getProductName());
         String ingredientSource = userProvidedIngredients ? SOURCE_USER_PROVIDED : SOURCE_AI_GENERATED;
 
         List<IngredientDetailDto> ingredients = ingredientNames.stream()
