@@ -8,6 +8,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -24,7 +25,10 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "products")
+@Table(
+        name = "products",
+        uniqueConstraints = @UniqueConstraint(name = "uk_products_normalized_name", columnNames = "normalized_name")
+)
 public class Product {
 
     @Id
@@ -33,6 +37,9 @@ public class Product {
 
     @Column(nullable = false)
     private String name;
+
+    @Column(name = "normalized_name", nullable = false, length = 255)
+    private String normalizedName;
 
     @Column
     private String brand;
@@ -54,6 +61,7 @@ public class Product {
     @Builder
     public Product(String name, String brand, ProductCategory category, String imageUrl) {
         this.name = name;
+        this.normalizedName = ProductNameNormalizer.canonicalKey(name);
         this.brand = brand;
         this.category = category;
         this.imageUrl = imageUrl;

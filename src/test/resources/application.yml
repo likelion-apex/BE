@@ -27,6 +27,11 @@ openai:
   model: gpt-4o-mini
   organization-id: ""
 
+gemini:
+  api-key: test-gemini-api-key
+  base-url: https://generativelanguage.googleapis.com
+  model: gemini-3.6-flash
+
 cors:
   allowed-origins: http://localhost:3000
 
@@ -34,3 +39,8 @@ product:
   seed:
     enabled: false
     kakao-delay-ms: 0
+
+inventory:
+  ai-cache-ttl: 30d
+  connect-timeout: 5s
+  read-timeout: 20s

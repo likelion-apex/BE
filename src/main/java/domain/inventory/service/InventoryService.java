@@ -1,9 +1,11 @@
 package domain.inventory.service;
 
-import domain.cosmetic.client.OpenAiIngredientClient;
 import domain.inventory.Inventory;
 import domain.inventory.InventoryRepository;
 import domain.inventory.Product;
+import domain.inventory.ai.IngredientAiClient;
+import domain.inventory.ai.InventoryAiCacheService;
+import domain.inventory.ai.PersonalizedAnalysisAiClient;
 import domain.inventory.client.OpenAiPersonalizedAnalysisClient;
 import domain.inventory.client.PersonalizedAnalysisResult;
 import domain.inventory.dto.request.InventoryCreateRequest;
@@ -19,12 +21,14 @@ import domain.member.MemberRepository;
 import global.exception.CustomException;
 import global.exception.ErrorCode;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.JsonNode;
 
 @Service
 @RequiredArgsConstructor
@@ -36,8 +40,9 @@ public class InventoryService {
     private final InventoryRepository inventoryRepository;
     private final MemberRepository memberRepository;
     private final ProductService productService;
-    private final OpenAiIngredientClient openAiIngredientClient;
-    private final OpenAiPersonalizedAnalysisClient personalizedAnalysisClient;
+    private final IngredientAiClient ingredientAiClient;
+    private final PersonalizedAnalysisAiClient personalizedAnalysisAiClient;
+    private final InventoryAiCacheService inventoryAiCacheService;
 
     @Transactional(readOnly = true)
     public FavoriteInventoryResponse getFavorites(Long memberId, Integer limit) {
@@ -83,32 +88,90 @@ public class InventoryService {
         Inventory inventory = findOwnedInventory(memberId, inventoryId);
         Member member = findMember(memberId);
         String productName = inventory.getProduct().getName();
-        List<String> ingredientNames = openAiIngredientClient.fetchIngredientNames(productName);
+        String cacheKey = InventoryAiCacheService.personalizedKey(
+                productName, member.getSkinType(), member.getSkinConcerns());
+        PersonalizedAnalysisResult cached = inventoryAiCacheService.find(cacheKey)
+                .map(OpenAiPersonalizedAnalysisClient::parseResult)
+                .orElse(null);
+        if (cached != null) {
+            return toAiResponse(inventory.getId(), productName, cached);
+        }
 
-        PersonalizedAnalysisResult result = personalizedAnalysisClient.analyze(
+        List<String> ingredientNames = ingredientAiClient.fetchIngredientNames(productName);
+        PersonalizedAnalysisResult result = personalizedAnalysisAiClient.analyze(
                 productName, ingredientNames, member.getSkinType(), member.getSkinConcerns());
         if (result == null) {
             throw new CustomException(ErrorCode.AI_ANALYSIS_FAILED);
         }
-
-        List<AiAnalysisResponse.AnalysisKeyword> keywords = result.keywords().stream()
-                .map(keyword -> new AiAnalysisResponse.AnalysisKeyword(keyword.keyword(), keyword.reason()))
-                .toList();
-        return new AiAnalysisResponse(inventory.getId(), productName, result.score(), keywords, LocalDateTime.now());
+        inventoryAiCacheService.save(cacheKey, Map.of(
+                "score", result.score(),
+                "keywords", result.keywords().stream()
+                        .map(keyword -> Map.of(
+                                "keyword", keyword.keyword(),
+                                "reason", keyword.reason() == null ? "" : keyword.reason()))
+                        .toList()));
+        return toAiResponse(inventory.getId(), productName, result);
     }
 
     @Transactional(readOnly = true)
     public IngredientAnalysisResponse getIngredientAnalysis(Long memberId, Long inventoryId) {
         Inventory inventory = findOwnedInventory(memberId, inventoryId);
         String productName = inventory.getProduct().getName();
-        List<String> ingredientNames = openAiIngredientClient.fetchIngredientNames(productName);
-        Map<String, List<String>> purposesByName = openAiIngredientClient.fetchIngredientPurposes(ingredientNames);
+        String cacheKey = InventoryAiCacheService.ingredientKey(productName);
+        List<IngredientAnalysisResponse.IngredientPurpose> cached = inventoryAiCacheService.find(cacheKey)
+                .map(this::ingredientsFromCache)
+                .orElse(null);
+        if (cached != null) {
+            return new IngredientAnalysisResponse(inventory.getId(), productName, cached);
+        }
 
+        List<String> ingredientNames = ingredientAiClient.fetchIngredientNames(productName);
+        Map<String, List<String>> purposesByName = ingredientAiClient.fetchIngredientPurposes(ingredientNames);
         List<IngredientAnalysisResponse.IngredientPurpose> ingredients = ingredientNames.stream()
                 .map(name -> new IngredientAnalysisResponse.IngredientPurpose(
                         name, purposesByName.getOrDefault(name, List.of())))
                 .toList();
+        if (!ingredients.isEmpty()) {
+            inventoryAiCacheService.save(cacheKey, Map.of("ingredients", ingredients.stream()
+                    .map(item -> Map.of(
+                            "ingredientName", item.ingredientName(),
+                            "purposes", item.purposes()))
+                    .toList()));
+        }
         return new IngredientAnalysisResponse(inventory.getId(), productName, ingredients);
+    }
+
+    private AiAnalysisResponse toAiResponse(Long inventoryId, String productName, PersonalizedAnalysisResult result) {
+        List<AiAnalysisResponse.AnalysisKeyword> keywords = result.keywords().stream()
+                .map(keyword -> new AiAnalysisResponse.AnalysisKeyword(keyword.keyword(), keyword.reason()))
+                .toList();
+        return new AiAnalysisResponse(inventoryId, productName, result.score(), keywords, LocalDateTime.now());
+    }
+
+    private List<IngredientAnalysisResponse.IngredientPurpose> ingredientsFromCache(JsonNode payload) {
+        JsonNode ingredientsNode = payload.path("ingredients");
+        if (!ingredientsNode.isArray() || ingredientsNode.isEmpty()) {
+            return null;
+        }
+        List<IngredientAnalysisResponse.IngredientPurpose> ingredients = new ArrayList<>();
+        ingredientsNode.forEach(node -> {
+            String name = node.path("ingredientName").asText(null);
+            if (name == null || name.isBlank()) {
+                return;
+            }
+            List<String> purposes = new ArrayList<>();
+            JsonNode purposesNode = node.path("purposes");
+            if (purposesNode.isArray()) {
+                purposesNode.forEach(purpose -> {
+                    String value = purpose.asText(null);
+                    if (value != null && !value.isBlank()) {
+                        purposes.add(value);
+                    }
+                });
+            }
+            ingredients.add(new IngredientAnalysisResponse.IngredientPurpose(name, purposes));
+        });
+        return ingredients.isEmpty() ? null : ingredients;
     }
 
     private Inventory findOwnedInventory(Long memberId, Long inventoryId) {

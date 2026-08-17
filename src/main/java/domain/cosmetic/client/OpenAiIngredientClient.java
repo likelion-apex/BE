@@ -1,30 +1,30 @@
 package domain.cosmetic.client;
 
+import domain.inventory.ai.AiProviderUnavailableException;
+import domain.inventory.ai.InventoryAiJsonSupport;
+import java.util.List;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-
 /**
  * 제품명으로 ChatGPT(OpenAI Chat Completions) API를 호출해 전성분 목록을 받아온다.
- * 공식 식약처 오픈API 중에는 "제품명 -> 전성분"을 제공하는 API가 없어 도입한 보조 수단으로,
- * 모델의 학습 데이터에 기반한 추정치이므로 실제 라벨과 다를 수 있다.
+ * 할당량 소진·타임아웃 등은 {@link AiProviderUnavailableException}으로 올려 호출측이 Gemini로 넘긴다.
  */
 @Slf4j
 @Component
 public class OpenAiIngredientClient {
 
-    private static final String SYSTEM_PROMPT = """
+    public static final String SYSTEM_PROMPT = """
             당신은 화장품 전성분 정보를 알려주는 어시스턴트입니다.
             사용자가 알려준 화장품 제품명에 대해 실제 제품 라벨에 기재되는 전성분(포함된 모든 성분)을
             한국어 표준 성분명으로, 배합량이 많은 순서대로 나열하세요.
@@ -32,7 +32,7 @@ public class OpenAiIngredientClient {
             반드시 아래 JSON 형식으로만 답변하세요: {"ingredients": ["성분1", "성분2"]}
             """;
 
-    private static final String PURPOSE_SYSTEM_PROMPT = """
+    public static final String PURPOSE_SYSTEM_PROMPT = """
             당신은 화장품 성분의 배합목적(용도)을 알려주는 어시스턴트입니다.
             사용자가 알려준 성분 목록 각각에 대해 화장품 원료로서의 배합목적을 1~3개씩 한국어로 나열하세요
             (예: "피부 보습", "피부 컨디셔닝", "기제(용매)", "피부 진정").
@@ -49,99 +49,40 @@ public class OpenAiIngredientClient {
 
     public OpenAiIngredientClient(
             @Value("${openai.api-key}") String apiKey,
-            @Value("${openai.api-url}") String apiUrl,
             @Value("${openai.model}") String model,
             @Value("${openai.organization-id:}") String organizationId,
+            @Qualifier("inventoryOpenAiRestClient") RestClient restClient,
             ObjectMapper objectMapper) {
         this.apiKey = apiKey;
         this.model = model;
         this.organizationId = organizationId;
         this.objectMapper = objectMapper;
-        this.restClient = RestClient.builder().baseUrl(apiUrl).build();
+        this.restClient = restClient;
     }
 
     public List<String> fetchIngredientNames(String productName) {
-        if (apiKey == null || apiKey.isBlank() || productName == null || productName.isBlank()) {
+        if (productName == null || productName.isBlank()) {
             return List.of();
         }
-        try {
-            Map<String, Object> requestBody = Map.of(
-                    "model", model,
-                    "temperature", 0,
-                    "response_format", Map.of("type", "json_object"),
-                    "messages", List.of(
-                            Map.of("role", "system", "content", SYSTEM_PROMPT),
-                            Map.of("role", "user", "content", "제품명: " + productName)
-                    )
-            );
-
-            JsonNode response = restClient.post()
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
-                    .headers(headers -> {
-                        if (organizationId != null && !organizationId.isBlank()) {
-                            headers.set("OpenAI-Organization", organizationId);
-                        }
-                    })
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(requestBody)
-                    .retrieve()
-                    .body(JsonNode.class);
-
-            return parseIngredients(response, productName);
-        } catch (RestClientException e) {
-            log.warn("ChatGPT 전성분 조회 실패: productName={}, message={}", productName, e.getMessage());
-            return List.of();
-        }
+        JsonNode payload = completeJson(SYSTEM_PROMPT, "제품명: " + productName, "전성분 조회", productName);
+        return InventoryAiJsonSupport.parseIngredientNames(payload);
     }
 
-    private List<String> parseIngredients(JsonNode response, String productName) {
-        if (response == null) {
-            return List.of();
-        }
-        String content = response.path("choices").path(0).path("message").path("content").asText(null);
-        if (content == null || content.isBlank()) {
-            return List.of();
-        }
-        try {
-            JsonNode parsed = objectMapper.readTree(content);
-            JsonNode ingredientsNode = parsed.path("ingredients");
-            if (!ingredientsNode.isArray()) {
-                return List.of();
-            }
-            List<String> ingredients = new ArrayList<>();
-            ingredientsNode.forEach(node -> {
-                String name = node.asText(null);
-                if (name != null && !name.isBlank()) {
-                    ingredients.add(name.trim());
-                }
-            });
-            return ingredients;
-        } catch (Exception e) {
-            log.warn("ChatGPT 전성분 응답 파싱 실패: productName={}, content={}", productName, content);
-            return List.of();
-        }
-    }
-
-    /**
-     * 성분명 목록을 받아 각 성분의 배합목적(용도) 목록을 조회한다.
-     * 결과는 요청 순서를 보존한 Map(성분명 -> 배합목적 목록)으로 반환하며, 실패하거나
-     * 응답에 없는 성분은 결과에 포함되지 않는다.
-     */
     public Map<String, List<String>> fetchIngredientPurposes(List<String> ingredientNames) {
-        if (apiKey == null || apiKey.isBlank() || ingredientNames == null || ingredientNames.isEmpty()) {
+        if (ingredientNames == null || ingredientNames.isEmpty()) {
             return Map.of();
         }
-        try {
-            Map<String, Object> requestBody = Map.of(
-                    "model", model,
-                    "temperature", 0,
-                    "response_format", Map.of("type", "json_object"),
-                    "messages", List.of(
-                            Map.of("role", "system", "content", PURPOSE_SYSTEM_PROMPT),
-                            Map.of("role", "user", "content", "성분 목록: " + String.join(", ", ingredientNames))
-                    )
-            );
+        JsonNode payload = completeJson(
+                PURPOSE_SYSTEM_PROMPT,
+                "성분 목록: " + String.join(", ", ingredientNames),
+                "배합목적 조회",
+                String.join(",", ingredientNames));
+        return InventoryAiJsonSupport.parsePurposes(payload);
+    }
 
+    private JsonNode completeJson(String systemPrompt, String userPrompt, String action, String context) {
+        requireApiKey();
+        try {
             JsonNode response = restClient.post()
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
                     .headers(headers -> {
@@ -150,53 +91,48 @@ public class OpenAiIngredientClient {
                         }
                     })
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(requestBody)
+                    .body(Map.of(
+                            "model", model,
+                            "temperature", 0,
+                            "response_format", Map.of("type", "json_object"),
+                            "messages", List.of(
+                                    Map.of("role", "system", "content", systemPrompt),
+                                    Map.of("role", "user", "content", userPrompt)
+                            )
+                    ))
                     .retrieve()
                     .body(JsonNode.class);
-
-            return parsePurposes(response, ingredientNames);
+            String content = response == null
+                    ? null
+                    : response.path("choices").path(0).path("message").path("content").asText(null);
+            JsonNode parsed = InventoryAiJsonSupport.readObject(objectMapper, content);
+            if (parsed == null || !parsed.isObject()) {
+                throw new AiProviderUnavailableException("OpenAI " + action + " 응답이 비어 있습니다.");
+            }
+            return parsed;
+        } catch (AiProviderUnavailableException e) {
+            throw e;
         } catch (RestClientException e) {
-            log.warn("ChatGPT 배합목적 조회 실패: ingredientNames={}, message={}", ingredientNames, e.getMessage());
-            return Map.of();
+            log.warn("ChatGPT {} 실패: context={}, message={}", action, context, e.getMessage());
+            throw unavailable(e);
+        } catch (RuntimeException e) {
+            log.warn("ChatGPT {} 파싱 실패: context={}", action, context);
+            throw new AiProviderUnavailableException("OpenAI " + action + " 응답을 해석할 수 없습니다.", e);
         }
     }
 
-    private Map<String, List<String>> parsePurposes(JsonNode response, List<String> ingredientNames) {
-        if (response == null) {
-            return Map.of();
+    private void requireApiKey() {
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new AiProviderUnavailableException("OPENAI_API_KEY가 없습니다.");
         }
-        String content = response.path("choices").path(0).path("message").path("content").asText(null);
-        if (content == null || content.isBlank()) {
-            return Map.of();
+    }
+
+    private AiProviderUnavailableException unavailable(RestClientException exception) {
+        if (exception instanceof RestClientResponseException responseException
+                && responseException.getStatusCode().is4xxClientError()
+                && responseException.getStatusCode().value() != 429) {
+            return new AiProviderUnavailableException("OpenAI 요청이 거부되었습니다.", exception);
         }
-        try {
-            JsonNode parsed = objectMapper.readTree(content);
-            JsonNode ingredientsNode = parsed.path("ingredients");
-            if (!ingredientsNode.isArray()) {
-                return Map.of();
-            }
-            Map<String, List<String>> result = new LinkedHashMap<>();
-            ingredientsNode.forEach(node -> {
-                String name = node.path("name").asText(null);
-                if (name == null || name.isBlank()) {
-                    return;
-                }
-                List<String> purposes = new ArrayList<>();
-                JsonNode purposesNode = node.path("purposes");
-                if (purposesNode.isArray()) {
-                    purposesNode.forEach(purposeNode -> {
-                        String value = purposeNode.asText(null);
-                        if (value != null && !value.isBlank()) {
-                            purposes.add(value.trim());
-                        }
-                    });
-                }
-                result.put(name.trim(), purposes);
-            });
-            return result;
-        } catch (Exception e) {
-            log.warn("ChatGPT 배합목적 응답 파싱 실패: ingredientNames={}, content={}", ingredientNames, content);
-            return Map.of();
-        }
+        return new AiProviderUnavailableException("OpenAI 호출에 실패했습니다.", exception);
     }
 }
