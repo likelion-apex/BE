@@ -45,7 +45,6 @@ public class ShortformAnalysisStateService {
         }
         return new AnalysisProfile(
                 member.getId(),
-                member.getNickname(),
                 member.getSkinType().getLabel(),
                 member.getSkinConcerns().stream().map(concern -> concern.getLabel()).sorted().toList(),
                 inventoryRepository.findAllByMemberIdOrderByCreatedAtDesc(memberId)
@@ -89,7 +88,6 @@ public class ShortformAnalysisStateService {
                 analysis.getId(),
                 analysis.getVideoId(),
                 analysis.getYoutubeUrl(),
-                member.getNickname(),
                 member.getSkinType() == null ? null : member.getSkinType().getLabel(),
                 member.getSkinConcerns().stream().map(concern -> concern.getLabel()).sorted().toList(),
                 inventoryRepository.findAllByMemberIdOrderByCreatedAtDesc(member.getId())
@@ -196,7 +194,6 @@ public class ShortformAnalysisStateService {
 
     public record AnalysisProfile(
             Long memberId,
-            String nickname,
             String skinType,
             List<String> skinConcerns,
             List<InventoryFact> inventory
@@ -207,7 +204,6 @@ public class ShortformAnalysisStateService {
             Long analysisId,
             String videoId,
             String youtubeUrl,
-            String nickname,
             String skinType,
             List<String> skinConcerns,
             List<InventoryFact> inventory

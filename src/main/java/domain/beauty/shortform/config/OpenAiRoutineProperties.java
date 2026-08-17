@@ -12,7 +12,7 @@ public class OpenAiRoutineProperties {
     private URI productApiUrl = URI.create("https://api.openai.com/v1/responses");
     private String organizationId = "";
     private String routineModel = "gpt-4o-mini";
-    private String routinePromptVersion = "3.0";
+    private String routinePromptVersion = "3.1";
     private String productModel = "gpt-5.6-luna";
     private String productFallbackModel = "gpt-5.4-mini";
     private String productReasoningEffort = "low";

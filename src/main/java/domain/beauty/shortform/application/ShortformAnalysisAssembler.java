@@ -14,6 +14,7 @@ import domain.beauty.shortform.domain.IngredientDataStatus;
 import domain.beauty.shortform.domain.IngredientRiskLevel;
 import domain.beauty.shortform.domain.IngredientVerificationStatus;
 import domain.beauty.shortform.domain.OptimizationStatus;
+import domain.beauty.shortform.domain.ProductResolutionStatus;
 import domain.beauty.shortform.domain.RoutineOptimizationSnapshot;
 import domain.beauty.shortform.domain.RoutineOptimizationSnapshot.OptimizedStep;
 import domain.beauty.shortform.domain.SafetyLevel;
@@ -49,6 +50,8 @@ public class ShortformAnalysisAssembler {
     private static final Set<String> INTERNAL_COPY_MARKERS = Set.of(
             "AI가", "AI는", "AI의", "AI 분석", "추정", "식별", "대표 처방", "서버", "모델", "확신도",
             "NORMALIZED", "ESTIMATED");
+    private static final Set<String> OWNERSHIP_COPY_MARKERS = Set.of(
+            "님", "내 루틴", "내 피부", "나의", "저의", "사용자", "회원", "고객");
 
     private final RegulationInfoCache regulationInfoCache;
     private final OpenAiRoutineProperties openAiProperties;
@@ -68,7 +71,7 @@ public class ShortformAnalysisAssembler {
     ) {
         return new RoutinePersonalizationInput(
                 new RoutinePersonalizationInput.MemberProfile(
-                        context.nickname(), context.skinType(), context.skinConcerns()),
+                        context.skinType(), context.skinConcerns()),
                 new RoutinePersonalizationInput.VideoContext(
                         context.videoId(), extraction.summary(), safe(extraction.warnings())),
                 matchedSteps.stream().map(step -> new RoutinePersonalizationInput.VideoStep(
@@ -123,12 +126,13 @@ public class ShortformAnalysisAssembler {
         int overallScore = steps.isEmpty()
                 ? 0
                 : (int) Math.round(steps.stream().mapToInt(StepResult::matchScore).average().orElse(0));
+        String coreGoal = userCopy(ai.coreGoal(), "피부 컨디션에 맞춘 단계별 관리");
 
         ShortformAnalysisSnapshot snapshot = new ShortformAnalysisSnapshot(
                 "3.0",
                 context.videoId(),
                 context.youtubeUrl(),
-                userCopy(ai.title(), "나를 위한 스킨케어 루틴"),
+                routineTitle(ai.title(), coreGoal, steps),
                 userCopy(ai.tag(), context.skinType() + " 맞춤"),
                 overallScore,
                 safe(ai.highlights()).stream()
@@ -136,9 +140,9 @@ public class ShortformAnalysisAssembler {
                         .distinct()
                         .limit(2)
                         .toList(),
-                userCopy(ai.coreGoal(), "피부 컨디션에 맞춘 단계별 관리"),
+                coreGoal,
                 userCopy(ai.synergyCombo(), "영상 속 제품 조합"),
-                userCopy(ai.summary(), "영상 속 스킨케어 단계를 피부 프로필에 맞춰 분석했습니다."),
+                routineSummary(ai.summary(), steps),
                 mergeWarnings(ai.warnings()),
                 DISCLAIMER,
                 steps,
@@ -572,6 +576,143 @@ public class ShortformAnalysisAssembler {
         return warnings.stream().filter(Objects::nonNull).filter(value -> !value.isBlank()).distinct().toList();
     }
 
+    private String routineTitle(String value, String coreGoal, List<StepResult> steps) {
+        String normalized = textOr(value, "");
+        if (isRoutineOverviewCopy(normalized)
+                && !containsIgnoreCase(normalized, "분석")
+                && normalized.length() <= 40) {
+            return normalized;
+        }
+
+        String goal = textOr(coreGoal, "").replaceAll("[.!?]+$", "").trim();
+        if (isRoutineOverviewCopy(goal) && !containsIgnoreCase(goal, "분석")) {
+            String candidate = goal.endsWith("루틴") ? goal : goal + " 루틴";
+            if (candidate.length() <= 40) {
+                return candidate;
+            }
+        }
+
+        String benefitTitle = steps.stream()
+                .flatMap(step -> safe(step.keyBenefits()).stream())
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(benefit -> !benefit.isBlank())
+                .distinct()
+                .limit(2)
+                .reduce((left, right) -> left + "·" + right)
+                .map(benefits -> benefits + " 루틴")
+                .filter(candidate -> candidate.length() <= 40)
+                .orElse("");
+        return benefitTitle.isBlank() ? "영상 속 스킨케어 루틴" : benefitTitle;
+    }
+
+    private String routineSummary(String value, List<StepResult> steps) {
+        String normalized = textOr(value, "");
+        if (isRoutineOverviewCopy(normalized) && referencesKnownDetail(normalized, steps)) {
+            return normalized;
+        }
+        return fallbackRoutineSummary(steps);
+    }
+
+    private boolean referencesKnownDetail(String value, List<StepResult> steps) {
+        for (StepResult step : steps) {
+            String productName = concreteProductName(step);
+            if (containsIgnoreCase(value, productName)) {
+                return true;
+            }
+            if (safe(step.ingredients()).stream()
+                    .map(IngredientDetail::name)
+                    .anyMatch(ingredient -> containsIgnoreCase(value, ingredient))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String fallbackRoutineSummary(List<StepResult> steps) {
+        List<SummaryExample> examples = new ArrayList<>();
+        for (StepResult step : steps) {
+            String reference = concreteProductName(step);
+            if (reference == null || examples.stream().anyMatch(example -> example.reference().equals(reference))) {
+                continue;
+            }
+            String benefit = safe(step.keyBenefits()).stream()
+                    .filter(Objects::nonNull)
+                    .map(String::trim)
+                    .filter(value -> !value.isBlank())
+                    .findFirst()
+                    .orElse("피부 컨디션 관리");
+            examples.add(new SummaryExample(benefit, reference));
+            if (examples.size() == 2) {
+                break;
+            }
+        }
+
+        String summary;
+        if (examples.size() == 2) {
+            SummaryExample first = examples.get(0);
+            SummaryExample second = examples.get(1);
+            summary = "%s(%s), %s(%s) 중심의 %d단계 영상 루틴입니다."
+                    .formatted(
+                            first.benefit(), first.reference(),
+                            second.benefit(), second.reference(),
+                            steps.size());
+        } else if (examples.size() == 1) {
+            SummaryExample example = examples.get(0);
+            summary = "%s(%s) 중심의 %d단계 영상 루틴입니다."
+                    .formatted(example.benefit(), example.reference(), steps.size());
+        } else if (!steps.isEmpty()) {
+            String category = textOr(steps.get(0).category(), "스킨케어");
+            summary = "%s 단계를 포함해 사용 순서대로 구성한 %d단계 영상 루틴입니다."
+                    .formatted(category, steps.size());
+        } else {
+            summary = "영상 속 스킨케어 단계의 목적과 사용 순서를 정리한 루틴입니다.";
+        }
+
+        StepResult cautionStep = steps.stream()
+                .filter(step -> step.primaryAssessmentCategory() == AssessmentCategory.CAUTION
+                        || step.primaryAssessmentCategory() == AssessmentCategory.WARNING)
+                .findFirst()
+                .orElse(null);
+        if (cautionStep == null) {
+            return summary;
+        }
+
+        String cautionReference = textOr(
+                concreteProductName(cautionStep),
+                textOr(cautionStep.category(), "해당 제품"));
+        IngredientDetail cautionIngredient = safe(cautionStep.ingredients()).stream()
+                .filter(ingredient -> ingredient.riskLevel() == IngredientRiskLevel.HIGH
+                        || ingredient.riskLevel() == IngredientRiskLevel.MODERATE
+                        || ingredient.caution20()
+                        || ingredient.allergen())
+                .findFirst()
+                .orElse(null);
+        if (cautionIngredient != null) {
+            return summary + " 다만, %s의 %s 성분은 피부 반응을 살피며 사용량과 빈도를 조절해 주세요."
+                    .formatted(cautionReference, cautionIngredient.name());
+        }
+        return summary + " 다만, %s 단계는 피부 반응을 살피며 적은 양부터 사용해 주세요."
+                .formatted(cautionReference);
+    }
+
+    private String concreteProductName(StepResult step) {
+        if (step.productResolutionStatus() == ProductResolutionStatus.UNRESOLVED) {
+            return null;
+        }
+        if (step.displayProductName() != null && !step.displayProductName().isBlank()) {
+            return step.displayProductName().trim();
+        }
+        return step.productName() == null || step.productName().isBlank() ? null : step.productName().trim();
+    }
+
+    private boolean isRoutineOverviewCopy(String value) {
+        return value != null
+                && !value.isBlank()
+                && isUserCopy(value)
+                && OWNERSHIP_COPY_MARKERS.stream().noneMatch(marker -> containsIgnoreCase(value, marker));
+    }
+
     private int clamp(int score, int minimum, int maximum) {
         return Math.max(minimum, Math.min(maximum, score));
     }
@@ -604,5 +745,8 @@ public class ShortformAnalysisAssembler {
             ShortformAnalysisSnapshot analysis,
             RoutineOptimizationSnapshot optimization
     ) {
+    }
+
+    private record SummaryExample(String benefit, String reference) {
     }
 }

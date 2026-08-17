@@ -3,12 +3,22 @@
   "additionalProperties": false,
   "required": ["title", "tag", "highlights", "coreGoal", "synergyCombo", "summary", "warnings", "steps", "inventoryRecommendations"],
   "properties": {
-    "title": {"type": "string", "minLength": 1, "maxLength": 40},
+    "title": {
+      "type": "string",
+      "description": "사람 이름이나 소유 표현 없이 영상 루틴의 핵심 목적을 요약한 짧은 제목. 예: 속건조 타파 루틴",
+      "minLength": 1,
+      "maxLength": 40
+    },
     "tag": {"type": "string", "minLength": 1, "maxLength": 30},
     "highlights": {"type": "array", "minItems": 1, "maxItems": 2, "items": {"type": "string", "maxLength": 80}},
     "coreGoal": {"type": "string", "minLength": 1, "maxLength": 80},
     "synergyCombo": {"type": "string", "minLength": 1, "maxLength": 80},
-    "summary": {"type": "string", "minLength": 1, "maxLength": 500},
+    "summary": {
+      "type": "string",
+      "description": "입력에 실제로 있는 제품명 또는 성분명 1~2개를 효능과 연결하고 필요한 주의점을 설명한 영상 루틴 요약",
+      "minLength": 1,
+      "maxLength": 500
+    },
     "warnings": {"type": "array", "maxItems": 6, "items": {"type": "string", "maxLength": 160}},
     "steps": {
       "type": "array",
