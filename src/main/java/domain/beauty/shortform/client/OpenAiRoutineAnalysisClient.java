@@ -51,7 +51,7 @@ public class OpenAiRoutineAnalysisClient {
         try {
             return analyzeWithOpenAi(input);
         } catch (CustomException openAiFailure) {
-            if (!fallbackProperties.isGeminiEnabled()) {
+            if (!shouldFallbackToGemini(openAiFailure)) {
                 throw openAiFailure;
             }
             log.warn("OpenAI 개인화 분석 실패 후 Gemini로 전환합니다: reason={}",
@@ -143,7 +143,9 @@ public class OpenAiRoutineAnalysisClient {
 
     private JsonNode execute(Map<String, Object> body) {
         RestClientException lastFailure = null;
-        int maxAttempts = fallbackProperties.isGeminiEnabled() ? 1 : 3;
+        int maxAttempts = fallbackProperties.isGeminiEnabled()
+                ? Math.max(1, fallbackProperties.getOpenAiAttemptsBeforeGemini())
+                : 3;
         for (int attempt = 0; attempt < maxAttempts; attempt++) {
             try {
                 JsonNode response = restClient.post()
@@ -165,7 +167,7 @@ public class OpenAiRoutineAnalysisClient {
                 log.warn("OpenAI 개인화 분석 HTTP 실패: status={}, model={}, attempt={}",
                         exception.getStatusCode().value(), properties.getRoutineModel(), attempt + 1);
                 if (exception.getStatusCode().value() != 429 && !exception.getStatusCode().is5xxServerError()) {
-                    break;
+                    throw nonRetryableFailure(exception);
                 }
             } catch (RestClientException exception) {
                 lastFailure = exception;
@@ -180,6 +182,22 @@ public class OpenAiRoutineAnalysisClient {
                 ErrorCode.SHORTFORM_EXTERNAL_API_UNAVAILABLE,
                 lastFailure == null ? "OpenAI 분석 요청에 실패했습니다." : "OpenAI 분석 서비스를 일시적으로 사용할 수 없습니다."
         );
+    }
+
+    private boolean shouldFallbackToGemini(CustomException failure) {
+        return fallbackProperties.isGeminiEnabled()
+                && failure.getErrorCode() == ErrorCode.SHORTFORM_EXTERNAL_API_UNAVAILABLE;
+    }
+
+    private CustomException nonRetryableFailure(RestClientResponseException failure) {
+        if (failure.getStatusCode().value() == 401 || failure.getStatusCode().value() == 403) {
+            return new CustomException(
+                    ErrorCode.SHORTFORM_CONFIGURATION_MISSING,
+                    "OpenAI API 키 또는 프로젝트 권한을 확인해 주세요.");
+        }
+        return new CustomException(
+                ErrorCode.SHORTFORM_INVALID_AI_RESPONSE,
+                "OpenAI 요청이 거부되었습니다. HTTP " + failure.getStatusCode().value());
     }
 
     private boolean waitBeforeRetry(int attempt, int maxAttempts) {

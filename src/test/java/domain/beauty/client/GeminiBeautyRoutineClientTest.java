@@ -130,21 +130,21 @@ class GeminiBeautyRoutineClientTest {
 			{"schemaVersion":"1.0","analysisStatus":"COMPLETE","routineType":"SKINCARE","summary":"토너 루틴","steps":[{"order":1,"startTime":"00:01","endTime":"00:03","applicationArea":"얼굴","action":"토너를 바릅니다.","technique":"손으로 바릅니다.","purpose":"정돈","purposeBasis":"GENERAL_INFERENCE","applicator":null,"identificationLevel":"CATEGORY_ONLY","category":"토너","brand":null,"productName":null,"variant":null,"identityEvidenceText":null,"observedColor":null,"evidenceSources":["VISUAL_USAGE"],"evidenceSummary":"사용 장면","confidence":0.8}],"warnings":[]}
 			""";
 		String envelope = objectMapper.writeValueAsString(Map.of(
-			"model", "gemini-3.5-flash",
+			"model", "gemini-3.7-flash",
 			"status", "completed",
 			"steps", List.of(Map.of("type", "model_output", "content", List.of(
 				Map.of("type", "text", "text", emptyRoutine))))));
 		server.expect(requestTo("https://generativelanguage.googleapis.com/v1beta/interactions"))
 			.andExpect(request -> assertThat(
 				((org.springframework.mock.http.client.MockClientHttpRequest) request).getBodyAsString())
-				.contains("gemini-3.5-flash"))
+					.contains("gemini-3.7-flash"))
 			.andRespond(withSuccess(envelope, MediaType.APPLICATION_JSON));
 
 		BeautyRoutineAnalysisResult result = client.analyze(
 			new NormalizedYouTubeVideo("-PC1SkLxtvo", "https://www.youtube.com/watch?v=-PC1SkLxtvo")
 		);
 
-		assertThat(result.model()).isEqualTo("gemini-3.5-flash");
+		assertThat(result.model()).isEqualTo("gemini-3.7-flash");
 		server.verify();
 	}
 }

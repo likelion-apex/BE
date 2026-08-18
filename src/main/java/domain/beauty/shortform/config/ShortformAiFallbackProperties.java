@@ -8,8 +8,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class ShortformAiFallbackProperties {
 
     private boolean geminiEnabled = true;
+    private boolean geminiModelRoutingEnabled = true;
+    private int openAiAttemptsBeforeGemini = 2;
     private int geminiMaxOutputTokens = 6_000;
     private List<String> geminiVideoModels = List.of(
+            "gemini-3.7-flash",
             "gemini-3.5-flash",
             "gemini-3.5-flash-lite",
             "gemini-3.1-flash-lite",
@@ -19,14 +22,16 @@ public class ShortformAiFallbackProperties {
             "gemini-3.1-flash-lite",
             "gemini-3.5-flash",
             "gemini-3.6-flash",
+            "gemini-3.7-flash",
             "gemini-3-flash-preview");
     private List<String> geminiProductModels = List.of(
             "gemini-3.5-flash",
             "gemini-3.5-flash-lite",
             "gemini-3.1-flash-lite",
             "gemini-3.6-flash",
+            "gemini-3.7-flash",
             "gemini-3-flash-preview");
-    private Duration geminiMaxRetryDelay = Duration.ofSeconds(60);
+    private Duration geminiMaxRoutingDuration = Duration.ofMinutes(3);
     private Duration geminiDefaultRateLimitDelay = Duration.ofSeconds(30);
     private Duration geminiDefaultTransientDelay = Duration.ofSeconds(2);
 
@@ -36,6 +41,22 @@ public class ShortformAiFallbackProperties {
 
     public void setGeminiEnabled(boolean geminiEnabled) {
         this.geminiEnabled = geminiEnabled;
+    }
+
+    public boolean isGeminiModelRoutingEnabled() {
+        return geminiModelRoutingEnabled;
+    }
+
+    public void setGeminiModelRoutingEnabled(boolean geminiModelRoutingEnabled) {
+        this.geminiModelRoutingEnabled = geminiModelRoutingEnabled;
+    }
+
+    public int getOpenAiAttemptsBeforeGemini() {
+        return openAiAttemptsBeforeGemini;
+    }
+
+    public void setOpenAiAttemptsBeforeGemini(int openAiAttemptsBeforeGemini) {
+        this.openAiAttemptsBeforeGemini = openAiAttemptsBeforeGemini;
     }
 
     public int getGeminiMaxOutputTokens() {
@@ -70,12 +91,12 @@ public class ShortformAiFallbackProperties {
         this.geminiProductModels = geminiProductModels;
     }
 
-    public Duration getGeminiMaxRetryDelay() {
-        return geminiMaxRetryDelay;
+    public Duration getGeminiMaxRoutingDuration() {
+        return geminiMaxRoutingDuration;
     }
 
-    public void setGeminiMaxRetryDelay(Duration geminiMaxRetryDelay) {
-        this.geminiMaxRetryDelay = geminiMaxRetryDelay;
+    public void setGeminiMaxRoutingDuration(Duration geminiMaxRoutingDuration) {
+        this.geminiMaxRoutingDuration = geminiMaxRoutingDuration;
     }
 
     public Duration getGeminiDefaultRateLimitDelay() {

@@ -15,6 +15,7 @@ import domain.beauty.shortform.domain.IngredientVerificationStatus;
 import domain.beauty.shortform.domain.ShortformProductEnrichment;
 import domain.beauty.shortform.domain.ShortformProductEnrichmentRepository;
 import global.exception.CustomException;
+import global.exception.ErrorCode;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
@@ -112,6 +113,9 @@ public class ShortformProductEnrichmentService {
         try {
             primary = openAiClient.enrich(toInput(misses, false));
         } catch (CustomException exception) {
+            if (exception.getErrorCode() != ErrorCode.SHORTFORM_EXTERNAL_API_UNAVAILABLE) {
+                throw exception;
+            }
             if (!properties.isProductFallbackEnabled() && !enrichmentProperties.isGeminiFallbackEnabled()) {
                 throw exception;
             }

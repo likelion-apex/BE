@@ -16,9 +16,11 @@ MFDS_SERVICE_KEY=...
 KAKAO_IMAGE_SEARCH_KEY=... # 선택
 SHORTFORM_PRODUCT_CACHE_ENABLED=true # false면 제품·전성분 캐시 조회/저장 모두 우회
 SHORTFORM_GEMINI_FALLBACK_ENABLED=true # 숏폼 OpenAI 장애 및 미확인 제품의 Gemini 폴백
-SHORTFORM_GEMINI_VIDEO_MODELS=gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3-flash-preview
-SHORTFORM_GEMINI_TEXT_MODELS=gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.5-flash,gemini-3.6-flash,gemini-3-flash-preview
-SHORTFORM_GEMINI_PRODUCT_MODELS=gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.6-flash,gemini-3-flash-preview
+SHORTFORM_GEMINI_MODEL_ROUTING_ENABLED=true # false면 GEMINI_MODEL 하나만 사용
+SHORTFORM_OPENAI_ATTEMPTS_BEFORE_GEMINI=2
+SHORTFORM_GEMINI_VIDEO_MODELS=gemini-3.7-flash,gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3-flash-preview
+SHORTFORM_GEMINI_TEXT_MODELS=gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.5-flash,gemini-3.6-flash,gemini-3.7-flash,gemini-3-flash-preview
+SHORTFORM_GEMINI_PRODUCT_MODELS=gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.6-flash,gemini-3.7-flash,gemini-3-flash-preview
 ```
 
 비밀값은 저장소에 커밋하거나 API 응답·로그에 출력하지 않는다. `YOUTUBE_API_KEY`는 Gemini 호출 전에 공개 여부와 5분 제한을 확인하는 데 필요하다.
@@ -42,7 +44,9 @@ SHORTFORM_GEMINI_PRODUCT_MODELS=gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.
 
 ## AI와 데이터 근거
 
-- 영상 단계·제품 식별은 `GEMINI_MODEL`을 최우선으로 시도한 뒤 `3.5 Flash → 3.5 Flash Lite → 3.1 Flash Lite → 3 Flash Preview` 순서로 전환한다.
+- 영상 단계·제품 식별은 Gemini만 사용한다. `GEMINI_MODEL`을 최우선으로 시도한 뒤 3.7 Flash를 포함한 영상 후보를 한 번씩 순회한다.
+- 개인화 분석·optimize·제품 보강은 OpenAI를 먼저 최대 2회 시도하고 429·5xx·연결 장애에만 Gemini 후보로 전환한다. 설정·권한 오류나 잘못된 요청은 Gemini로 숨기지 않는다.
+- Gemini 후보 호출은 서로 직렬화하지 않는다. 429 모델은 공유 쿨다운 동안 건너뛰되 같은 요청에서 대기 후 전체 후보를 다시 순회하지 않는다.
 - 개인화·점수·조합·인벤토리 추천은 `gpt-4o-mini`를 우선 사용한다. 실패 시 Gemini JSON 모드에서 `3.5 Flash Lite → 3.1 Flash Lite → 3.5 Flash → 3.6 Flash → 3 Flash Preview` 순서로 전환하고, 기존 JSON Schema는 프롬프트 계약과 서버 검증에 사용한다.
 - 제품 검색·성분 보강의 Gemini 순서는 `3.5 Flash → 3.5 Flash Lite → 3.1 Flash Lite → 3.6 Flash → 3 Flash Preview`다. Google Search 할당량이 소진되면 같은 라우터를 사용하는 모델 지식 보강으로 전환한다.
 - Gemini 모델별 429 쿨다운과 404 비활성화 상태는 숏폼 작업 전체에서 공유한다. 같은 모델 호출은 직렬화하며, 모든 후보가 일시 실패하면 60초 이내의 가장 빠른 재시도 시점에 한 번만 다시 순회한다. 401/403은 모델 문제가 아닌 키·프로젝트 권한 오류로 즉시 종료한다.

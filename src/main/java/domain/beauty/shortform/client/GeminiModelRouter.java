@@ -10,7 +10,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
@@ -34,7 +33,6 @@ public class GeminiModelRouter {
     private final GeminiProperties geminiProperties;
     private final ShortformAiFallbackProperties routingProperties;
     private final Clock clock;
-    private final Sleeper sleeper;
     private final Map<String, ModelState> states = new ConcurrentHashMap<>();
 
     @Autowired
@@ -42,19 +40,17 @@ public class GeminiModelRouter {
             GeminiProperties geminiProperties,
             ShortformAiFallbackProperties routingProperties
     ) {
-        this(geminiProperties, routingProperties, Clock.systemUTC(), Thread::sleep);
+        this(geminiProperties, routingProperties, Clock.systemUTC());
     }
 
     GeminiModelRouter(
             GeminiProperties geminiProperties,
             ShortformAiFallbackProperties routingProperties,
-            Clock clock,
-            Sleeper sleeper
+            Clock clock
     ) {
         this.geminiProperties = geminiProperties;
         this.routingProperties = routingProperties;
         this.clock = clock;
-        this.sleeper = sleeper;
     }
 
     public <T> T route(GeminiRouteProfile profile, String operation, CandidateCall<T> candidateCall) {
@@ -63,23 +59,11 @@ public class GeminiModelRouter {
             throw new GeminiModelRoutingException("Gemini 라우팅 모델이 설정되지 않았습니다.", null, true);
         }
 
-        AttemptResult<T> first = attempt(models, operation, candidateCall);
-        if (first.value() != null) {
-            return first.value();
+        AttemptResult<T> result = attempt(models, operation, candidateCall);
+        if (result.value() != null) {
+            return result.value();
         }
-
-        Duration delay = retryDelay(first.earliestRetryAt());
-        if (delay != null) {
-            log.warn("Gemini 숏폼 {} 전체 후보 실패로 한 번 지연 재시도합니다: delayMs={}",
-                    operation, delay.toMillis());
-            sleep(delay);
-            AttemptResult<T> second = attempt(models, operation, candidateCall);
-            if (second.value() != null) {
-                return second.value();
-            }
-            throw exhausted(operation, second.lastFailure());
-        }
-        throw exhausted(operation, first.lastFailure());
+        throw exhausted(operation, result.lastFailure());
     }
 
     private <T> AttemptResult<T> attempt(
@@ -87,79 +71,69 @@ public class GeminiModelRouter {
             String operation,
             CandidateCall<T> candidateCall
     ) {
-        Instant earliestRetryAt = null;
         Throwable lastFailure = null;
+        Instant deadline = clock.instant().plus(maxRoutingDuration());
         for (String model : models) {
+            if (!clock.instant().isBefore(deadline)) {
+                log.warn("Gemini 숏폼 {} 모델 라우팅 제한 시간 초과: limitMs={}",
+                        operation, maxRoutingDuration().toMillis());
+                break;
+            }
             ModelState state = states.computeIfAbsent(model, ignored -> new ModelState());
             Instant now = clock.instant();
             if (state.unsupported) {
                 continue;
             }
             if (state.cooldownUntil.isAfter(now)) {
-                earliestRetryAt = earlier(earliestRetryAt, state.cooldownUntil);
                 continue;
             }
 
-            state.lock.lock();
             try {
-                now = clock.instant();
-                if (state.unsupported) {
+                T value = candidateCall.call(model);
+                state.cooldownUntil = Instant.EPOCH;
+                log.info("Gemini 숏폼 {} 모델 라우팅 성공: model={}", operation, model);
+                return new AttemptResult<>(value, lastFailure);
+            } catch (RestClientResponseException exception) {
+                lastFailure = exception;
+                int status = exception.getStatusCode().value();
+                log.warn("Gemini 숏폼 {} 후보 HTTP 실패: status={}, model={}", operation, status, model);
+                if (exception.getStatusCode() == HttpStatus.UNAUTHORIZED
+                        || exception.getStatusCode() == HttpStatus.FORBIDDEN) {
+                    throw new GeminiModelRoutingException(
+                            "Gemini API 키 또는 프로젝트 권한을 확인해 주세요.", exception, true);
+                }
+                if (exception.getStatusCode() == HttpStatus.NOT_FOUND) {
+                    state.unsupported = true;
                     continue;
                 }
-                if (state.cooldownUntil.isAfter(now)) {
-                    earliestRetryAt = earlier(earliestRetryAt, state.cooldownUntil);
+                if (status == HttpStatus.TOO_MANY_REQUESTS.value()) {
+                    state.cooldownUntil = now.plus(rateLimitDelay(exception));
                     continue;
                 }
-                try {
-                    T value = candidateCall.call(model);
-                    state.cooldownUntil = Instant.EPOCH;
-                    log.info("Gemini 숏폼 {} 모델 라우팅 성공: model={}", operation, model);
-                    return new AttemptResult<>(value, earliestRetryAt, lastFailure);
-                } catch (RestClientResponseException exception) {
-                    lastFailure = exception;
-                    int status = exception.getStatusCode().value();
-                    log.warn("Gemini 숏폼 {} 후보 HTTP 실패: status={}, model={}", operation, status, model);
-                    if (exception.getStatusCode() == HttpStatus.UNAUTHORIZED
-                            || exception.getStatusCode() == HttpStatus.FORBIDDEN) {
-                        throw new GeminiModelRoutingException(
-                                "Gemini API 키 또는 프로젝트 권한을 확인해 주세요.", exception, true);
-                    }
-                    if (exception.getStatusCode() == HttpStatus.NOT_FOUND) {
-                        state.unsupported = true;
-                        continue;
-                    }
-                    if (status == HttpStatus.TOO_MANY_REQUESTS.value()) {
-                        state.cooldownUntil = now.plus(rateLimitDelay(exception));
-                        earliestRetryAt = earlier(earliestRetryAt, state.cooldownUntil);
-                        continue;
-                    }
-                    if (exception.getStatusCode().is5xxServerError()) {
-                        state.cooldownUntil = now.plus(transientDelay());
-                        earliestRetryAt = earlier(earliestRetryAt, state.cooldownUntil);
-                    }
-                } catch (ResourceAccessException exception) {
-                    lastFailure = exception;
+                if (exception.getStatusCode().is5xxServerError()) {
                     state.cooldownUntil = now.plus(transientDelay());
-                    earliestRetryAt = earlier(earliestRetryAt, state.cooldownUntil);
-                    log.warn("Gemini 숏폼 {} 후보 연결 실패: model={}", operation, model);
-                } catch (GeminiCandidateRejectedException exception) {
-                    lastFailure = exception;
-                    log.warn("Gemini 숏폼 {} 후보 응답 거부: model={}, reason={}",
-                            operation, model, exception.getMessage());
-                } catch (RestClientException exception) {
-                    lastFailure = exception;
-                    state.cooldownUntil = now.plus(transientDelay());
-                    earliestRetryAt = earlier(earliestRetryAt, state.cooldownUntil);
-                    log.warn("Gemini 숏폼 {} 후보 요청 실패: model={}", operation, model);
                 }
-            } finally {
-                state.lock.unlock();
+            } catch (ResourceAccessException exception) {
+                lastFailure = exception;
+                state.cooldownUntil = now.plus(transientDelay());
+                log.warn("Gemini 숏폼 {} 후보 연결 실패: model={}", operation, model);
+            } catch (GeminiCandidateRejectedException exception) {
+                lastFailure = exception;
+                log.warn("Gemini 숏폼 {} 후보 응답 거부: model={}, reason={}",
+                        operation, model, exception.getMessage());
+            } catch (RestClientException exception) {
+                lastFailure = exception;
+                state.cooldownUntil = now.plus(transientDelay());
+                log.warn("Gemini 숏폼 {} 후보 요청 실패: model={}", operation, model);
             }
         }
-        return new AttemptResult<>(null, earliestRetryAt, lastFailure);
+        return new AttemptResult<>(null, lastFailure);
     }
 
     private List<String> models(GeminiRouteProfile profile) {
+        if (!routingProperties.isGeminiModelRoutingEnabled()) {
+            return singlePrimaryModel();
+        }
         List<String> configured = switch (profile) {
             case VIDEO -> routingProperties.getGeminiVideoModels();
             case TEXT -> routingProperties.getGeminiTextModels();
@@ -173,6 +147,13 @@ public class GeminiModelRouter {
             configured.forEach(model -> addModel(models, model));
         }
         return new ArrayList<>(models);
+    }
+
+    private List<String> singlePrimaryModel() {
+        if (geminiProperties.getModel() == null || geminiProperties.getModel().isBlank()) {
+            return List.of();
+        }
+        return List.of(geminiProperties.getModel().trim());
     }
 
     private void addModel(LinkedHashSet<String> models, String model) {
@@ -227,33 +208,12 @@ public class GeminiModelRouter {
         return nonNegative(routingProperties.getGeminiDefaultTransientDelay(), Duration.ofSeconds(2));
     }
 
-    private Duration retryDelay(Instant earliestRetryAt) {
-        if (earliestRetryAt == null) {
-            return null;
-        }
-        Duration delay = Duration.between(clock.instant(), earliestRetryAt);
-        if (delay.isNegative()) {
-            delay = Duration.ZERO;
-        }
-        Duration maxDelay = nonNegative(routingProperties.getGeminiMaxRetryDelay(), Duration.ofSeconds(60));
-        return delay.compareTo(maxDelay) <= 0 ? delay : null;
+    private Duration maxRoutingDuration() {
+        return nonNegative(routingProperties.getGeminiMaxRoutingDuration(), Duration.ofMinutes(3));
     }
 
     private Duration nonNegative(Duration value, Duration fallback) {
         return value == null || value.isNegative() ? fallback : value;
-    }
-
-    private Instant earlier(Instant current, Instant candidate) {
-        return current == null || candidate.isBefore(current) ? candidate : current;
-    }
-
-    private void sleep(Duration delay) {
-        try {
-            sleeper.sleep(delay.toMillis());
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw new GeminiModelRoutingException("Gemini 재시도 대기가 중단되었습니다.", exception, false);
-        }
     }
 
     private GeminiModelRoutingException exhausted(String operation, Throwable cause) {
@@ -266,17 +226,11 @@ public class GeminiModelRouter {
         T call(String model);
     }
 
-    @FunctionalInterface
-    interface Sleeper {
-        void sleep(long millis) throws InterruptedException;
-    }
-
     private static final class ModelState {
-        private final ReentrantLock lock = new ReentrantLock(true);
         private volatile Instant cooldownUntil = Instant.EPOCH;
         private volatile boolean unsupported;
     }
 
-    private record AttemptResult<T>(T value, Instant earliestRetryAt, Throwable lastFailure) {
+    private record AttemptResult<T>(T value, Throwable lastFailure) {
     }
 }

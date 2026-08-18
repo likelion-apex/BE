@@ -35,14 +35,14 @@ class GeminiModelRouterTest {
         List<String> product = attemptedOrder(router, GeminiRouteProfile.PRODUCT);
 
         assertThat(video).containsExactly(
-                "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite",
+                "gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite",
                 "gemini-3.1-flash-lite", "gemini-3-flash-preview");
         assertThat(text).containsExactly(
                 "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.5-flash",
-                "gemini-3.6-flash", "gemini-3-flash-preview");
+                "gemini-3.6-flash", "gemini-3.7-flash", "gemini-3-flash-preview");
         assertThat(product).containsExactly(
                 "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite",
-                "gemini-3.6-flash", "gemini-3-flash-preview");
+                "gemini-3.6-flash", "gemini-3.7-flash", "gemini-3-flash-preview");
     }
 
     @Test
@@ -51,7 +51,7 @@ class GeminiModelRouterTest {
         ShortformAiFallbackProperties routing = new ShortformAiFallbackProperties();
         routing.setGeminiVideoModels(List.of("secondary"));
         MutableClock clock = new MutableClock();
-        GeminiModelRouter router = new GeminiModelRouter(gemini, routing, clock, clock::advanceMillis);
+        GeminiModelRouter router = new GeminiModelRouter(gemini, routing, clock);
         AtomicInteger primaryCalls = new AtomicInteger();
 
         String first = router.route(GeminiRouteProfile.VIDEO, "test", model -> {
@@ -112,12 +112,12 @@ class GeminiModelRouterTest {
     }
 
     @Test
-    void waitsForEarliestRetryAfterAndRunsOnlyOneMoreCycle() {
+    void triesEachCandidateOnlyOnceWithoutWaiting() {
         GeminiProperties gemini = properties("unused");
         ShortformAiFallbackProperties routing = new ShortformAiFallbackProperties();
         routing.setGeminiTextModels(List.of("first", "second"));
         MutableClock clock = new MutableClock();
-        GeminiModelRouter router = new GeminiModelRouter(gemini, routing, clock, clock::advanceMillis);
+        GeminiModelRouter router = new GeminiModelRouter(gemini, routing, clock);
         AtomicInteger calls = new AtomicInteger();
 
         assertThatThrownBy(() -> router.route(GeminiRouteProfile.TEXT, "test", model -> {
@@ -125,33 +125,37 @@ class GeminiModelRouterTest {
             throw response(HttpStatus.TOO_MANY_REQUESTS, "Please retry in 1.25s", null);
         })).isInstanceOf(GeminiModelRoutingException.class);
 
-        assertThat(calls).hasValue(4);
-        assertThat(clock.advancedMillis()).isEqualTo(1_250);
-    }
-
-    @Test
-    void doesNotWaitBeyondConfiguredMaximum() {
-        GeminiProperties gemini = properties("unused");
-        ShortformAiFallbackProperties routing = new ShortformAiFallbackProperties();
-        routing.setGeminiTextModels(List.of("only"));
-        MutableClock clock = new MutableClock();
-        GeminiModelRouter router = new GeminiModelRouter(gemini, routing, clock, clock::advanceMillis);
-
-        assertThatThrownBy(() -> router.route(GeminiRouteProfile.TEXT, "test", model -> {
-            throw response(HttpStatus.TOO_MANY_REQUESTS, "Please retry in 61s", null);
-        })).isInstanceOf(GeminiModelRoutingException.class);
+        assertThat(calls).hasValue(2);
         assertThat(clock.advancedMillis()).isZero();
     }
 
     @Test
-    void serializesConcurrentCallsToTheSameModel() throws Exception {
+    void stopsStartingCandidatesAfterRoutingDeadline() {
+        GeminiProperties gemini = properties("unused");
+        ShortformAiFallbackProperties routing = new ShortformAiFallbackProperties();
+        routing.setGeminiTextModels(List.of("first", "second"));
+        routing.setGeminiMaxRoutingDuration(Duration.ofSeconds(1));
+        MutableClock clock = new MutableClock();
+        GeminiModelRouter router = new GeminiModelRouter(gemini, routing, clock);
+        AtomicInteger calls = new AtomicInteger();
+
+        assertThatThrownBy(() -> router.route(GeminiRouteProfile.TEXT, "test", model -> {
+            calls.incrementAndGet();
+            clock.advanceMillis(1_000);
+            throw new GeminiCandidateRejectedException("invalid");
+        })).isInstanceOf(GeminiModelRoutingException.class);
+        assertThat(calls).hasValue(1);
+    }
+
+    @Test
+    void doesNotSerializeConcurrentCallsToTheSameModel() throws Exception {
         GeminiProperties gemini = properties("unused");
         ShortformAiFallbackProperties routing = new ShortformAiFallbackProperties();
         routing.setGeminiTextModels(List.of("only"));
         GeminiModelRouter router = router(gemini, routing);
         AtomicInteger concurrent = new AtomicInteger();
         AtomicInteger maxConcurrent = new AtomicInteger();
-        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch entered = new CountDownLatch(2);
         CountDownLatch release = new CountDownLatch(1);
 
         try (var executor = Executors.newFixedThreadPool(2)) {
@@ -163,18 +167,38 @@ class GeminiModelRouterTest {
                 concurrent.decrementAndGet();
                 return model;
             }));
-            assertThat(entered.await(1, TimeUnit.SECONDS)).isTrue();
             var second = executor.submit(() -> router.route(GeminiRouteProfile.TEXT, "test", model -> {
                 int active = concurrent.incrementAndGet();
                 maxConcurrent.accumulateAndGet(active, Math::max);
+                entered.countDown();
+                await(release);
                 concurrent.decrementAndGet();
                 return model;
             }));
+            assertThat(entered.await(1, TimeUnit.SECONDS)).isTrue();
             release.countDown();
             assertThat(first.get(1, TimeUnit.SECONDS)).isEqualTo("only");
             assertThat(second.get(1, TimeUnit.SECONDS)).isEqualTo("only");
         }
-        assertThat(maxConcurrent).hasValue(1);
+        assertThat(maxConcurrent).hasValue(2);
+    }
+
+    @Test
+    void routingSwitchUsesOnlyConfiguredPrimaryModel() {
+        GeminiProperties gemini = properties("primary");
+        ShortformAiFallbackProperties routing = new ShortformAiFallbackProperties();
+        routing.setGeminiModelRoutingEnabled(false);
+        routing.setGeminiTextModels(List.of("secondary"));
+        GeminiModelRouter router = router(gemini, routing);
+        List<String> called = new ArrayList<>();
+
+        String result = router.route(GeminiRouteProfile.TEXT, "test", model -> {
+            called.add(model);
+            return model;
+        });
+
+        assertThat(result).isEqualTo("primary");
+        assertThat(called).containsExactly("primary");
     }
 
     private List<String> attemptedOrder(GeminiModelRouter router, GeminiRouteProfile profile) {
@@ -195,7 +219,7 @@ class GeminiModelRouterTest {
             ShortformAiFallbackProperties routing
     ) {
         MutableClock clock = new MutableClock();
-        return new GeminiModelRouter(gemini, routing, clock, clock::advanceMillis);
+        return new GeminiModelRouter(gemini, routing, clock);
     }
 
     private GeminiProperties properties(String model) {

@@ -1,6 +1,7 @@
 package domain.beauty.shortform.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -33,6 +34,8 @@ class ShortformAiFallbackClientTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         server.expect(requestTo(openAiProperties.getApiUrl().toString()))
                 .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
+        server.expect(requestTo(openAiProperties.getApiUrl().toString()))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
         GeminiStructuredOutputClient geminiClient = mock(GeminiStructuredOutputClient.class);
         RoutinePersonalizationResult decoded = objectMapper.readValue(
                 routineResultJson(), RoutinePersonalizationResult.class);
@@ -58,20 +61,10 @@ class ShortformAiFallbackClientTest {
     }
 
     @Test
-    void fallsBackToGeminiWhenOptimizationOpenAiConfigurationIsMissing() {
+    void doesNotFallbackToGeminiWhenOptimizationOpenAiConfigurationIsMissing() {
         ObjectMapper objectMapper = new ObjectMapper();
         OpenAiRoutineProperties openAiProperties = new OpenAiRoutineProperties();
         GeminiStructuredOutputClient geminiClient = mock(GeminiStructuredOutputClient.class);
-        OptimizationReasonResult decoded = new OptimizationReasonResult(List.of(
-                new OptimizationReasonResult.StepReason(
-                        1,
-                        "진정 성분을 확인한 보유 제품으로 대체할 수 있어요.",
-                        new RoutinePersonalizationResult.ScoreBreakdown(32, 28),
-                        List.of("판테놀"))));
-        when(geminiClient.generateDecoded(
-                anyString(), anyString(), anyString(), any(JsonNode.class), anyInt(), any()))
-                .thenReturn(new GeminiStructuredOutputClient.DecodedResponse<>(
-                        decoded, "gemini-test", 40, 20));
         OpenAiOptimizationReasonClient client = new OpenAiOptimizationReasonClient(
                 RestClient.create(),
                 openAiProperties,
@@ -83,16 +76,10 @@ class ShortformAiFallbackClientTest {
                 new OptimizationReasonInput.MemberProfile("민감성", List.of("피부 진정")),
                 List.of());
 
-        OptimizationReasonResult.Response response = client.generate(input);
-
-        assertThat(response.model()).isEqualTo("gemini-test");
-        assertThat(response.result().steps()).singleElement()
-                .satisfies(step -> {
-                    assertThat(step.reason()).contains("보유 제품");
-                    assertThat(step.scoreBreakdown().skinTypeFit()).isEqualTo(32);
-                    assertThat(step.matchedIngredientNames()).containsExactly("판테놀");
-                });
-        verify(geminiClient).generateDecoded(
+        assertThatThrownBy(() -> client.generate(input))
+                .isInstanceOf(global.exception.CustomException.class)
+                .hasMessageContaining("OPENAI_API_KEY");
+        verify(geminiClient, times(0)).generateDecoded(
                 anyString(), anyString(), anyString(), any(JsonNode.class), anyInt(), any());
     }
 
