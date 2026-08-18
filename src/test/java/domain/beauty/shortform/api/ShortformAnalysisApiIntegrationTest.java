@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import domain.beauty.shortform.application.ShortformAnalysisJobHandler;
+import domain.beauty.shortform.client.OpenAiRoutineAnalysisClient;
 import domain.beauty.shortform.client.YouTubeMetadataClient;
 import domain.beauty.shortform.client.YouTubeVideoMetadata;
 import domain.beauty.shortform.domain.ShortformAnalysis;
@@ -19,6 +20,7 @@ import domain.member.MemberRepository;
 import domain.member.Provider;
 import domain.member.Role;
 import domain.member.SkinType;
+import domain.inventory.client.OpenAiCategoryClassifier;
 import java.math.BigInteger;
 import java.time.Duration;
 import java.util.List;
@@ -52,6 +54,12 @@ class ShortformAnalysisApiIntegrationTest {
 
     @MockitoBean
     private ShortformAnalysisJobHandler jobHandler;
+
+    @MockitoBean
+    private OpenAiRoutineAnalysisClient openAiRoutineAnalysisClient;
+
+    @MockitoBean
+    private OpenAiCategoryClassifier openAiCategoryClassifier;
 
     @BeforeEach
     void setUp() {
@@ -206,6 +214,151 @@ class ShortformAnalysisApiIntegrationTest {
                 .andExpect(jsonPath("$.data.items[0].overallScore").doesNotExist());
 
         verifyNoInteractions(youtubeMetadataClient);
+    }
+
+    @Test
+    void normalizesLegacyOptimizationWithoutCallingExternalApis() throws Exception {
+        Member member = saveMember("optimization-member");
+        String resultJson = """
+                {
+                  "schemaVersion": "3.0",
+                  "videoId": "legacyOptimize",
+                  "youtubeUrl": "https://www.youtube.com/watch?v=legacyOptimize",
+                  "title": "기존 최적화",
+                  "tag": "맞춤",
+                  "overallScore": 80,
+                  "highlights": ["수분 공급"],
+                  "coreGoal": "보습",
+                  "synergyCombo": "히알루론산",
+                  "summary": "영상 제품을 활용한 루틴입니다.",
+                  "warnings": [],
+                  "disclaimer": "안내",
+                  "steps": [
+                    {
+                      "resultId": 1,
+                      "order": 1,
+                      "category": "앰플",
+                      "productName": "영상 수분 앰플",
+                      "displayBrand": "영상 브랜드",
+                      "displayProductName": "영상 수분 앰플",
+                      "productResolutionStatus": "CATALOG_MATCH",
+                      "productResolutionConfidence": 1,
+                      "imageUrl": "/video-ampoule.png",
+                      "productId": 10,
+                      "identificationConfidence": 1,
+                      "evidenceSummary": "영상에서 확인",
+                      "matchScore": 80,
+                      "matchSummary": "수분 공급",
+                      "keyBenefits": ["수분 공급"],
+                      "scoreBreakdown": {"skinTypeFit": 30, "benefitFit": 25, "ingredientSafety": 25},
+                      "safetyLevel": "SAFE",
+                      "primaryAssessmentCategory": "SAFE",
+                      "safetyTitle": "피부 안전도 평가",
+                      "safetySummary": "안전합니다.",
+                      "reasons": [],
+                      "ingredientDataStatus": "AVAILABLE",
+                      "ingredientVerificationStatus": "OFFICIAL",
+                      "ingredientSources": [],
+                      "estimatedIngredientCount": 1,
+                      "ingredientStats": {"totalCount": 1, "lowRiskCount": 1, "moderateRiskCount": 0, "highRiskCount": 0, "unknownRiskCount": 0, "caution20Count": 0, "allergenCount": 0},
+                      "ingredients": []
+                    },
+                    {
+                      "resultId": 2,
+                      "order": 2,
+                      "category": "앰플",
+                      "productName": "영상 진정 앰플",
+                      "displayBrand": "영상 브랜드",
+                      "displayProductName": "영상 진정 앰플",
+                      "productResolutionStatus": "CATALOG_MATCH",
+                      "productResolutionConfidence": 1,
+                      "imageUrl": "/video-soothing.png",
+                      "productId": 11,
+                      "identificationConfidence": 1,
+                      "evidenceSummary": "영상에서 확인",
+                      "matchScore": 80,
+                      "matchSummary": "피부 진정",
+                      "keyBenefits": ["피부 진정"],
+                      "scoreBreakdown": {"skinTypeFit": 30, "benefitFit": 25, "ingredientSafety": 25},
+                      "safetyLevel": "SAFE",
+                      "primaryAssessmentCategory": "SAFE",
+                      "safetyTitle": "피부 안전도 평가",
+                      "safetySummary": "안전합니다.",
+                      "reasons": [],
+                      "ingredientDataStatus": "AVAILABLE",
+                      "ingredientVerificationStatus": "OFFICIAL",
+                      "ingredientSources": [],
+                      "estimatedIngredientCount": 1,
+                      "ingredientStats": {"totalCount": 1, "lowRiskCount": 1, "moderateRiskCount": 0, "highRiskCount": 0, "unknownRiskCount": 0, "caution20Count": 0, "allergenCount": 0},
+                      "ingredients": []
+                    }
+                  ],
+                  "aiMetadata": null
+                }
+                """;
+        String optimizationJson = """
+                {
+                  "newProductCount": 1,
+                  "compatibleCount": 1,
+                  "replacedCount": 1,
+                  "missingCount": 0,
+                  "summary": "기존 요약",
+                  "steps": [
+                    {
+                      "sourceResultId": 1,
+                      "order": 1,
+                      "status": "COMPATIBLE",
+                      "inventoryId": 100,
+                      "productId": 20,
+                      "category": "SERUM",
+                      "productName": "보유 수분 세럼",
+                      "brand": "보유 브랜드",
+                      "imageUrl": "/owned-serum.png",
+                      "reason": "같은 카테고리의 보유 제품입니다."
+                    },
+                    {
+                      "sourceResultId": 2,
+                      "order": 2,
+                      "status": "REPLACED",
+                      "inventoryId": 101,
+                      "productId": 21,
+                      "category": "SKIN_TONER",
+                      "productName": "보유 진정 토너",
+                      "brand": "보유 브랜드",
+                      "imageUrl": "/owned-toner.png",
+                      "reason": "보습 역할이 비슷합니다."
+                    }
+                  ]
+                }
+                """;
+        ShortformAnalysis analysis = new ShortformAnalysis(
+                member,
+                "legacyOptimize",
+                "https://www.youtube.com/watch?v=legacyOptimize",
+                "legacy-optimize-fingerprint"
+        );
+        analysis.complete(
+                null, resultJson, optimizationJson, "기존 최적화", 2, 80,
+                "gpt-test", "3.1", 1, 1);
+        analysisRepository.saveAndFlush(analysis);
+        clearInvocations(youtubeMetadataClient, jobHandler, openAiRoutineAnalysisClient, openAiCategoryClassifier);
+
+        mockMvc.perform(post("/api/shortform-analyses/{analysisId}/optimize", analysis.getId())
+                        .with(authentication(memberAuthentication(member.getId()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.result.compatibleCount").doesNotExist())
+                .andExpect(jsonPath("$.data.result.replacedCount").value(1))
+                .andExpect(jsonPath("$.data.result.missingCount").value(1))
+                .andExpect(jsonPath("$.data.result.steps[0].status").value("REPLACED"))
+                .andExpect(jsonPath("$.data.result.steps[0].productName").value("보유 수분 세럼"))
+                .andExpect(jsonPath("$.data.result.steps[0].replaceName").value("영상 수분 앰플"))
+                .andExpect(jsonPath("$.data.result.steps[1].status").value("VIDEO_PRODUCT"))
+                .andExpect(jsonPath("$.data.result.steps[1].productName").value("영상 진정 앰플"))
+                .andExpect(jsonPath("$.data.result.steps[1].replaceName").value((Object) null));
+
+        String savedOptimization = analysisRepository.findById(analysis.getId()).orElseThrow().getOptimizationJson();
+        assertThat(savedOptimization).doesNotContain("compatibleCount", "COMPATIBLE", "NO_INVENTORY_MATCH");
+        verifyNoInteractions(youtubeMetadataClient, jobHandler, openAiRoutineAnalysisClient, openAiCategoryClassifier);
     }
 
     private Member saveMember(String providerId) {

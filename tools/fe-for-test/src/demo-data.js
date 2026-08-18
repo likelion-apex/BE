@@ -233,15 +233,14 @@ export const demoAnalysisResult = {
 
 export const demoOptimization = {
   newProductCount: 1,
-  compatibleCount: 2,
-  replacedCount: 1,
+  replacedCount: 3,
   missingCount: 1,
-  summary: '자극적인 성분은 빼고 역할이 같은 보유 제품으로 안전하게 재구성했어요.',
+  summary: '영상 속 제품 중 3개를 같은 카테고리의 인벤토리 제품으로 교체했어요.',
   steps: [
-    { order: 1, productName: '초미세먼지 세정 클렌저', status: 'MISSING', reason: '대체 제품이 인벤토리에 없어요.' },
-    { order: 2, productName: '셀퓨전씨 쿨링 패드', status: 'REPLACED', reason: '각질 제거 토너 대신 보유한 진정 패드로 교체했어요.' },
-    { order: 3, productName: '메디힐 수분 앰플', status: 'COMPATIBLE', reason: '동일한 히알루론산 기반 보유 제품이에요.' },
-    { order: 4, productName: '에스트라 아토베리어 로션', status: 'COMPATIBLE', reason: '손상된 장벽을 보호하는 보유 제품이에요.' },
+    { order: 1, productName: '초미세먼지 세정 클렌저', replaceName: null, imageUrl: '/assets/product-jar.png', status: 'VIDEO_PRODUCT', reason: '같은 카테고리의 대체 제품이 인벤토리에 없어요.' },
+    { order: 2, productName: '셀퓨전씨 쿨링 패드', replaceName: '라운드랩 1025 독도 토너', imageUrl: '/assets/product-jar.png', status: 'REPLACED', reason: '같은 카테고리에서 사용할 수 있는 보유 제품이에요.' },
+    { order: 3, productName: '메디힐 수분 앰플', replaceName: '자작나무 수분 앰플', imageUrl: '/assets/product-jar.png', status: 'REPLACED', reason: '동일한 히알루론산 기반 보유 제품이에요.' },
+    { order: 4, productName: '에스트라 아토베리어 로션', replaceName: '판테놀 장벽 로션', imageUrl: '/assets/product-jar.png', status: 'REPLACED', reason: '손상된 장벽을 보호하는 보유 제품이에요.' },
   ],
 };
 

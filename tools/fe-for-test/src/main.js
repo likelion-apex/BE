@@ -1,5 +1,6 @@
 import './styles.css';
 import { ApiClient } from './api.js';
+import { optimizationPresentation } from './optimization.js';
 import {
   buildGeneratedRoutineCreatePayload,
   buildKakaoAuthorizeUrl,
@@ -488,7 +489,6 @@ function renderOptimization(result) {
     <span class="report-badge">AI 매칭 리포트</span>
     <dl>
       <div><dt>숏폼 속 새로운 제품</dt><dd>${Number(result.newProductCount || 0)}개</dd></div>
-      <div><dt>인벤토리 속 호환 제품</dt><dd>${Number(result.compatibleCount || 0)}개</dd></div>
       <div><dt>AI가 안전하게 대체한 제품</dt><dd class="blue">${Number(result.replacedCount || 0)}개</dd></div>
     </dl>
     <p>${escapeHtml(result.summary || '')}</p>
@@ -497,11 +497,10 @@ function renderOptimization(result) {
 
 function renderOptimizedSteps(steps = []) {
   return steps.map((step) => {
-    const status = String(step.status || 'COMPATIBLE').toLowerCase();
-    const label = ({ missing: '영상 속 제품', replaced: '대체', compatible: '호환', new: '새 제품' })[status] || step.status;
+    const { status, label, reasonTitle, sourceLabel } = optimizationPresentation(step);
     return `<article class="optimized-step">
-      <div class="optimized-head"><i>${step.order}</i><span class="product-placeholder"></span><span><b>${escapeHtml(step.productName)}</b><small>${escapeHtml(label)}</small></span><em class="status-${status}">${escapeHtml(label)}</em></div>
-      <div class="optimization-reason ${status}"><b>${status === 'missing' ? '대체품 없음' : 'AI 대체 이유'}</b><p>${escapeHtml(step.reason || '')}</p></div>
+      <div class="optimized-head"><i>${step.order}</i><img src="${safeImageUrl(step.imageUrl, '/assets/product-jar.png')}" alt=""><span><b>${escapeHtml(step.productName)}</b><small>${escapeHtml(sourceLabel)}</small></span><em class="status-${status}">${escapeHtml(label)}</em></div>
+      <div class="optimization-reason ${status}"><b>${escapeHtml(reasonTitle)}</b><p>${escapeHtml(step.reason || '')}</p></div>
     </article>`;
   }).join('');
 }

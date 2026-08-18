@@ -16,6 +16,7 @@ import domain.beauty.shortform.domain.IngredientVerificationStatus;
 import domain.beauty.shortform.domain.ProductResolutionStatus;
 import domain.cosmetic.client.KakaoImageClient;
 import domain.inventory.ProductRepository;
+import domain.inventory.ProductCategory;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -31,7 +32,8 @@ class ShortformProductMatcherTest {
         when(repository.findFirstByNameIgnoreCaseAndBrandIgnoreCase(anyString(), anyString()))
                 .thenReturn(Optional.empty());
         when(imageClient.searchImageUrl(anyString())).thenReturn(null);
-        ShortformProductMatcher matcher = new ShortformProductMatcher(repository, imageClient);
+        ShortformProductMatcher matcher = new ShortformProductMatcher(
+                repository, imageClient, new ShortformProductCategoryResolver());
         ProductEnrichmentData estimated = new ProductEnrichmentData(
                 "토리든",
                 "다이브인 저분자 히알루론산 수딩 크림",
@@ -49,6 +51,7 @@ class ShortformProductMatcherTest {
         assertThat(matched.ingredientDataStatus()).isEqualTo(IngredientDataStatus.AVAILABLE);
         assertThat(matched.productResolutionStatus()).isEqualTo(ProductResolutionStatus.AI_NORMALIZED);
         assertThat(matched.displayProductName()).contains("다이브인");
+        assertThat(matched.productCategory()).isEqualTo(ProductCategory.CREAM);
     }
 
     private Step categoryStep() {

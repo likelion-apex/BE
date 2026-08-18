@@ -207,4 +207,8 @@ public class ShortformAnalysis {
             this.optimizedAt = LocalDateTime.now();
         }
     }
+
+    public void replaceOptimization(String optimizationJson) {
+        this.optimizationJson = optimizationJson;
+    }
 }
