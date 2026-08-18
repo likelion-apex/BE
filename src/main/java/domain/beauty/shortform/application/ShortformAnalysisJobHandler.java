@@ -13,6 +13,9 @@ import domain.beauty.shortform.domain.ShortformAnalysisStatus;
 import global.exception.CustomException;
 import global.exception.ErrorCode;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -25,6 +28,7 @@ public class ShortformAnalysisJobHandler {
     private final VideoRoutineExtractionService extractionService;
     private final ShortformProductMatcher productMatcher;
     private final ShortformProductEnrichmentService productEnrichmentService;
+    private final InventoryProductEvidenceService inventoryEvidenceService;
     private final ShortformAnalysisAssembler assembler;
     private final OpenAiRoutineAnalysisClient openAiClient;
     private final OpenAiRoutineProperties openAiProperties;
@@ -35,6 +39,7 @@ public class ShortformAnalysisJobHandler {
             VideoRoutineExtractionService extractionService,
             ShortformProductMatcher productMatcher,
             ShortformProductEnrichmentService productEnrichmentService,
+            InventoryProductEvidenceService inventoryEvidenceService,
             ShortformAnalysisAssembler assembler,
             OpenAiRoutineAnalysisClient openAiClient,
             OpenAiRoutineProperties openAiProperties,
@@ -44,6 +49,7 @@ public class ShortformAnalysisJobHandler {
         this.extractionService = extractionService;
         this.productMatcher = productMatcher;
         this.productEnrichmentService = productEnrichmentService;
+        this.inventoryEvidenceService = inventoryEvidenceService;
         this.assembler = assembler;
         this.openAiClient = openAiClient;
         this.openAiProperties = openAiProperties;
@@ -80,6 +86,11 @@ public class ShortformAnalysisJobHandler {
                     extraction.result().analysis().steps());
             List<MatchedVideoStep> matchedSteps = productMatcher.match(
                     extraction.result().analysis().steps(), enrichment.productsByOrder());
+            Set<domain.inventory.ProductCategory> videoCategories = matchedSteps.stream()
+                    .map(MatchedVideoStep::productCategory)
+                    .collect(Collectors.toSet());
+            Map<Long, InventoryProductEvidence> inventoryEvidence = inventoryEvidenceService
+                    .enrichMatchingCategories(context.inventory(), videoCategories);
 
             if (stopIfCancelled(analysisId)) {
                 return;
@@ -90,7 +101,7 @@ public class ShortformAnalysisJobHandler {
                     "피부 타입과 고민에 맞는 루틴인지 분석하고 있습니다."
             );
             RoutinePersonalizationInput input = assembler.toInput(
-                    context, extraction.result().analysis(), matchedSteps);
+                    context, extraction.result().analysis(), matchedSteps, inventoryEvidence);
             Response aiResponse = openAiClient.analyze(input);
 
             if (stopIfCancelled(analysisId)) {
@@ -102,7 +113,7 @@ public class ShortformAnalysisJobHandler {
                     "인벤토리 제품과의 궁합을 확인하고 있습니다."
             );
             AssembledResult assembled = assembler.assemble(
-                    context, matchedSteps, aiResponse, extraction.entity(), enrichment);
+                    context, matchedSteps, aiResponse, extraction.entity(), enrichment, inventoryEvidence);
 
             if (stopIfCancelled(analysisId)) {
                 return;

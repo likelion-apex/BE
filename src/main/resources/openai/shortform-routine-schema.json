@@ -78,7 +78,12 @@
             "type": ["integer", "null"],
             "description": "영상 단계의 productCategory와 동일한 category를 가진 입력 inventory ID. 없으면 null"
           },
-          "reason": {"type": "string", "minLength": 1, "maxLength": 240}
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240,
+            "description": "영상 제품과 선택한 보유 제품의 확인된 성분·효능 및 피부 프로필을 연결한 1~2문장 맞춤 이유. 대체품이 없으면 영상 제품의 구체적 역할과 보유 대체품 부재를 설명한다."
+          }
         }
       }
     }

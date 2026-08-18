@@ -84,6 +84,9 @@ public class ShortformAnalysis {
     @Column(name = "optimization_json", columnDefinition = "TEXT")
     private String optimizationJson;
 
+    @Column(name = "optimization_reason_version", length = 20)
+    private String optimizationReasonVersion;
+
     @Column(name = "openai_model", length = 80)
     private String openAiModel;
 
@@ -172,6 +175,7 @@ public class ShortformAnalysis {
         this.resultOverallScore = resultOverallScore;
         this.openAiModel = openAiModel;
         this.openAiPromptVersion = openAiPromptVersion;
+        this.optimizationReasonVersion = openAiPromptVersion;
         this.openAiInputTokens = inputTokens;
         this.openAiOutputTokens = outputTokens;
         this.status = ShortformAnalysisStatus.COMPLETED;
@@ -210,5 +214,10 @@ public class ShortformAnalysis {
 
     public void replaceOptimization(String optimizationJson) {
         this.optimizationJson = optimizationJson;
+    }
+
+    public void replaceOptimization(String optimizationJson, String reasonVersion) {
+        this.optimizationJson = optimizationJson;
+        this.optimizationReasonVersion = reasonVersion;
     }
 }

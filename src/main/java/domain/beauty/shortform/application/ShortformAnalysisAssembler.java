@@ -57,21 +57,33 @@ public class ShortformAnalysisAssembler {
     private final RegulationInfoCache regulationInfoCache;
     private final OpenAiRoutineProperties openAiProperties;
     private final ShortformProductCategoryResolver categoryResolver;
+    private final OptimizationReasonComposer reasonComposer;
 
     public ShortformAnalysisAssembler(
             RegulationInfoCache regulationInfoCache,
             OpenAiRoutineProperties openAiProperties,
-            ShortformProductCategoryResolver categoryResolver
+            ShortformProductCategoryResolver categoryResolver,
+            OptimizationReasonComposer reasonComposer
     ) {
         this.regulationInfoCache = regulationInfoCache;
         this.openAiProperties = openAiProperties;
         this.categoryResolver = categoryResolver;
+        this.reasonComposer = reasonComposer;
     }
 
     public RoutinePersonalizationInput toInput(
             JobContext context,
             BeautyRoutineAnalysis extraction,
             List<MatchedVideoStep> matchedSteps
+    ) {
+        return toInput(context, extraction, matchedSteps, Map.of());
+    }
+
+    public RoutinePersonalizationInput toInput(
+            JobContext context,
+            BeautyRoutineAnalysis extraction,
+            List<MatchedVideoStep> matchedSteps,
+            Map<Long, InventoryProductEvidence> inventoryEvidence
     ) {
         return new RoutinePersonalizationInput(
                 new RoutinePersonalizationInput.MemberProfile(
@@ -103,13 +115,31 @@ public class ShortformAnalysisAssembler {
                                 ))
                                 .toList()
                 )).toList(),
-                context.inventory().stream().map(item -> new RoutinePersonalizationInput.InventoryProduct(
+                context.inventory().stream()
+                        .filter(item -> inventoryEvidence.containsKey(item.productId()))
+                        .map(item -> {
+                    InventoryProductEvidence evidence = inventoryEvidence.getOrDefault(
+                            item.productId(), InventoryProductEvidence.unavailable());
+                    return new RoutinePersonalizationInput.InventoryProduct(
                         item.inventoryId(),
                         item.productId(),
                         item.category(),
                         item.brand(),
-                        item.productName()
-                )).toList()
+                        item.productName(),
+                        evidence.isAvailable() ? IngredientDataStatus.AVAILABLE : IngredientDataStatus.UNAVAILABLE,
+                        safe(evidence.ingredients()).stream()
+                                .map(ingredient -> new RoutinePersonalizationInput.Ingredient(
+                                        ingredient.order(),
+                                        ingredient.name(),
+                                        safe(ingredient.purposes()),
+                                        safe(ingredient.skinBenefits()),
+                                        ingredient.riskScore(),
+                                        ingredient.caution20(),
+                                        ingredient.allergen()
+                                ))
+                                .toList()
+                    );
+                }).toList()
         );
     }
 
@@ -119,6 +149,17 @@ public class ShortformAnalysisAssembler {
             Response aiResponse,
             VideoRoutineExtraction extraction,
             BatchResult enrichment
+    ) {
+        return assemble(context, matchedSteps, aiResponse, extraction, enrichment, Map.of());
+    }
+
+    public AssembledResult assemble(
+            JobContext context,
+            List<MatchedVideoStep> matchedSteps,
+            Response aiResponse,
+            VideoRoutineExtraction extraction,
+            BatchResult enrichment,
+            Map<Long, InventoryProductEvidence> inventoryEvidence
     ) {
         RoutinePersonalizationResult ai = aiResponse.analysis();
         Map<Integer, RoutinePersonalizationResult.StepAnalysis> aiSteps = indexSteps(ai.steps());
@@ -169,7 +210,8 @@ public class ShortformAnalysisAssembler {
                 )
         );
 
-        return new AssembledResult(snapshot, optimize(context.inventory(), matchedSteps, recommendations));
+        return new AssembledResult(snapshot, optimize(
+                context, matchedSteps, steps, recommendations, inventoryEvidence));
     }
 
     private StepResult toStepResult(
@@ -472,12 +514,17 @@ public class ShortformAnalysisAssembler {
     }
 
     private RoutineOptimizationSnapshot optimize(
-            List<InventoryFact> inventory,
+            JobContext context,
             List<MatchedVideoStep> matchedSteps,
-            Map<Integer, RoutinePersonalizationResult.InventoryRecommendation> recommendations
+            List<StepResult> analysisSteps,
+            Map<Integer, RoutinePersonalizationResult.InventoryRecommendation> recommendations,
+            Map<Long, InventoryProductEvidence> inventoryEvidence
     ) {
+        List<InventoryFact> inventory = context.inventory();
         Map<Long, InventoryFact> inventoryById = new HashMap<>();
         inventory.forEach(item -> inventoryById.put(item.inventoryId(), item));
+        Map<Integer, StepResult> analysisByOrder = new HashMap<>();
+        analysisSteps.forEach(step -> analysisByOrder.put(step.order(), step));
         List<OptimizedStep> steps = new ArrayList<>();
         int newProductCount = 0;
         int replacedCount = 0;
@@ -511,7 +558,13 @@ public class ShortformAnalysisAssembler {
                 replaceName = textOr(matched.displayProductName(), source.category());
                 brand = selected.brand();
                 imageUrl = selected.imageUrl();
-                reason = textOr(recommendation.reason(), "같은 카테고리에서 사용할 수 있는 보유 제품입니다.");
+                reason = reasonComposer.forNewAnalysis(
+                        context,
+                        matched,
+                        analysisByOrder.get(source.order()),
+                        selected,
+                        inventoryEvidence.get(selected.productId()),
+                        recommendation.reason());
             } else {
                 status = OptimizationStatus.VIDEO_PRODUCT;
                 missingCount++;
@@ -521,9 +574,13 @@ public class ShortformAnalysisAssembler {
                 replaceName = null;
                 brand = matched.displayBrand();
                 imageUrl = matched.imageUrl();
-                reason = recommendation == null
-                        ? "인벤토리에서 같은 카테고리의 대체 제품을 찾지 못했습니다."
-                        : "추천된 인벤토리 제품의 카테고리가 달라 영상 속 제품을 유지합니다.";
+                reason = reasonComposer.forNewAnalysis(
+                        context,
+                        matched,
+                        analysisByOrder.get(source.order()),
+                        null,
+                        null,
+                        recommendation == null ? null : recommendation.reason());
             }
 
             boolean alreadyOwned = matched.productId() != null && inventory.stream()

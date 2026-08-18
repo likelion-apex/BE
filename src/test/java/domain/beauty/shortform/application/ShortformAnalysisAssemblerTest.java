@@ -28,6 +28,7 @@ import domain.cosmetic.cache.RegulationInfoCache;
 import domain.cosmetic.client.CsmtcsReglMaterialClient;
 import domain.inventory.ProductCategory;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
@@ -37,7 +38,10 @@ class ShortformAnalysisAssemblerTest {
             new RegulationInfoCache(mock(CsmtcsReglMaterialClient.class));
     private final ShortformAnalysisAssembler assembler =
             new ShortformAnalysisAssembler(
-                    regulationInfoCache, new OpenAiRoutineProperties(), new ShortformProductCategoryResolver());
+                    regulationInfoCache,
+                    new OpenAiRoutineProperties(),
+                    new ShortformProductCategoryResolver(),
+                    new OptimizationReasonComposer());
 
     @Test
     void forcesUnknownForCategoryOnlyStepAndIgnoresUnknownInventoryId() {
@@ -246,7 +250,8 @@ class ShortformAnalysisAssemblerTest {
     void omitsNicknameFromPersonalizationInput() throws Exception {
         JobContext context = new JobContext(
                 1L, "video", "https://www.youtube.com/watch?v=video", "수부지",
-                List.of("속건조"), List.of());
+                List.of("속건조"), List.of(new InventoryFact(
+                        100L, 20L, "보유 수분 토너", "테스트", "SKIN_TONER", null)));
         ProductEnrichmentData product = enrichment(
                 IngredientVerificationStatus.OFFICIAL,
                 new ProductEnrichmentResult.Ingredient(
@@ -263,12 +268,20 @@ class ShortformAnalysisAssemblerTest {
                 List.of(matched.source()),
                 List.of());
 
-        RoutinePersonalizationInput input = assembler.toInput(context, extraction, List.of(matched));
+        RoutinePersonalizationInput input = assembler.toInput(
+                context,
+                extraction,
+                List.of(matched),
+                Map.of(20L, new InventoryProductEvidence(
+                        IngredientVerificationStatus.OFFICIAL,
+                        List.of(new ProductEnrichmentResult.Ingredient(
+                                1, "히알루론산", List.of("보습제"), List.of("수분 공급"), 1, false, false)))));
         String json = new ObjectMapper().writeValueAsString(input);
 
         assertThat(json).doesNotContain("nickname");
         assertThat(json).contains("\"skinType\":\"수부지\"");
         assertThat(json).contains("\"productCategory\":\"SKIN_TONER\"");
+        assertThat(json).contains("\"ingredientDataStatus\":\"AVAILABLE\"", "히알루론산");
     }
 
     @Test
