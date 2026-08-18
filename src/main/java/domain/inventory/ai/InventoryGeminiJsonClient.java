@@ -21,14 +21,17 @@ public class InventoryGeminiJsonClient {
 
     private final RestClient restClient;
     private final GeminiProperties geminiProperties;
+    private final InventoryAiProperties inventoryAiProperties;
     private final ObjectMapper objectMapper;
 
     public InventoryGeminiJsonClient(
             @Qualifier("inventoryGeminiRestClient") RestClient restClient,
             GeminiProperties geminiProperties,
+            InventoryAiProperties inventoryAiProperties,
             ObjectMapper objectMapper) {
         this.restClient = restClient;
         this.geminiProperties = geminiProperties;
+        this.inventoryAiProperties = inventoryAiProperties;
         this.objectMapper = objectMapper;
     }
 
@@ -46,16 +49,18 @@ public class InventoryGeminiJsonClient {
                     )),
                     "generationConfig", Map.of(
                             "temperature", 0,
+                            "maxOutputTokens", inventoryAiProperties.getOpenaiMaxOutputTokens(),
                             "responseMimeType", "application/json"
                     )
             );
-            JsonNode response = restClient.post()
+            String responseJson = restClient.post()
                     .uri("/v1beta/models/" + geminiProperties.getModel() + ":generateContent")
                     .header("x-goog-api-key", apiKey)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(body)
+                    .body(objectMapper.writeValueAsString(body))
                     .retrieve()
-                    .body(JsonNode.class);
+                    .body(String.class);
+            JsonNode response = InventoryAiJsonSupport.readObject(objectMapper, responseJson);
             String text = extractText(response);
             JsonNode parsed = InventoryAiJsonSupport.readObject(objectMapper, text);
             if (parsed == null || parsed.isMissingNode() || !parsed.isObject()) {

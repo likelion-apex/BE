@@ -2,6 +2,7 @@ package domain.cosmetic.client;
 
 import domain.inventory.ai.AiProviderUnavailableException;
 import domain.inventory.ai.InventoryAiJsonSupport;
+import domain.inventory.ai.InventoryAiProperties;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +44,7 @@ public class OpenAiIngredientClient {
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
+    private final InventoryAiProperties inventoryAiProperties;
     private final String apiKey;
     private final String model;
     private final String organizationId;
@@ -52,12 +54,14 @@ public class OpenAiIngredientClient {
             @Value("${openai.model}") String model,
             @Value("${openai.organization-id:}") String organizationId,
             @Qualifier("inventoryOpenAiRestClient") RestClient restClient,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            InventoryAiProperties inventoryAiProperties) {
         this.apiKey = apiKey;
         this.model = model;
         this.organizationId = organizationId;
         this.objectMapper = objectMapper;
         this.restClient = restClient;
+        this.inventoryAiProperties = inventoryAiProperties;
     }
 
     public List<String> fetchIngredientNames(String productName) {
@@ -83,7 +87,17 @@ public class OpenAiIngredientClient {
     private JsonNode completeJson(String systemPrompt, String userPrompt, String action, String context) {
         requireApiKey();
         try {
-            JsonNode response = restClient.post()
+            String requestJson = objectMapper.writeValueAsString(Map.of(
+                    "model", model,
+                    "temperature", 0,
+                    "max_tokens", inventoryAiProperties.getOpenaiMaxOutputTokens(),
+                    "response_format", Map.of("type", "json_object"),
+                    "messages", List.of(
+                            Map.of("role", "system", "content", systemPrompt),
+                            Map.of("role", "user", "content", userPrompt)
+                    )
+            ));
+            String responseJson = restClient.post()
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
                     .headers(headers -> {
                         if (organizationId != null && !organizationId.isBlank()) {
@@ -91,17 +105,10 @@ public class OpenAiIngredientClient {
                         }
                     })
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of(
-                            "model", model,
-                            "temperature", 0,
-                            "response_format", Map.of("type", "json_object"),
-                            "messages", List.of(
-                                    Map.of("role", "system", "content", systemPrompt),
-                                    Map.of("role", "user", "content", userPrompt)
-                            )
-                    ))
+                    .body(requestJson)
                     .retrieve()
-                    .body(JsonNode.class);
+                    .body(String.class);
+            JsonNode response = InventoryAiJsonSupport.readObject(objectMapper, responseJson);
             String content = response == null
                     ? null
                     : response.path("choices").path(0).path("message").path("content").asText(null);

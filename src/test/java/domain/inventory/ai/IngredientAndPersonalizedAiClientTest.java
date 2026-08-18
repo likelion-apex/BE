@@ -33,7 +33,7 @@ class IngredientAndPersonalizedAiClientTest {
 
     @Test
     void fallsBackToGeminiWhenOpenAiIngredientLookupFails() {
-        IngredientAiClient client = new IngredientAiClient(openAiIngredientClient, geminiJsonClient);
+        IngredientAiClient client = client();
         when(openAiIngredientClient.fetchIngredientNames("바닥 토너"))
                 .thenThrow(new AiProviderUnavailableException("429"));
         ObjectNode payload = new ObjectMapper().createObjectNode();
@@ -47,7 +47,7 @@ class IngredientAndPersonalizedAiClientTest {
 
     @Test
     void returnsEmptyWhenBothIngredientProvidersFail() {
-        IngredientAiClient client = new IngredientAiClient(openAiIngredientClient, geminiJsonClient);
+        IngredientAiClient client = client();
         when(openAiIngredientClient.fetchIngredientNames("바닥 토너"))
                 .thenThrow(new AiProviderUnavailableException("429"));
         when(geminiJsonClient.generateJson(any(), any()))
@@ -58,7 +58,7 @@ class IngredientAndPersonalizedAiClientTest {
 
     @Test
     void skipsGeminiWhenOpenAiIngredientLookupSucceeds() {
-        IngredientAiClient client = new IngredientAiClient(openAiIngredientClient, geminiJsonClient);
+        IngredientAiClient client = client();
         when(openAiIngredientClient.fetchIngredientNames("바닥 토너")).thenReturn(List.of("정제수"));
 
         assertThat(client.fetchIngredientNames("바닥 토너")).containsExactly("정제수");
@@ -66,9 +66,42 @@ class IngredientAndPersonalizedAiClientTest {
     }
 
     @Test
+    void skipsOpenAiAfterCooldownAndCallsGemini() {
+        OpenAiSkipGate skipGate = new OpenAiSkipGate();
+        skipGate.markUnavailable();
+        IngredientAiClient client = new IngredientAiClient(
+                openAiIngredientClient, geminiJsonClient, skipGate, new InventoryAiProperties());
+        ObjectNode payload = new ObjectMapper().createObjectNode();
+        payload.putArray("ingredients").addObject().put("name", "정제수");
+        when(geminiJsonClient.generateJson(any(), any())).thenReturn(payload);
+
+        assertThat(client.fetchIngredientNames("바닥 토너")).containsExactly("정제수");
+        verify(openAiIngredientClient, never()).fetchIngredientNames(any());
+    }
+
+    @Test
+    void skipsOpenAiWhenEstimatedInputTokensExceedBudget() {
+        InventoryAiProperties properties = new InventoryAiProperties();
+        properties.setOpenaiMaxInputTokens(1);
+        IngredientAiClient client = new IngredientAiClient(
+                openAiIngredientClient, geminiJsonClient, new OpenAiSkipGate(), properties);
+        ObjectNode payload = new ObjectMapper().createObjectNode();
+        payload.putArray("ingredients").add("정제수");
+        when(geminiJsonClient.generateJson(any(), any())).thenReturn(payload);
+
+        assertThat(client.fetchIngredientNames("바닥 토너")).containsExactly("정제수");
+        verify(openAiIngredientClient, never()).fetchIngredientNames(any());
+        verify(geminiJsonClient).generateJson(any(), any());
+    }
+
+    @Test
     void fallsBackToGeminiForPersonalizedAnalysis() {
         PersonalizedAnalysisAiClient client =
-                new PersonalizedAnalysisAiClient(openAiPersonalizedAnalysisClient, geminiJsonClient);
+                new PersonalizedAnalysisAiClient(
+                        openAiPersonalizedAnalysisClient,
+                        geminiJsonClient,
+                        new OpenAiSkipGate(),
+                        new InventoryAiProperties());
         when(openAiPersonalizedAnalysisClient.analyze("바닥 토너", List.of("정제수"), SkinType.DRY, Set.of()))
                 .thenThrow(new AiProviderUnavailableException("insufficient_quota"));
         ObjectNode payload = new ObjectMapper().createObjectNode();
@@ -85,7 +118,7 @@ class IngredientAndPersonalizedAiClientTest {
 
     @Test
     void parsePurposesFromGeminiPayload() {
-        IngredientAiClient client = new IngredientAiClient(openAiIngredientClient, geminiJsonClient);
+        IngredientAiClient client = client();
         when(openAiIngredientClient.fetchIngredientPurposes(List.of("정제수")))
                 .thenThrow(new AiProviderUnavailableException("timeout"));
         ObjectNode payload = new ObjectMapper().createObjectNode();
@@ -96,5 +129,10 @@ class IngredientAndPersonalizedAiClientTest {
 
         Map<String, List<String>> purposes = client.fetchIngredientPurposes(List.of("정제수"));
         assertThat(purposes.get("정제수")).containsExactly("기제(용매)");
+    }
+
+    private IngredientAiClient client() {
+        return new IngredientAiClient(
+                openAiIngredientClient, geminiJsonClient, new OpenAiSkipGate(), new InventoryAiProperties());
     }
 }

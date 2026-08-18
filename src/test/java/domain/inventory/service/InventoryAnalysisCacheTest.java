@@ -164,8 +164,7 @@ class InventoryAnalysisCacheTest {
         when(inventoryRepository.findByIdAndMemberId(11L, 9L)).thenReturn(Optional.of(inventory));
         when(memberRepository.findById(9L)).thenReturn(Optional.of(member));
         when(inventoryAiCacheService.find(any())).thenThrow(new RuntimeException("inventory_ai_caches missing"));
-        when(ingredientAiClient.fetchIngredientNames("바닥 토너")).thenReturn(List.of("정제수"));
-        when(personalizedAnalysisAiClient.analyze("바닥 토너", List.of("정제수"), SkinType.DRY, Set.of()))
+        when(personalizedAnalysisAiClient.analyze("바닥 토너", List.of(), SkinType.DRY, Set.of()))
                 .thenReturn(new PersonalizedAnalysisResult(
                         80, List.of(new PersonalizedAnalysisResult.Keyword("보습", "건성"))));
         doThrow(new RuntimeException("read-only transaction")).when(inventoryAiCacheService).save(any(), any());
@@ -181,7 +180,6 @@ class InventoryAnalysisCacheTest {
         when(inventoryRepository.findByIdAndMemberId(11L, 9L)).thenReturn(Optional.of(inventory));
         when(memberRepository.findById(9L)).thenReturn(Optional.of(member));
         when(inventoryAiCacheService.find(any())).thenReturn(Optional.empty());
-        when(ingredientAiClient.fetchIngredientNames("바닥 토너")).thenReturn(List.of());
         when(personalizedAnalysisAiClient.analyze("바닥 토너", List.of(), SkinType.DRY, Set.of()))
                 .thenReturn(null);
 

@@ -21,44 +21,65 @@ public final class InventoryAiJsonSupport {
     }
 
     public static List<String> parseIngredientNames(JsonNode payload) {
+        if (payload == null) {
+            return List.of();
+        }
         JsonNode ingredientsNode = payload.path("ingredients");
         if (!ingredientsNode.isArray()) {
             return List.of();
         }
         List<String> ingredients = new ArrayList<>();
         ingredientsNode.forEach(node -> {
-            String name = node.asText(null);
-            if (name != null && !name.isBlank()) {
-                ingredients.add(name.trim());
+            String name = ingredientName(node);
+            if (name != null) {
+                ingredients.add(name);
             }
         });
         return ingredients;
     }
 
     public static Map<String, List<String>> parsePurposes(JsonNode payload) {
+        if (payload == null) {
+            return Map.of();
+        }
         JsonNode ingredientsNode = payload.path("ingredients");
         if (!ingredientsNode.isArray()) {
             return Map.of();
         }
         Map<String, List<String>> result = new LinkedHashMap<>();
         ingredientsNode.forEach(node -> {
-            String name = node.path("name").asText(null);
-            if (name == null || name.isBlank()) {
+            String name = ingredientName(node);
+            if (name == null) {
                 return;
             }
             List<String> purposes = new ArrayList<>();
             JsonNode purposesNode = node.path("purposes");
             if (purposesNode.isArray()) {
                 purposesNode.forEach(purposeNode -> {
-                    String value = purposeNode.asText(null);
-                    if (value != null && !value.isBlank()) {
+                    String value = textOrNull(purposeNode);
+                    if (value != null) {
                         purposes.add(value.trim());
                     }
                 });
             }
-            result.put(name.trim(), purposes);
+            result.put(name, purposes);
         });
         return result;
+    }
+
+    private static String ingredientName(JsonNode node) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return null;
+        }
+        if (node.isTextual()) {
+            return textOrNull(node);
+        }
+        String name = textOrNull(node.path("name"));
+        if (name != null) {
+            return name.trim();
+        }
+        name = textOrNull(node.path("ingredientName"));
+        return name == null ? null : name.trim();
     }
 
     public static JsonNode readObject(ObjectMapper objectMapper, String json) {
