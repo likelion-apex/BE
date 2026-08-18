@@ -59,6 +59,11 @@ public class ShortformAnalysisJobHandler {
 
     @Async("shortformAnalysisExecutor")
     public void analyze(Long analysisId) {
+        analyze(analysisId, false);
+    }
+
+    @Async("shortformAnalysisExecutor")
+    public void analyze(Long analysisId, boolean refreshUnverifiedProducts) {
         try {
             JobContext context = stateService.loadJobContext(analysisId);
             if (stopIfCancelled(analysisId)) {
@@ -84,7 +89,7 @@ public class ShortformAnalysisJobHandler {
                     "영상 제품을 서비스의 제품 정보와 연결하고 있습니다."
             );
             BatchResult enrichment = productEnrichmentService.getOrEnrich(
-                    extraction.result().analysis().steps());
+                    extraction.result().analysis().steps(), refreshUnverifiedProducts);
             List<MatchedVideoStep> matchedSteps = productMatcher.match(
                     extraction.result().analysis().steps(), enrichment.productsByOrder());
             Set<domain.inventory.ProductCategory> videoCategories = matchedSteps.stream()

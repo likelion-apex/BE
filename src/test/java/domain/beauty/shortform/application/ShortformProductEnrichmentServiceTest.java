@@ -58,6 +58,7 @@ class ShortformProductEnrichmentServiceTest {
         List<Step> steps = List.of(exactStep(1, "1025 Dokdo Toner"), exactStep(2, "Birch Juice Ampoule"));
         ShortformProductEnrichmentService.BatchResult first = service.getOrEnrich(steps);
         ShortformProductEnrichmentService.BatchResult cached = service.getOrEnrich(steps);
+        ShortformProductEnrichmentService.BatchResult forced = service.getOrEnrich(steps, true);
 
         ArgumentCaptor<ProductEnrichmentInput> request = ArgumentCaptor.forClass(ProductEnrichmentInput.class);
         verify(client, times(1)).enrich(request.capture());
@@ -69,6 +70,53 @@ class ShortformProductEnrichmentServiceTest {
         assertThat(cached.inputTokens()).isZero();
         assertThat(cached.outputTokens()).isZero();
         assertThat(cached.productsByOrder().get(1).ingredients()).hasSize(1);
+        assertThat(forced.cacheHits()).isEqualTo(2);
+        assertThat(forced.cacheMisses()).isZero();
+    }
+
+    @Test
+    void refreshesOnlyUnverifiedCachedProductsWhenExplicitlyRequested() {
+        ShortformProductEnrichmentRepository repository = mock(ShortformProductEnrichmentRepository.class);
+        OpenAiProductEnrichmentClient client = mock(OpenAiProductEnrichmentClient.class);
+        OpenAiRoutineProperties properties = new OpenAiRoutineProperties();
+        properties.setProductFallbackEnabled(false);
+        ShortformAnalysisJsonMapper jsonMapper = new ShortformAnalysisJsonMapper(new ObjectMapper());
+        ShortformProductEnrichmentService service = service(repository, client, properties, jsonMapper);
+        List<ShortformProductEnrichment> stored = new ArrayList<>();
+        AtomicInteger lookup = new AtomicInteger();
+        AtomicInteger request = new AtomicInteger();
+        when(repository.findByCacheKeyIn(any())).thenAnswer(invocation ->
+                lookup.getAndIncrement() == 0 ? List.of() : List.copyOf(stored));
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> {
+            ShortformProductEnrichment entity = invocation.getArgument(0);
+            stored.clear();
+            stored.add(entity);
+            return entity;
+        });
+        when(repository.findByCacheKey(anyString())).thenAnswer(invocation ->
+                stored.stream().findFirst());
+        when(client.enrich(any())).thenAnswer(invocation -> {
+            ProductEnrichmentInput input = invocation.getArgument(0);
+            String key = input.products().getFirst().requestKey();
+            if (request.getAndIncrement() == 0) {
+                return new ProductEnrichmentResult.Response(
+                        new ProductEnrichmentResult(List.of(product(key, List.of(), List.of()))),
+                        "gpt-test", 20, 10);
+            }
+            return response(key, "gpt-test", List.of(ingredient()));
+        });
+
+        List<Step> steps = List.of(exactStep(1, "1025 Dokdo Toner"));
+        ShortformProductEnrichmentService.BatchResult first = service.getOrEnrich(steps);
+        ShortformProductEnrichmentService.BatchResult cached = service.getOrEnrich(steps);
+        ShortformProductEnrichmentService.BatchResult refreshed = service.getOrEnrich(steps, true);
+
+        assertThat(first.productsByOrder().get(1).ingredients()).isEmpty();
+        assertThat(cached.cacheHits()).isEqualTo(1);
+        assertThat(cached.productsByOrder().get(1).ingredients()).isEmpty();
+        assertThat(refreshed.cacheMisses()).isEqualTo(1);
+        assertThat(refreshed.productsByOrder().get(1).ingredients()).hasSize(1);
+        verify(client, times(2)).enrich(any());
     }
 
     @Test

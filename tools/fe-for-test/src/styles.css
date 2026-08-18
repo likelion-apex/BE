@@ -508,6 +508,9 @@ body.is-busy::after { position: fixed; z-index: 999; top: 18px; left: 50%; width
 .ingredient-list i.risk-low { background: var(--green-05); color: var(--green); }
 .ingredient-list i.risk-mid, .ingredient-list i.risk-moderate { background: #fff8dc; color: #a47c00; }
 .ingredient-list i.risk-high { background: var(--red-02); color: var(--red); }
+.ingredient-reanalysis { display: grid; gap: 10px; }
+.ingredient-reanalysis .secondary-button { width: 100%; }
+.ingredient-reanalysis small { color: var(--gray-40); font-size: 9px; }
 .ingredient-list span { display: grid; gap: 3px; }
 .ingredient-list b { font-size: 11px; }
 .ingredient-list small { color: var(--gray-60); font-size: 9px; }

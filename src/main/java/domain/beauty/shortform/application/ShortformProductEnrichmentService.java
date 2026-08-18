@@ -1,6 +1,7 @@
 package domain.beauty.shortform.application;
 
 import domain.beauty.config.GeminiProperties;
+import domain.beauty.domain.BeautyRoutineAnalysis.IdentificationLevel;
 import domain.beauty.domain.BeautyRoutineAnalysis.Step;
 import domain.beauty.shortform.client.GeminiProductEnrichmentClient;
 import domain.beauty.shortform.client.OpenAiProductEnrichmentClient;
@@ -71,6 +72,10 @@ public class ShortformProductEnrichmentService {
     }
 
     public BatchResult getOrEnrich(List<Step> steps) {
+        return getOrEnrich(steps, false);
+    }
+
+    public BatchResult getOrEnrich(List<Step> steps, boolean refreshUnverifiedProducts) {
         List<RequestedProduct> requested = steps.stream()
                 .filter(this::researchable)
                 .map(step -> new RequestedProduct(step, cacheKey(step)))
@@ -93,7 +98,14 @@ public class ShortformProductEnrichmentService {
             if (entity == null) {
                 misses.add(item);
             } else {
-                results.put(item.step().order(), toData(read(entity)));
+                ProductEnrichmentData cachedData = toData(read(entity));
+                if (refreshUnverifiedProducts && isRefreshable(item.step(), cachedData)) {
+                    misses.add(item);
+                    log.info("성분 재분석에서 불완전 제품 캐시를 건너뜁니다: order={}, verification={}",
+                            item.step().order(), cachedData.ingredientVerificationStatus());
+                } else {
+                    results.put(item.step().order(), cachedData);
+                }
             }
         }
 
@@ -325,6 +337,14 @@ public class ShortformProductEnrichmentService {
 
     private boolean needsFallback(ProductEnrichmentResult.Product product) {
         return product == null || !toData(product).hasVerifiedIngredients();
+    }
+
+    private boolean isRefreshable(Step step, ProductEnrichmentData cachedData) {
+        if (cachedData.hasVerifiedIngredients()) {
+            return false;
+        }
+        return step.identificationLevel() == IdentificationLevel.EXACT_PRODUCT
+                || cachedData.displayProductName() != null;
     }
 
     private boolean needsGeminiFallback(ProductEnrichmentResult.Product product) {

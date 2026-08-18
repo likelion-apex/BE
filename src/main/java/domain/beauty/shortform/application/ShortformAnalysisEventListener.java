@@ -15,6 +15,6 @@ public class ShortformAnalysisEventListener {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handle(ShortformAnalysisRequested event) {
-        jobHandler.analyze(event.analysisId());
+        jobHandler.analyze(event.analysisId(), event.refreshUnverifiedProducts());
     }
 }
