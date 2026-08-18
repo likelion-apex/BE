@@ -22,14 +22,17 @@ import global.exception.CustomException;
 import global.exception.ErrorCode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -83,16 +86,13 @@ public class InventoryService {
         return FavoriteUpdateResponse.from(inventory);
     }
 
-    @Transactional(readOnly = true)
     public AiAnalysisResponse getAiAnalysis(Long memberId, Long inventoryId) {
         Inventory inventory = findOwnedInventory(memberId, inventoryId);
         Member member = findMember(memberId);
         String productName = inventory.getProduct().getName();
         String cacheKey = InventoryAiCacheService.personalizedKey(
                 productName, member.getSkinType(), member.getSkinConcerns());
-        PersonalizedAnalysisResult cached = inventoryAiCacheService.find(cacheKey)
-                .map(OpenAiPersonalizedAnalysisClient::parseResult)
-                .orElse(null);
+        PersonalizedAnalysisResult cached = findCachedAnalysis(cacheKey);
         if (cached != null) {
             return toAiResponse(inventory.getId(), productName, cached);
         }
@@ -103,24 +103,15 @@ public class InventoryService {
         if (result == null) {
             throw new CustomException(ErrorCode.AI_ANALYSIS_FAILED);
         }
-        inventoryAiCacheService.save(cacheKey, Map.of(
-                "score", result.score(),
-                "keywords", result.keywords().stream()
-                        .map(keyword -> Map.of(
-                                "keyword", keyword.keyword(),
-                                "reason", keyword.reason() == null ? "" : keyword.reason()))
-                        .toList()));
+        saveCache(cacheKey, personalizedCachePayload(result));
         return toAiResponse(inventory.getId(), productName, result);
     }
 
-    @Transactional(readOnly = true)
     public IngredientAnalysisResponse getIngredientAnalysis(Long memberId, Long inventoryId) {
         Inventory inventory = findOwnedInventory(memberId, inventoryId);
         String productName = inventory.getProduct().getName();
         String cacheKey = InventoryAiCacheService.ingredientKey(productName);
-        List<IngredientAnalysisResponse.IngredientPurpose> cached = inventoryAiCacheService.find(cacheKey)
-                .map(this::ingredientsFromCache)
-                .orElse(null);
+        List<IngredientAnalysisResponse.IngredientPurpose> cached = findCachedIngredients(cacheKey);
         if (cached != null) {
             return new IngredientAnalysisResponse(inventory.getId(), productName, cached);
         }
@@ -132,17 +123,79 @@ public class InventoryService {
                         name, purposesByName.getOrDefault(name, List.of())))
                 .toList();
         if (!ingredients.isEmpty()) {
-            inventoryAiCacheService.save(cacheKey, Map.of("ingredients", ingredients.stream()
-                    .map(item -> Map.of(
-                            "ingredientName", item.ingredientName(),
-                            "purposes", item.purposes()))
-                    .toList()));
+            saveCache(cacheKey, ingredientCachePayload(ingredients));
         }
         return new IngredientAnalysisResponse(inventory.getId(), productName, ingredients);
     }
 
+    private PersonalizedAnalysisResult findCachedAnalysis(String cacheKey) {
+        try {
+            return inventoryAiCacheService.find(cacheKey)
+                    .map(OpenAiPersonalizedAnalysisClient::parseResult)
+                    .orElse(null);
+        } catch (RuntimeException e) {
+            log.warn("맞춤 분석 캐시 조회를 건너뜁니다: cacheKey={}, message={}", cacheKey, e.getMessage());
+            return null;
+        }
+    }
+
+    private List<IngredientAnalysisResponse.IngredientPurpose> findCachedIngredients(String cacheKey) {
+        try {
+            return inventoryAiCacheService.find(cacheKey)
+                    .map(this::ingredientsFromCache)
+                    .orElse(null);
+        } catch (RuntimeException e) {
+            log.warn("성분 분석 캐시 조회를 건너뜁니다: cacheKey={}, message={}", cacheKey, e.getMessage());
+            return null;
+        }
+    }
+
+    private void saveCache(String cacheKey, Object payload) {
+        try {
+            inventoryAiCacheService.save(cacheKey, payload);
+        } catch (RuntimeException e) {
+            log.warn("인벤토리 AI 캐시 저장을 건너뜁니다: cacheKey={}, message={}", cacheKey, e.getMessage());
+        }
+    }
+
+    private Map<String, Object> personalizedCachePayload(PersonalizedAnalysisResult result) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("score", result.score());
+        List<Map<String, String>> keywords = new ArrayList<>();
+        List<PersonalizedAnalysisResult.Keyword> source =
+                result.keywords() == null ? List.of() : result.keywords();
+        for (PersonalizedAnalysisResult.Keyword keyword : source) {
+            if (keyword == null || keyword.keyword() == null || keyword.keyword().isBlank()) {
+                continue;
+            }
+            Map<String, String> item = new HashMap<>();
+            item.put("keyword", keyword.keyword());
+            item.put("reason", keyword.reason() == null ? "" : keyword.reason());
+            keywords.add(item);
+        }
+        payload.put("keywords", keywords);
+        return payload;
+    }
+
+    private Map<String, Object> ingredientCachePayload(
+            List<IngredientAnalysisResponse.IngredientPurpose> ingredients) {
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (IngredientAnalysisResponse.IngredientPurpose ingredient : ingredients) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("ingredientName", ingredient.ingredientName());
+            item.put("purposes", ingredient.purposes() == null ? List.of() : ingredient.purposes());
+            items.add(item);
+        }
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("ingredients", items);
+        return payload;
+    }
+
     private AiAnalysisResponse toAiResponse(Long inventoryId, String productName, PersonalizedAnalysisResult result) {
-        List<AiAnalysisResponse.AnalysisKeyword> keywords = result.keywords().stream()
+        List<PersonalizedAnalysisResult.Keyword> source =
+                result.keywords() == null ? List.of() : result.keywords();
+        List<AiAnalysisResponse.AnalysisKeyword> keywords = source.stream()
+                .filter(keyword -> keyword != null && keyword.keyword() != null && !keyword.keyword().isBlank())
                 .map(keyword -> new AiAnalysisResponse.AnalysisKeyword(keyword.keyword(), keyword.reason()))
                 .toList();
         return new AiAnalysisResponse(inventoryId, productName, result.score(), keywords, LocalDateTime.now());
