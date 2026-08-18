@@ -72,7 +72,7 @@ class ShortformProductEnrichmentServiceTest {
     }
 
     @Test
-    void skipsOptionalOpenAiFallbackWhenPrimaryCannotVerifyIngredients() {
+    void usesFallbackModelOnceWhenPrimaryCannotVerifyIngredients() {
         ShortformProductEnrichmentRepository repository = mock(ShortformProductEnrichmentRepository.class);
         OpenAiProductEnrichmentClient client = mock(OpenAiProductEnrichmentClient.class);
         OpenAiRoutineProperties properties = new OpenAiRoutineProperties();
@@ -87,14 +87,20 @@ class ShortformProductEnrichmentServiceTest {
                     new ProductEnrichmentResult(List.of(product(key, List.of(), List.of()))),
                     "gpt-test", 20, 10);
         });
+        when(client.enrich(any(), anyString(), anyInt())).thenAnswer(invocation -> {
+            ProductEnrichmentInput input = invocation.getArgument(0);
+            String key = input.products().getFirst().requestKey();
+            return response(key, "gpt-fallback", List.of(ingredient()));
+        });
+
         ShortformProductEnrichmentService.BatchResult result = service.getOrEnrich(
                 List.of(exactStep(1, "1025 Dokdo Toner")));
 
         verify(client, times(1)).enrich(any());
-        verify(client, never()).enrich(any(), anyString(), anyInt());
-        assertThat(result.productsByOrder().get(1).ingredients()).isEmpty();
-        assertThat(result.inputTokens()).isEqualTo(20);
-        assertThat(result.model()).isEqualTo("gpt-test");
+        verify(client, times(1)).enrich(any(), anyString(), anyInt());
+        assertThat(result.productsByOrder().get(1).ingredients()).hasSize(1);
+        assertThat(result.inputTokens()).isEqualTo(40);
+        assertThat(result.model()).contains("gpt-test", "gpt-fallback");
     }
 
     @Test
@@ -225,7 +231,7 @@ class ShortformProductEnrichmentServiceTest {
     }
 
     @Test
-    void usesGeminiSearchForOpenAiUnresolvedProductWithoutOptionalOpenAiCall() {
+    void usesGeminiSearchForOpenAiUnresolvedProductAndKeepsEstimatedIngredients() {
         ShortformProductEnrichmentRepository repository = mock(ShortformProductEnrichmentRepository.class);
         OpenAiProductEnrichmentClient openAiClient = mock(OpenAiProductEnrichmentClient.class);
         GeminiProductEnrichmentClient geminiClient = mock(GeminiProductEnrichmentClient.class);
@@ -258,6 +264,7 @@ class ShortformProductEnrichmentServiceTest {
                     new ProductEnrichmentResult(List.of(estimated)),
                     "gemini-3.6-flash", 30, 20, 1, List.of(webSource()));
         });
+
         ProductEnrichmentData result = service.getOrEnrich(
                 List.of(categoryStep(1))).productsByOrder().get(1);
 
@@ -265,7 +272,6 @@ class ShortformProductEnrichmentServiceTest {
                 .isEqualTo(IngredientVerificationStatus.ESTIMATED);
         assertThat(result.ingredients()).hasSize(1);
         verify(geminiClient).enrich(any());
-        verify(openAiClient, never()).enrich(any(), anyString(), anyInt());
     }
 
     @Test
