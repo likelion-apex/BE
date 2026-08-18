@@ -31,7 +31,7 @@ public class InventoryAiConfiguration {
         String baseUrl = geminiProperties.getBaseUrl() == null
                 ? "https://generativelanguage.googleapis.com"
                 : geminiProperties.getBaseUrl().toString();
-        return restClient(baseUrl, properties.getConnectTimeout(), properties.getReadTimeout());
+        return restClient(baseUrl, properties.getGeminiConnectTimeout(), properties.getGeminiReadTimeout());
     }
 
     private RestClient restClient(String baseUrl, Duration connectTimeout, Duration readTimeout) {

@@ -34,15 +34,6 @@ public class PersonalizedAnalysisAiClient {
             String productName, List<String> ingredientNames, SkinType skinType, Set<SkinConcern> skinConcerns) {
         String userPrompt = OpenAiPersonalizedAnalysisClient.buildUserContent(
                 productName, ingredientNames, skinType, skinConcerns);
-        if (shouldCallOpenAi(OpenAiPersonalizedAnalysisClient.SYSTEM_PROMPT, userPrompt)) {
-            try {
-                return openAiPersonalizedAnalysisClient.analyze(
-                        productName, ingredientNames, skinType, skinConcerns);
-            } catch (AiProviderUnavailableException e) {
-                openAiSkipGate.markUnavailable();
-                log.warn("맞춤 분석 OpenAI 실패, Gemini로 폴백: productName={}, message={}", productName, e.getMessage());
-            }
-        }
         try {
             JsonNode payload = geminiJsonClient.generateJson(
                     OpenAiPersonalizedAnalysisClient.SYSTEM_PROMPT, userPrompt);
@@ -51,8 +42,19 @@ public class PersonalizedAnalysisAiClient {
                 throw new AiProviderUnavailableException("Gemini 맞춤 분석 응답이 비어 있습니다.");
             }
             return result;
-        } catch (AiProviderUnavailableException fallback) {
-            log.warn("맞춤 분석 Gemini 폴백 실패: productName={}, message={}", productName, fallback.getMessage());
+        } catch (AiProviderUnavailableException geminiFailure) {
+            log.warn("맞춤 분석 Gemini 실패, OpenAI 폴백 검토: productName={}, message={}",
+                    productName, geminiFailure.getMessage());
+        }
+        if (!shouldCallOpenAi(OpenAiPersonalizedAnalysisClient.SYSTEM_PROMPT, userPrompt)) {
+            return null;
+        }
+        try {
+            return openAiPersonalizedAnalysisClient.analyze(
+                    productName, ingredientNames, skinType, skinConcerns);
+        } catch (AiProviderUnavailableException e) {
+            openAiSkipGate.markFrom(e);
+            log.warn("맞춤 분석 OpenAI 폴백 실패: productName={}, message={}", productName, e.getMessage());
             return null;
         }
     }
@@ -64,7 +66,7 @@ public class PersonalizedAnalysisAiClient {
         int estimated = InventoryAiTokenEstimator.estimate(promptParts);
         int limit = inventoryAiProperties.getOpenaiMaxInputTokens();
         if (estimated > limit) {
-            log.info("예상 입력 토큰 {}이 한도 {}를 넘어 OpenAI를 건너뛰고 Gemini를 사용합니다.", estimated, limit);
+            log.info("예상 입력 토큰 {}이 한도 {}를 넘어 OpenAI 폴백을 건너뜁니다.", estimated, limit);
             return false;
         }
         return true;
