@@ -91,7 +91,12 @@ shortform:
   ai-fallback:
     gemini-enabled: ${SHORTFORM_GEMINI_FALLBACK_ENABLED:true}
     gemini-max-output-tokens: 6000
-    gemini-max-attempts: 2
+    gemini-video-models: ${SHORTFORM_GEMINI_VIDEO_MODELS:gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3-flash-preview}
+    gemini-text-models: ${SHORTFORM_GEMINI_TEXT_MODELS:gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.5-flash,gemini-3.6-flash,gemini-3-flash-preview}
+    gemini-product-models: ${SHORTFORM_GEMINI_PRODUCT_MODELS:gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.6-flash,gemini-3-flash-preview}
+    gemini-max-retry-delay: 60s
+    gemini-default-rate-limit-delay: 30s
+    gemini-default-transient-delay: 2s
   product-enrichment:
     cache-enabled: ${SHORTFORM_PRODUCT_CACHE_ENABLED:true}
     gemini-fallback-enabled: ${SHORTFORM_GEMINI_FALLBACK_ENABLED:true}

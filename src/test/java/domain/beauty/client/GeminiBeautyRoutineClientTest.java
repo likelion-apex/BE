@@ -1,22 +1,21 @@
 package domain.beauty.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
-import java.util.List;
-import java.util.Map;
-
 import domain.beauty.config.GeminiProperties;
 import domain.beauty.domain.BeautyRoutineAnalysis.IdentificationLevel;
 import domain.beauty.domain.BeautyRoutineAnalysisResult;
 import domain.beauty.domain.NormalizedYouTubeVideo;
-import domain.beauty.exception.BeautyRoutineException.GeminiUnavailable;
+import domain.beauty.shortform.client.GeminiModelRouter;
+import domain.beauty.shortform.config.ShortformAiFallbackProperties;
 import domain.beauty.support.BeautyRoutineAnalysisValidator;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
@@ -46,7 +45,8 @@ class GeminiBeautyRoutineClientTest {
 			properties,
 			new GeminiPromptResources(objectMapper),
 			objectMapper,
-			new BeautyRoutineAnalysisValidator()
+			new BeautyRoutineAnalysisValidator(),
+			new GeminiModelRouter(properties, new ShortformAiFallbackProperties())
 		);
 	}
 
@@ -121,16 +121,30 @@ class GeminiBeautyRoutineClientTest {
 	}
 
 	@Test
-	void mapsRateLimitToServiceUnavailable() {
+	void routesToNextVideoModelWhenPrimaryIsRateLimited() throws Exception {
 		server.expect(requestTo("https://generativelanguage.googleapis.com/v1beta/interactions"))
 			.andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS)
 				.contentType(MediaType.APPLICATION_JSON)
 				.body("{\"error\":{\"message\":\"quota exceeded\"}}"));
+		String emptyRoutine = """
+			{"schemaVersion":"1.0","analysisStatus":"COMPLETE","routineType":"SKINCARE","summary":"토너 루틴","steps":[{"order":1,"startTime":"00:01","endTime":"00:03","applicationArea":"얼굴","action":"토너를 바릅니다.","technique":"손으로 바릅니다.","purpose":"정돈","purposeBasis":"GENERAL_INFERENCE","applicator":null,"identificationLevel":"CATEGORY_ONLY","category":"토너","brand":null,"productName":null,"variant":null,"identityEvidenceText":null,"observedColor":null,"evidenceSources":["VISUAL_USAGE"],"evidenceSummary":"사용 장면","confidence":0.8}],"warnings":[]}
+			""";
+		String envelope = objectMapper.writeValueAsString(Map.of(
+			"model", "gemini-3.5-flash",
+			"status", "completed",
+			"steps", List.of(Map.of("type", "model_output", "content", List.of(
+				Map.of("type", "text", "text", emptyRoutine))))));
+		server.expect(requestTo("https://generativelanguage.googleapis.com/v1beta/interactions"))
+			.andExpect(request -> assertThat(
+				((org.springframework.mock.http.client.MockClientHttpRequest) request).getBodyAsString())
+				.contains("gemini-3.5-flash"))
+			.andRespond(withSuccess(envelope, MediaType.APPLICATION_JSON));
 
-		assertThatThrownBy(() -> client.analyze(
+		BeautyRoutineAnalysisResult result = client.analyze(
 			new NormalizedYouTubeVideo("-PC1SkLxtvo", "https://www.youtube.com/watch?v=-PC1SkLxtvo")
-		))
-			.isInstanceOf(GeminiUnavailable.class);
+		);
+
+		assertThat(result.model()).isEqualTo("gemini-3.5-flash");
 		server.verify();
 	}
 }

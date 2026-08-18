@@ -118,16 +118,17 @@ public class OpenAiRoutineAnalysisClient {
 
     private Response analyzeWithGemini(RoutinePersonalizationInput input) {
         try {
-            GeminiStructuredOutputClient.Response response = geminiClient.generate(
+            GeminiStructuredOutputClient.DecodedResponse<RoutinePersonalizationResult> response = geminiClient.generateDecoded(
                     "개인화 분석",
                     promptResources.systemPrompt(),
                     "다음 JSON 데이터만 근거로 분석하세요.\n" + objectMapper.writeValueAsString(input),
                     promptResources.responseSchema(),
-                    properties.getMaxOutputTokens());
-            RoutinePersonalizationResult analysis = objectMapper.readValue(
-                    response.outputText(), RoutinePersonalizationResult.class);
+                    properties.getMaxOutputTokens(),
+                    output -> GeminiStructuredResultValidator.validateRoutine(
+                            input,
+                            objectMapper.readValue(output, RoutinePersonalizationResult.class)));
             return new Response(
-                    analysis,
+                    response.result(),
                     response.model(),
                     response.inputTokens(),
                     response.outputTokens());

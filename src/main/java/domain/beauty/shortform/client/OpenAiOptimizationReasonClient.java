@@ -111,17 +111,18 @@ public class OpenAiOptimizationReasonClient {
 
     private Response generateWithGemini(OptimizationReasonInput input) {
         try {
-            GeminiStructuredOutputClient.Response response = geminiClient.generate(
+            GeminiStructuredOutputClient.DecodedResponse<OptimizationReasonResult> response = geminiClient.generateDecoded(
                     "최적화 이유 생성",
                     promptResources.systemPrompt(),
                     "다음 JSON 데이터만 근거로 이유 문구를 작성하세요.\n"
                             + objectMapper.writeValueAsString(input),
                     promptResources.responseSchema(),
-                    Math.min(properties.getMaxOutputTokens(), 2_000));
-            OptimizationReasonResult result = objectMapper.readValue(
-                    response.outputText(), OptimizationReasonResult.class);
+                    Math.min(properties.getMaxOutputTokens(), 2_000),
+                    output -> GeminiStructuredResultValidator.validateOptimization(
+                            input,
+                            objectMapper.readValue(output, OptimizationReasonResult.class)));
             return new Response(
-                    result,
+                    response.result(),
                     response.model(),
                     response.inputTokens(),
                     response.outputTokens());

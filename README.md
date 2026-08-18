@@ -68,10 +68,15 @@ http://localhost:3000/onboarding/kakaocallback
 ```text
 GEMINI_API_KEY=Google AI Studio에서 발급한 서버용 API 키
 GEMINI_MODEL=gemini-3.6-flash
+SHORTFORM_GEMINI_VIDEO_MODELS=gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3-flash-preview
+SHORTFORM_GEMINI_TEXT_MODELS=gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.5-flash,gemini-3.6-flash,gemini-3-flash-preview
+SHORTFORM_GEMINI_PRODUCT_MODELS=gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.6-flash,gemini-3-flash-preview
 ```
 
 - API 키는 프론트엔드나 Git에 포함하지 않고 서버 환경변수로만 주입합니다.
 - `GEMINI_MODEL`을 생략하면 샘플 영상의 OCR 정확도와 단계 재현율이 더 높았던 `gemini-3.6-flash`를 사용합니다.
+- 숏폼 분석은 작업별 모델 목록을 순서대로 사용하며 429가 발생한 모델은 응답의 재시도 시간 동안 건너뜁니다. 위 `SHORTFORM_GEMINI_*_MODELS`로 기본 순서를 교체할 수 있습니다.
+- 개인화 분석과 optimize의 Gemini 폴백은 모델별 JSON Schema 지원 차이를 피하기 위해 JSON 모드를 사용하고, 반환값은 서버에서 입력 단계·성분·인벤토리 ID 기준으로 다시 검증합니다.
 - 로컬 실행 시에는 기본 `local` 프로필이 활성화되며 `application-local.yml`의 더미 키와 localhost 더미 URL을 사용합니다. 실제 Kakao·식약처·OpenAI·Gemini API로 요청을 보내지 않고도 애플리케이션과 Swagger를 실행할 수 있습니다.
 - 운영 환경은 `SPRING_PROFILES_ACTIVE=prod`를 사용하며 실제 비밀값을 서버 환경변수로 주입해야 합니다.
 

@@ -16,12 +16,13 @@ import domain.beauty.domain.NormalizedYouTubeVideo;
 import domain.beauty.exception.BeautyRoutineException.GeminiUnavailable;
 import domain.beauty.exception.BeautyRoutineException.InvalidGeminiResponse;
 import domain.beauty.exception.BeautyRoutineException.MissingGeminiConfiguration;
+import domain.beauty.shortform.client.GeminiCandidateRejectedException;
+import domain.beauty.shortform.client.GeminiModelRouter;
+import domain.beauty.shortform.client.GeminiModelRoutingException;
+import domain.beauty.shortform.client.GeminiRouteProfile;
 import domain.beauty.support.BeautyRoutineAnalysisValidator;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientResponseException;
 
 @Component
 public class GeminiBeautyRoutineClient implements BeautyRoutineGateway {
@@ -33,19 +34,22 @@ public class GeminiBeautyRoutineClient implements BeautyRoutineGateway {
 	private final GeminiPromptResources promptResources;
 	private final ObjectMapper objectMapper;
 	private final BeautyRoutineAnalysisValidator validator;
+	private final GeminiModelRouter modelRouter;
 
 	public GeminiBeautyRoutineClient(
 		RestClient geminiRestClient,
 		GeminiProperties properties,
 		GeminiPromptResources promptResources,
 		ObjectMapper objectMapper,
-		BeautyRoutineAnalysisValidator validator
+		BeautyRoutineAnalysisValidator validator,
+		GeminiModelRouter modelRouter
 	) {
 		this.restClient = geminiRestClient;
 		this.properties = properties;
 		this.promptResources = promptResources;
 		this.objectMapper = objectMapper;
 		this.validator = validator;
+		this.modelRouter = modelRouter;
 	}
 
 	@Override
@@ -55,32 +59,30 @@ public class GeminiBeautyRoutineClient implements BeautyRoutineGateway {
 		}
 
 		try {
-			String responseBody = restClient.post()
-				.uri(API_PATH)
-				.header("x-goog-api-key", properties.getApiKey())
-				.body(buildRequest(video.watchUrl()))
-				.retrieve()
-				.body(String.class);
-
-			return parseResponse(video, responseBody);
-		} catch (RestClientResponseException exception) {
-			if (exception.getStatusCode().is5xxServerError()
-				|| exception.getStatusCode().value() == HttpStatus.TOO_MANY_REQUESTS.value()) {
-				throw new GeminiUnavailable("Gemini가 일시적으로 요청을 처리할 수 없습니다.", exception);
+			return modelRouter.route(GeminiRouteProfile.VIDEO, "영상 분석", model -> {
+				String responseBody = restClient.post()
+					.uri(API_PATH)
+					.header("x-goog-api-key", properties.getApiKey())
+					.body(buildRequest(video.watchUrl(), model))
+					.retrieve()
+					.body(String.class);
+				try {
+					return parseResponse(video, responseBody, model);
+				} catch (InvalidGeminiResponse exception) {
+					throw new GeminiCandidateRejectedException(exception.getMessage(), exception);
+				}
+			});
+		} catch (GeminiModelRoutingException exception) {
+			if (exception.isConfigurationFailure()) {
+				throw new MissingGeminiConfiguration(exception.getMessage());
 			}
-			if (exception.getStatusCode() == HttpStatus.UNAUTHORIZED
-				|| exception.getStatusCode() == HttpStatus.FORBIDDEN) {
-				throw new MissingGeminiConfiguration("Gemini API 키 또는 프로젝트 권한을 확인해 주세요.");
-			}
-			throw new InvalidGeminiResponse("Gemini 요청이 거부되었습니다.", exception);
-		} catch (ResourceAccessException exception) {
-			throw new GeminiUnavailable("Gemini 응답 시간이 초과되었거나 연결할 수 없습니다.", exception);
+			throw new GeminiUnavailable("Gemini가 일시적으로 요청을 처리할 수 없습니다.", exception);
 		}
 	}
 
-	private Map<String, Object> buildRequest(String watchUrl) {
+	private Map<String, Object> buildRequest(String watchUrl, String model) {
 		Map<String, Object> request = new LinkedHashMap<>();
-		request.put("model", properties.getModel());
+		request.put("model", model);
 		request.put("system_instruction", promptResources.systemPrompt());
 		request.put("input", List.of(
 			Map.of("type", "video", "uri", watchUrl),
@@ -101,7 +103,11 @@ public class GeminiBeautyRoutineClient implements BeautyRoutineGateway {
 		return request;
 	}
 
-	private BeautyRoutineAnalysisResult parseResponse(NormalizedYouTubeVideo video, String responseBody) {
+	private BeautyRoutineAnalysisResult parseResponse(
+		NormalizedYouTubeVideo video,
+		String responseBody,
+		String requestedModel
+	) {
 		if (responseBody == null || responseBody.isBlank()) {
 			throw new InvalidGeminiResponse("Gemini가 빈 응답을 반환했습니다.");
 		}
@@ -116,7 +122,7 @@ public class GeminiBeautyRoutineClient implements BeautyRoutineGateway {
 			BeautyRoutineAnalysis parsedAnalysis = objectMapper.readValue(outputText, BeautyRoutineAnalysis.class);
 			BeautyRoutineAnalysis analysis = validator.validateAndNormalize(parsedAnalysis);
 			TokenUsage usage = parseUsage(envelope.path("usage"));
-			String model = envelope.path("model").asString(properties.getModel());
+			String model = envelope.path("model").asString(requestedModel);
 
 			return new BeautyRoutineAnalysisResult(
 				video.videoId(),
