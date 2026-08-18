@@ -9,6 +9,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import domain.beauty.shortform.config.OpenAiRoutineProperties;
+import domain.beauty.shortform.config.ShortformAiFallbackProperties;
 import java.net.URI;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,7 @@ class OpenAiProductEnrichmentClientTest {
                 builder.build(),
                 properties,
                 new OpenAiProductEnrichmentPromptResources(objectMapper),
+                new ShortformAiFallbackProperties(),
                 objectMapper
         );
         server.expect(requestTo("https://api.openai.test/v1/responses"))

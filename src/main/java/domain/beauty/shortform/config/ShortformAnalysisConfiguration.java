@@ -17,6 +17,7 @@ import org.springframework.web.client.RestClient;
 @EnableConfigurationProperties({
         YouTubeProperties.class,
         OpenAiRoutineProperties.class,
+        ShortformAiFallbackProperties.class,
         ShortformProductEnrichmentProperties.class
 })
 public class ShortformAnalysisConfiguration {

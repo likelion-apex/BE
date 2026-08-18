@@ -108,15 +108,20 @@ public class ShortformProductEnrichmentService {
 
         Response primary = emptyResponse(properties.getProductModel());
         boolean primaryUsesFallbackModel = false;
+        boolean openAiUnavailable = false;
         try {
             primary = openAiClient.enrich(toInput(misses, false));
         } catch (CustomException exception) {
             if (!properties.isProductFallbackEnabled() && !enrichmentProperties.isGeminiFallbackEnabled()) {
                 throw exception;
             }
-            log.warn("숏폼 제품 기본 모델 실패로 보완 모델을 사용합니다: primary={}, fallback={}, reason={}",
-                    properties.getProductModel(), properties.getProductFallbackModel(), exception.getErrorCode());
-            if (properties.isProductFallbackEnabled()) {
+            if (enrichmentProperties.isGeminiFallbackEnabled()) {
+                openAiUnavailable = true;
+                log.warn("OpenAI 제품 보강 실패 후 Gemini로 바로 전환합니다: model={}, reason={}",
+                        properties.getProductModel(), exception.getErrorCode());
+            } else if (properties.isProductFallbackEnabled()) {
+                log.warn("숏폼 제품 기본 모델 실패로 OpenAI 보완 모델을 사용합니다: primary={}, fallback={}, reason={}",
+                        properties.getProductModel(), properties.getProductFallbackModel(), exception.getErrorCode());
                 try {
                     primary = openAiClient.enrich(toInput(misses, true), properties.getProductFallbackModel());
                     primaryUsesFallbackModel = true;
@@ -130,13 +135,15 @@ public class ShortformProductEnrichmentService {
             }
         }
         Map<String, ProductEnrichmentResult.Product> enriched = indexValid(primary, misses);
-        List<RequestedProduct> fallbackTargets = properties.isProductFallbackEnabled() && !primaryUsesFallbackModel
+        List<RequestedProduct> fallbackTargets = properties.isProductFallbackEnabled()
+                && !primaryUsesFallbackModel
+                && !openAiUnavailable
                 ? misses.stream().filter(item -> needsFallback(enriched.get(item.cacheKey()))).toList()
                 : List.of();
 
         long inputTokens = primary.inputTokens();
         long outputTokens = primary.outputTokens();
-        String model = primary.model();
+        String model = openAiUnavailable ? "" : primary.model();
         if (!fallbackTargets.isEmpty()) {
             log.info("숏폼 제품 보완 모델 호출: targets={}, model={}",
                     fallbackTargets.size(), properties.getProductFallbackModel());

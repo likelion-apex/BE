@@ -3,6 +3,7 @@ package domain.beauty.shortform.client;
 import domain.beauty.shortform.client.ProductEnrichmentResult.Response;
 import domain.beauty.shortform.client.ProductEnrichmentResult.WebSource;
 import domain.beauty.shortform.config.OpenAiRoutineProperties;
+import domain.beauty.shortform.config.ShortformAiFallbackProperties;
 import global.exception.CustomException;
 import global.exception.ErrorCode;
 import java.time.Duration;
@@ -33,6 +34,7 @@ public class OpenAiProductEnrichmentClient {
     private final RestClient restClient;
     private final OpenAiRoutineProperties properties;
     private final OpenAiProductEnrichmentPromptResources promptResources;
+    private final ShortformAiFallbackProperties fallbackProperties;
     private final ObjectMapper objectMapper;
     private final Semaphore requestPermit = new Semaphore(1, true);
 
@@ -40,11 +42,13 @@ public class OpenAiProductEnrichmentClient {
             @Qualifier("shortformOpenAiRestClient") RestClient restClient,
             OpenAiRoutineProperties properties,
             OpenAiProductEnrichmentPromptResources promptResources,
+            ShortformAiFallbackProperties fallbackProperties,
             ObjectMapper objectMapper
     ) {
         this.restClient = restClient;
         this.properties = properties;
         this.promptResources = promptResources;
+        this.fallbackProperties = fallbackProperties;
         this.objectMapper = objectMapper;
     }
 
@@ -53,7 +57,7 @@ public class OpenAiProductEnrichmentClient {
     }
 
     public Response enrich(ProductEnrichmentInput input, String model) {
-        return enrich(input, model, MAX_ATTEMPTS);
+        return enrich(input, model, fallbackProperties.isGeminiEnabled() ? 1 : MAX_ATTEMPTS);
     }
 
     public Response enrich(ProductEnrichmentInput input, String model, int maxAttempts) {
