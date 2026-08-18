@@ -6,12 +6,24 @@ import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record RoutineOptimizationSnapshot(
+        Integer overallScore,
+        List<String> highlights,
         int newProductCount,
         int replacedCount,
         int missingCount,
         String summary,
         List<OptimizedStep> steps
 ) {
+
+    public RoutineOptimizationSnapshot(
+            int newProductCount,
+            int replacedCount,
+            int missingCount,
+            String summary,
+            List<OptimizedStep> steps
+    ) {
+        this(null, List.of(), newProductCount, replacedCount, missingCount, summary, steps);
+    }
 
     public record OptimizedStep(
             long sourceResultId,

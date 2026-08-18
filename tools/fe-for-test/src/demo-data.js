@@ -232,6 +232,8 @@ export const demoAnalysisResult = {
 };
 
 export const demoOptimization = {
+  overallScore: 88,
+  highlights: ['수부지 맞춤 성분 12개 매칭', '알레르기 유발 성분 0개'],
   newProductCount: 1,
   replacedCount: 3,
   missingCount: 1,

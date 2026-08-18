@@ -27,7 +27,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["order", "scoreBreakdown", "keyBenefits", "reasons"],
+        "required": ["order", "scoreBreakdown", "keyBenefits", "reasons", "matchedIngredientNames"],
         "properties": {
           "order": {"type": "integer", "minimum": 1, "maximum": 12},
           "scoreBreakdown": {
@@ -61,6 +61,12 @@
                 "evidenceSource": {"type": "string", "minLength": 1, "maxLength": 80}
               }
             }
+          },
+          "matchedIngredientNames": {
+            "type": "array",
+            "maxItems": 30,
+            "description": "이 단계 제품의 입력 ingredients.name 중 피부 타입·고민 적합도 점수의 근거로 사용한 실제 성분명",
+            "items": {"type": "string", "minLength": 1, "maxLength": 100}
           }
         }
       }
@@ -72,7 +78,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["order", "inventoryId", "reason"],
+        "required": ["order", "inventoryId", "reason", "scoreBreakdown", "matchedIngredientNames"],
         "properties": {
           "order": {"type": "integer", "minimum": 1, "maximum": 12},
           "inventoryId": {
@@ -84,6 +90,21 @@
             "minLength": 1,
             "maxLength": 240,
             "description": "영상 제품과 선택한 보유 제품의 확인된 성분·효능 및 피부 프로필을 연결한 1~2문장 맞춤 이유. 대체품이 없으면 영상 제품의 구체적 역할과 보유 대체품 부재를 설명한다."
+          },
+          "scoreBreakdown": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["skinTypeFit", "benefitFit"],
+            "properties": {
+              "skinTypeFit": {"type": "integer", "minimum": 0, "maximum": 40},
+              "benefitFit": {"type": "integer", "minimum": 0, "maximum": 35}
+            }
+          },
+          "matchedIngredientNames": {
+            "type": "array",
+            "maxItems": 30,
+            "description": "선택한 인벤토리 제품의 입력 ingredients.name 중 점수 근거로 사용한 실제 성분명. inventoryId가 null이면 빈 배열",
+            "items": {"type": "string", "minLength": 1, "maxLength": 100}
           }
         }
       }

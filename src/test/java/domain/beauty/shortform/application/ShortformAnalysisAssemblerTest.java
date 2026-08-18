@@ -43,7 +43,8 @@ class ShortformAnalysisAssemblerTest {
                     new ShortformProductCategoryResolver(),
                     new OptimizationReasonComposer(),
                     new ReasonCardNormalizer(),
-                    new ProductCapacityNormalizer());
+                    new ProductCapacityNormalizer(),
+                    new OptimizationScoreCalculator());
 
     @Test
     void forcesUnknownForCategoryOnlyStepAndIgnoresUnknownInventoryId() {
@@ -147,6 +148,7 @@ class ShortformAnalysisAssemblerTest {
         });
         assertThat(assembled.optimization().replacedCount()).isZero();
         assertThat(assembled.optimization().missingCount()).isEqualTo(1);
+        assertThat(assembled.optimization().overallScore()).isEqualTo(80);
     }
 
     @Test
@@ -174,6 +176,10 @@ class ShortformAnalysisAssemblerTest {
             assertThat(step.inventoryId()).isEqualTo(100L);
         });
         assertThat(assembled.optimization().replacedCount()).isEqualTo(1);
+        assertThat(assembled.optimization().overallScore()).isEqualTo(67);
+        assertThat(assembled.optimization().highlights()).containsExactly(
+                "수부지 맞춤 성분 0개 매칭",
+                "알레르기 유발 성분 0개");
         String json = new ObjectMapper().writeValueAsString(assembled.optimization());
         assertThat(json).doesNotContain("compatibleCount", "COMPATIBLE");
     }

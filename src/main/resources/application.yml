@@ -58,7 +58,7 @@ openai:
   model: gpt-4o-mini
   organization-id: ${OPENAI_ORGANIZATION_ID:}
   routine-model: ${OPENAI_ROUTINE_MODEL:gpt-4o-mini}
-  routine-prompt-version: "3.4"
+  routine-prompt-version: "3.5"
   product-model: ${OPENAI_PRODUCT_MODEL:gpt-5.6-luna}
   product-fallback-model: ${OPENAI_PRODUCT_FALLBACK_MODEL:gpt-5.4-mini}
   product-reasoning-effort: ${OPENAI_PRODUCT_REASONING_EFFORT:low}

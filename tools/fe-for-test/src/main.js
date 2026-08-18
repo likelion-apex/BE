@@ -1,6 +1,6 @@
 import './styles.css';
 import { ApiClient } from './api.js';
-import { optimizationPresentation } from './optimization.js';
+import { optimizationPresentation, optimizationScorePresentation } from './optimization.js';
 import { reasonPresentation } from './product-detail.js';
 import {
   buildGeneratedRoutineCreatePayload,
@@ -486,8 +486,10 @@ function assessmentLabel(category) {
 }
 
 function renderOptimization(result) {
+  const score = optimizationScorePresentation(result);
   return `<section class="optimization-report page-section">
     <span class="report-badge">AI 매칭 리포트</span>
+    <div class="score-panel"><strong>AI 매칭 점수 ${score.score}점</strong>${score.highlights.map((item) => `<small>☑ ${escapeHtml(item)}</small>`).join('')}</div>
     <dl>
       <div><dt>숏폼 속 새로운 제품</dt><dd>${Number(result.newProductCount || 0)}개</dd></div>
       <div><dt>AI가 안전하게 대체한 제품</dt><dd class="blue">${Number(result.replacedCount || 0)}개</dd></div>

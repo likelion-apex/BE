@@ -61,7 +61,13 @@ public class RoutineOptimizationNormalizer {
                 ? "영상 속 제품 중 %d개를 같은 카테고리의 인벤토리 제품으로 교체했습니다.".formatted(replacedCount)
                 : "영상 속 루틴과 현재 인벤토리의 조합을 확인했습니다.";
         return new RoutineOptimizationSnapshot(
-                optimization.newProductCount(), replacedCount, missingCount, summary, List.copyOf(normalizedSteps));
+                optimization.overallScore(),
+                optimization.highlights(),
+                optimization.newProductCount(),
+                replacedCount,
+                missingCount,
+                summary,
+                List.copyOf(normalizedSteps));
     }
 
     private OptimizedStep replacementStep(OptimizedStep stored, StepResult source) {

@@ -9,10 +9,24 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["order", "reason"],
+        "required": ["order", "reason", "scoreBreakdown", "matchedIngredientNames"],
         "properties": {
           "order": {"type": "integer", "minimum": 1},
-          "reason": {"type": "string", "minLength": 1, "maxLength": 240}
+          "reason": {"type": "string", "minLength": 1, "maxLength": 240},
+          "scoreBreakdown": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["skinTypeFit", "benefitFit"],
+            "properties": {
+              "skinTypeFit": {"type": "integer", "minimum": 0, "maximum": 40},
+              "benefitFit": {"type": "integer", "minimum": 0, "maximum": 35}
+            }
+          },
+          "matchedIngredientNames": {
+            "type": "array",
+            "maxItems": 30,
+            "items": {"type": "string", "minLength": 1, "maxLength": 100}
+          }
         }
       }
     }
