@@ -88,9 +88,9 @@ public class RoutineController {
     @GetMapping("/api/v1/routines")
     public ApiResponse<ArchivedRoutineListResponse> getArchivedRoutines(
             @AuthenticationPrincipal Long memberId,
-            @RequestParam(defaultValue = "3M") String period,
+            @RequestParam(required = false) Integer year,
             @RequestParam(defaultValue = "LATEST") String sort) {
-        return ApiResponse.success(routineService.getArchivedRoutines(memberId, period, sort));
+        return ApiResponse.success(routineService.getArchivedRoutines(memberId, year, sort));
     }
 
     @Operation(summary = "보관함 루틴 상세 조회")

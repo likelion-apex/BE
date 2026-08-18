@@ -42,12 +42,14 @@ import global.exception.ErrorCode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -125,14 +127,31 @@ public class RoutineService {
         return DailyLogDetailResponse.from(date, dailyCondition, logs);
     }
 
-    public ArchivedRoutineListResponse getArchivedRoutines(Long memberId, String period, String sort) {
-        List<Routine> routines = switch (period) {
-            case "3M" -> routineRepository.findByMemberIdAndStatusAndCreatedAtAfterOrderByCreatedAtDesc(
-                    memberId, RoutineStatus.ARCHIVED, LocalDateTime.now().minusMonths(3));
-            case "6M" -> routineRepository.findByMemberIdAndStatusAndCreatedAtAfterOrderByCreatedAtDesc(
-                    memberId, RoutineStatus.ARCHIVED, LocalDateTime.now().minusMonths(6));
-            default -> routineRepository.findByMemberIdAndStatusOrderByCreatedAtDesc(memberId, RoutineStatus.ARCHIVED);
+    public ArchivedRoutineListResponse getArchivedRoutines(Long memberId, Integer year, String sort) {
+        Sort sortOrder = switch (sort) {
+            case "NAME" -> Sort.by(Sort.Order.asc("name"), Sort.Order.desc("createdAt"));
+            case "STEP_COUNT" -> Sort.unsorted(); // 자바에서 재정렬
+            default -> Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")); // LATEST, SCORE 폴백 (TODO: 선우 매칭점수 필드 추가되면 SCORE 케이스 분리해서 구현)
         };
+
+        List<Routine> routines;
+        if (year != null) {
+            LocalDateTime start = LocalDateTime.of(year, 1, 1, 0, 0);
+            LocalDateTime end = LocalDateTime.of(year, 12, 31, 23, 59, 59);
+            routines = routineRepository.findByMemberIdAndStatusAndCreatedAtBetween(
+                    memberId, RoutineStatus.ARCHIVED, start, end, sortOrder);
+        } else {
+            routines = routineRepository.findByMemberIdAndStatusAndCreatedAtAfter(
+                    memberId, RoutineStatus.ARCHIVED, LocalDateTime.now().minusYears(3), sortOrder);
+        }
+
+        if ("STEP_COUNT".equals(sort)) {
+            routines = routines.stream()
+                    .sorted(Comparator.comparingInt((Routine r) -> r.getSteps().size())
+                            .thenComparing(Routine::getCreatedAt, Comparator.reverseOrder()))
+                    .toList();
+        }
+
         return ArchivedRoutineListResponse.from(routines);
     }
 
