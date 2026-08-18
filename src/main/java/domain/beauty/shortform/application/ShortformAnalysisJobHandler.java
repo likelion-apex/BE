@@ -12,6 +12,7 @@ import domain.beauty.shortform.config.OpenAiRoutineProperties;
 import domain.beauty.shortform.domain.ShortformAnalysisStatus;
 import global.exception.CustomException;
 import global.exception.ErrorCode;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -118,11 +119,19 @@ public class ShortformAnalysisJobHandler {
             if (stopIfCancelled(analysisId)) {
                 return;
             }
+            String resultJson = jsonMapper.write(assembled.analysis());
+            String optimizationJson = jsonMapper.write(assembled.optimization());
+            log.info(
+                    "숏폼 분석 결과 직렬화 완료: analysisId={}, resultBytes={}, optimizationBytes={}, steps={}",
+                    analysisId,
+                    resultJson.getBytes(StandardCharsets.UTF_8).length,
+                    optimizationJson.getBytes(StandardCharsets.UTF_8).length,
+                    assembled.analysis().steps().size());
             stateService.complete(
                     analysisId,
                     extraction.entity(),
-                    jsonMapper.write(assembled.analysis()),
-                    jsonMapper.write(assembled.optimization()),
+                    resultJson,
+                    optimizationJson,
                     assembled.analysis().title(),
                     assembled.analysis().steps().size(),
                     assembled.analysis().overallScore(),
