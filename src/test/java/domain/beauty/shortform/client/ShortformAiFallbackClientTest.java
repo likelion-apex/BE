@@ -1,6 +1,7 @@
 package domain.beauty.shortform.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -25,7 +26,7 @@ import tools.jackson.databind.ObjectMapper;
 class ShortformAiFallbackClientTest {
 
     @Test
-    void fallsBackToGeminiWhenRoutineOpenAiIsRateLimited() {
+    void fallsBackToGeminiWhenRoutineOpenAiIsRateLimited() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper();
         OpenAiRoutineProperties openAiProperties = new OpenAiRoutineProperties();
         openAiProperties.setApiKey("test-openai-key");
@@ -33,10 +34,15 @@ class ShortformAiFallbackClientTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         server.expect(requestTo(openAiProperties.getApiUrl().toString()))
                 .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
+        server.expect(requestTo(openAiProperties.getApiUrl().toString()))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
         GeminiStructuredOutputClient geminiClient = mock(GeminiStructuredOutputClient.class);
-        when(geminiClient.generate(anyString(), anyString(), anyString(), any(JsonNode.class), anyInt()))
-                .thenReturn(new GeminiStructuredOutputClient.Response(
-                        routineResultJson(), "gemini-test", 120, 80));
+        RoutinePersonalizationResult decoded = objectMapper.readValue(
+                routineResultJson(), RoutinePersonalizationResult.class);
+        when(geminiClient.generateDecoded(
+                anyString(), anyString(), anyString(), any(JsonNode.class), anyInt(), any()))
+                .thenReturn(new GeminiStructuredOutputClient.DecodedResponse<>(
+                        decoded, "gemini-test", 120, 80));
         OpenAiRoutineAnalysisClient client = new OpenAiRoutineAnalysisClient(
                 builder.build(),
                 openAiProperties,
@@ -49,19 +55,16 @@ class ShortformAiFallbackClientTest {
 
         assertThat(response.model()).isEqualTo("gemini-test");
         assertThat(response.analysis().title()).isEqualTo("민감 피부 진정 루틴");
-        verify(geminiClient).generate(anyString(), anyString(), anyString(), any(JsonNode.class), anyInt());
+        verify(geminiClient).generateDecoded(
+                anyString(), anyString(), anyString(), any(JsonNode.class), anyInt(), any());
         server.verify();
     }
 
     @Test
-    void fallsBackToGeminiWhenOptimizationOpenAiConfigurationIsMissing() {
+    void doesNotFallbackToGeminiWhenOptimizationOpenAiConfigurationIsMissing() {
         ObjectMapper objectMapper = new ObjectMapper();
         OpenAiRoutineProperties openAiProperties = new OpenAiRoutineProperties();
         GeminiStructuredOutputClient geminiClient = mock(GeminiStructuredOutputClient.class);
-        when(geminiClient.generate(anyString(), anyString(), anyString(), any(JsonNode.class), anyInt()))
-                .thenReturn(new GeminiStructuredOutputClient.Response(
-                        "{\"steps\":[{\"order\":1,\"reason\":\"진정 성분을 확인한 보유 제품으로 대체할 수 있어요.\",\"scoreBreakdown\":{\"skinTypeFit\":32,\"benefitFit\":28},\"matchedIngredientNames\":[\"판테놀\"]}]}",
-                        "gemini-test", 40, 20));
         OpenAiOptimizationReasonClient client = new OpenAiOptimizationReasonClient(
                 RestClient.create(),
                 openAiProperties,
@@ -73,16 +76,11 @@ class ShortformAiFallbackClientTest {
                 new OptimizationReasonInput.MemberProfile("민감성", List.of("피부 진정")),
                 List.of());
 
-        OptimizationReasonResult.Response response = client.generate(input);
-
-        assertThat(response.model()).isEqualTo("gemini-test");
-        assertThat(response.result().steps()).singleElement()
-                .satisfies(step -> {
-                    assertThat(step.reason()).contains("보유 제품");
-                    assertThat(step.scoreBreakdown().skinTypeFit()).isEqualTo(32);
-                    assertThat(step.matchedIngredientNames()).containsExactly("판테놀");
-                });
-        verify(geminiClient).generate(anyString(), anyString(), anyString(), any(JsonNode.class), anyInt());
+        assertThatThrownBy(() -> client.generate(input))
+                .isInstanceOf(global.exception.CustomException.class)
+                .hasMessageContaining("OPENAI_API_KEY");
+        verify(geminiClient, times(0)).generateDecoded(
+                anyString(), anyString(), anyString(), any(JsonNode.class), anyInt(), any());
     }
 
     @Test
@@ -104,7 +102,8 @@ class ShortformAiFallbackClientTest {
                 .isInstanceOf(global.exception.CustomException.class)
                 .hasMessageContaining("OPENAI_API_KEY");
         verify(geminiClient, times(0))
-                .generate(anyString(), anyString(), anyString(), any(JsonNode.class), anyInt());
+                .generateDecoded(
+                        anyString(), anyString(), anyString(), any(JsonNode.class), anyInt(), any());
     }
 
     private RoutinePersonalizationInput routineInput() {

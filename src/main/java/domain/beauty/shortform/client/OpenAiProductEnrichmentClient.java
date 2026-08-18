@@ -57,7 +57,9 @@ public class OpenAiProductEnrichmentClient {
     }
 
     public Response enrich(ProductEnrichmentInput input, String model) {
-        return enrich(input, model, fallbackProperties.isGeminiEnabled() ? 1 : MAX_ATTEMPTS);
+        return enrich(input, model, fallbackProperties.isGeminiEnabled()
+                ? Math.max(1, fallbackProperties.getOpenAiAttemptsBeforeGemini())
+                : MAX_ATTEMPTS);
     }
 
     public Response enrich(ProductEnrichmentInput input, String model, int maxAttempts) {
@@ -158,6 +160,9 @@ public class OpenAiProductEnrichmentClient {
                         exception.getStatusCode().value(), model, attempt + 1);
                 if (!retryable(exception)
                         || !waitBeforeRetry(attempt, maxAttempts, retryAfter(exception))) {
+                    if (!retryable(exception)) {
+                        throw nonRetryableFailure(exception);
+                    }
                     break;
                 }
             } catch (RestClientException exception) {
@@ -174,6 +179,17 @@ public class OpenAiProductEnrichmentClient {
                         ? "OpenAI 제품 보강 요청에 실패했습니다."
                         : "OpenAI 제품 보강 서비스를 일시적으로 사용할 수 없습니다."
         );
+    }
+
+    private CustomException nonRetryableFailure(RestClientResponseException failure) {
+        if (failure.getStatusCode().value() == 401 || failure.getStatusCode().value() == 403) {
+            return new CustomException(
+                    ErrorCode.SHORTFORM_CONFIGURATION_MISSING,
+                    "OpenAI API 키 또는 프로젝트 권한을 확인해 주세요.");
+        }
+        return new CustomException(
+                ErrorCode.SHORTFORM_INVALID_AI_RESPONSE,
+                "OpenAI 제품 보강 요청이 거부되었습니다. HTTP " + failure.getStatusCode().value());
     }
 
     private String outputText(JsonNode envelope) {

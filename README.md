@@ -68,10 +68,19 @@ http://localhost:3000/onboarding/kakaocallback
 ```text
 GEMINI_API_KEY=Google AI Studio에서 발급한 서버용 API 키
 GEMINI_MODEL=gemini-3.6-flash
+SHORTFORM_GEMINI_MODEL_ROUTING_ENABLED=true
+SHORTFORM_OPENAI_ATTEMPTS_BEFORE_GEMINI=2
+SHORTFORM_GEMINI_VIDEO_MODELS=gemini-3.7-flash,gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3-flash-preview
+SHORTFORM_GEMINI_TEXT_MODELS=gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.5-flash,gemini-3.6-flash,gemini-3.7-flash,gemini-3-flash-preview
+SHORTFORM_GEMINI_PRODUCT_MODELS=gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.6-flash,gemini-3.7-flash,gemini-3-flash-preview
 ```
 
 - API 키는 프론트엔드나 Git에 포함하지 않고 서버 환경변수로만 주입합니다.
 - `GEMINI_MODEL`을 생략하면 샘플 영상의 OCR 정확도와 단계 재현율이 더 높았던 `gemini-3.6-flash`를 사용합니다.
+- 개인화 분석·optimize·제품 보강은 OpenAI를 먼저 최대 2회 시도하고, 429·5xx·연결 장애일 때만 Gemini로 전환합니다. 영상 추출은 Gemini만 사용합니다.
+- Gemini는 작업별 모델 목록을 한 번만 순회하며 429 모델은 쿨다운 동안 건너뜁니다. 네트워크 호출을 직렬화하거나 한 요청에서 지연 재순회하지 않습니다.
+- `SHORTFORM_GEMINI_MODEL_ROUTING_ENABLED=false`이면 모든 Gemini 작업이 `GEMINI_MODEL` 하나만 사용하므로 배포 후 다중 모델 라우팅을 즉시 끌 수 있습니다.
+- 개인화 분석과 optimize의 Gemini 폴백은 모델별 JSON Schema 지원 차이를 피하기 위해 JSON 모드를 사용하고, 반환값은 서버에서 입력 단계·성분·인벤토리 ID 기준으로 다시 검증합니다.
 - 로컬 실행 시에는 기본 `local` 프로필이 활성화되며 `application-local.yml`의 더미 키와 localhost 더미 URL을 사용합니다. 실제 Kakao·식약처·OpenAI·Gemini API로 요청을 보내지 않고도 애플리케이션과 Swagger를 실행할 수 있습니다.
 - 운영 환경은 `SPRING_PROFILES_ACTIVE=prod`를 사용하며 실제 비밀값을 서버 환경변수로 주입해야 합니다.
 

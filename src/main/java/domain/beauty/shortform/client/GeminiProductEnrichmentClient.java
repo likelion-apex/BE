@@ -6,18 +6,14 @@ import domain.beauty.shortform.client.ProductEnrichmentResult.WebSource;
 import domain.beauty.shortform.config.ShortformProductEnrichmentProperties;
 import global.exception.CustomException;
 import global.exception.ErrorCode;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -27,27 +23,27 @@ import tools.jackson.databind.ObjectMapper;
 public class GeminiProductEnrichmentClient {
 
     private static final String API_PATH = "/v1beta/interactions";
-    private static final int MAX_ATTEMPTS = 3;
-    private static final Duration MAX_RETRY_DELAY = Duration.ofSeconds(30);
-
     private final RestClient restClient;
     private final GeminiProperties geminiProperties;
     private final ShortformProductEnrichmentProperties properties;
     private final GeminiProductEnrichmentPromptResources promptResources;
     private final ObjectMapper objectMapper;
+    private final GeminiModelRouter modelRouter;
 
     public GeminiProductEnrichmentClient(
             RestClient geminiRestClient,
             GeminiProperties geminiProperties,
             ShortformProductEnrichmentProperties properties,
             GeminiProductEnrichmentPromptResources promptResources,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            GeminiModelRouter modelRouter
     ) {
         this.restClient = geminiRestClient;
         this.geminiProperties = geminiProperties;
         this.properties = properties;
         this.promptResources = promptResources;
         this.objectMapper = objectMapper;
+        this.modelRouter = modelRouter;
     }
 
     public Response enrich(ProductEnrichmentInput input) {
@@ -65,10 +61,10 @@ public class GeminiProductEnrichmentClient {
         }
 
         try {
-            String responseBody = webSearchEnabled
-                    ? executeWithRetry(buildRequest(input, true))
-                    : executeOnce(buildRequest(input, false));
-            Response parsed = parse(responseBody);
+            Response parsed = modelRouter.route(
+                    GeminiRouteProfile.PRODUCT,
+                    webSearchEnabled ? "제품 검색" : "제품 지식 보강",
+                    model -> executeCandidate(input, webSearchEnabled, model));
             Response response = webSearchEnabled
                     ? parsed
                     : new Response(
@@ -80,24 +76,47 @@ public class GeminiProductEnrichmentClient {
                     response.model(), input.products().size(), response.webSearchCalls(),
                     response.webSources().size(), response.inputTokens(), response.outputTokens());
             return response;
-        } catch (CustomException exception) {
-            throw exception;
-        } catch (RestClientResponseException exception) {
-            log.warn("Gemini 제품 웹 보강 HTTP 실패: status={}, model={}",
-                    exception.getStatusCode().value(), geminiProperties.getModel());
-            if (exception.getStatusCode() == HttpStatus.UNAUTHORIZED
-                    || exception.getStatusCode() == HttpStatus.FORBIDDEN) {
+        } catch (GeminiModelRoutingException exception) {
+            if (exception.isConfigurationFailure()) {
                 throw new CustomException(ErrorCode.SHORTFORM_CONFIGURATION_MISSING,
                         "Gemini API 키 또는 프로젝트 권한을 확인해 주세요.");
             }
             throw new CustomException(ErrorCode.SHORTFORM_EXTERNAL_API_UNAVAILABLE,
                     "Gemini 제품 보강 서비스를 일시적으로 사용할 수 없습니다.");
-        } catch (ResourceAccessException exception) {
-            throw new CustomException(ErrorCode.SHORTFORM_EXTERNAL_API_UNAVAILABLE,
-                    "Gemini 제품 보강 응답 시간이 초과되었습니다.");
         } catch (JacksonException exception) {
             throw new CustomException(ErrorCode.SHORTFORM_INVALID_AI_RESPONSE,
                     "Gemini 제품 보강 응답 JSON을 해석할 수 없습니다.");
+        }
+    }
+
+    private Response executeCandidate(
+            ProductEnrichmentInput input,
+            boolean webSearchEnabled,
+            String model
+    ) {
+        try {
+            String responseBody = restClient.post()
+                    .uri(API_PATH)
+                    .header("x-goog-api-key", geminiProperties.getApiKey())
+                    .body(buildRequest(input, webSearchEnabled, model))
+                    .retrieve()
+                    .body(String.class);
+            Response response = parse(responseBody, model);
+            Set<String> requestedKeys = input.products() == null
+                    ? Set.of()
+                    : input.products().stream()
+                            .map(ProductEnrichmentInput.Product::requestKey)
+                            .collect(java.util.stream.Collectors.toSet());
+            boolean hasRequestedProduct = response.result() != null
+                    && response.result().products() != null
+                    && response.result().products().stream()
+                            .anyMatch(product -> product != null && requestedKeys.contains(product.requestKey()));
+            if (!hasRequestedProduct) {
+                throw new GeminiCandidateRejectedException("요청한 제품의 보강 결과가 없습니다.");
+            }
+            return response;
+        } catch (JacksonException exception) {
+            throw new GeminiCandidateRejectedException("제품 보강 JSON을 해석할 수 없습니다.", exception);
         }
     }
 
@@ -137,89 +156,13 @@ public class GeminiProductEnrichmentClient {
         return value == null || value.isBlank() ? fallback : value;
     }
 
-    private String executeOnce(Map<String, Object> request) {
-        return restClient.post()
-                .uri(API_PATH)
-                .header("x-goog-api-key", geminiProperties.getApiKey())
-                .body(request)
-                .retrieve()
-                .body(String.class);
-    }
-
-    private String executeWithRetry(Map<String, Object> request) {
-        RestClientResponseException lastFailure = null;
-        for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-            try {
-                return restClient.post()
-                        .uri(API_PATH)
-                        .header("x-goog-api-key", geminiProperties.getApiKey())
-                        .body(request)
-                        .retrieve()
-                        .body(String.class);
-            } catch (RestClientResponseException exception) {
-                lastFailure = exception;
-                log.warn("Gemini 제품 웹 보강 HTTP 실패: status={}, model={}, attempt={}",
-                        exception.getStatusCode().value(), geminiProperties.getModel(), attempt + 1);
-                if (exception.getStatusCode() == HttpStatus.UNAUTHORIZED
-                        || exception.getStatusCode() == HttpStatus.FORBIDDEN
-                        || quotaExhausted(exception)
-                        || (!retryable(exception) || !waitBeforeRetry(exception, attempt))) {
-                    throw exception;
-                }
-            }
-        }
-        throw lastFailure;
-    }
-
-    private boolean retryable(RestClientResponseException exception) {
-        return exception.getStatusCode().value() == 429 || exception.getStatusCode().is5xxServerError();
-    }
-
-    private boolean quotaExhausted(RestClientResponseException exception) {
-        String body = exception.getResponseBodyAsString();
-        return body != null && body.contains("exceeded your current quota");
-    }
-
-    private boolean waitBeforeRetry(RestClientResponseException exception, int attempt) {
-        if (attempt >= MAX_ATTEMPTS - 1) {
-            return false;
-        }
-        Duration fallback = Duration.ofSeconds(5L << attempt);
-        Duration requested = retryAfter(exception);
-        Duration delay = requested == null ? fallback : requested;
-        if (delay.compareTo(MAX_RETRY_DELAY) > 0) {
-            delay = MAX_RETRY_DELAY;
-        }
-        try {
-            Thread.sleep(delay.toMillis());
-            return true;
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
-            return false;
-        }
-    }
-
-    private Duration retryAfter(RestClientResponseException exception) {
-        if (exception.getResponseHeaders() == null) {
-            return null;
-        }
-        String value = exception.getResponseHeaders().getFirst(HttpHeaders.RETRY_AFTER);
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        try {
-            return Duration.ofSeconds(Math.max(0, Long.parseLong(value.trim())));
-        } catch (NumberFormatException ignored) {
-            return null;
-        }
-    }
-
     private Map<String, Object> buildRequest(
             ProductEnrichmentInput input,
-            boolean webSearchEnabled
+            boolean webSearchEnabled,
+            String model
     ) throws JacksonException {
         Map<String, Object> request = new LinkedHashMap<>();
-        request.put("model", geminiProperties.getModel());
+		request.put("model", model);
         String systemPrompt = promptResources.systemPrompt();
         if (!webSearchEnabled) {
             systemPrompt += "\n\nGoogle Search 쿼터가 없어 모델 지식으로만 최선 추정합니다. "
@@ -229,6 +172,8 @@ public class GeminiProductEnrichmentClient {
                     + "카테고리 대표 처방이면 marketOrVariant와 notes에 제품별 확정값이 아님을 분명히 적으세요. "
                     + "sources는 빈 배열로 두고 불확실성은 notes에 명시하세요.";
         }
+        systemPrompt += "\n\n반드시 아래 JSON 계약의 필드명과 구조를 따라 JSON 객체만 반환하세요.\n"
+                + promptResources.responseSchema().toString();
         request.put("system_instruction", systemPrompt);
         request.put("input", "다음 JSON의 모든 제품을 "
                 + (webSearchEnabled ? "Google Search로 재조사하세요.\n" : "모델 지식으로 보완하세요.\n")
@@ -238,8 +183,7 @@ public class GeminiProductEnrichmentClient {
         }
         request.put("response_format", Map.of(
                 "type", "text",
-                "mime_type", "application/json",
-                "schema", promptResources.responseSchema()
+                "mime_type", "application/json"
         ));
         request.put("generation_config", Map.of(
                 "max_output_tokens", properties.getGeminiMaxOutputTokens(),
@@ -250,15 +194,13 @@ public class GeminiProductEnrichmentClient {
         return request;
     }
 
-    private Response parse(String responseBody) throws JacksonException {
+    private Response parse(String responseBody, String requestedModel) throws JacksonException {
         if (responseBody == null || responseBody.isBlank()) {
-            throw new CustomException(ErrorCode.SHORTFORM_INVALID_AI_RESPONSE,
-                    "Gemini 제품 보강이 빈 응답을 반환했습니다.");
+            throw new GeminiCandidateRejectedException("제품 보강이 빈 응답을 반환했습니다.");
         }
         JsonNode envelope = objectMapper.readTree(responseBody);
         if (!"completed".equals(envelope.path("status").asString())) {
-            throw new CustomException(ErrorCode.SHORTFORM_INVALID_AI_RESPONSE,
-                    "Gemini 제품 보강이 완료 상태가 아닙니다.");
+            throw new GeminiCandidateRejectedException("제품 보강이 완료 상태가 아닙니다.");
         }
 
         String outputText = null;
@@ -284,15 +226,14 @@ public class GeminiProductEnrichmentClient {
             }
         }
         if (outputText == null || outputText.isBlank()) {
-            throw new CustomException(ErrorCode.SHORTFORM_INVALID_AI_RESPONSE,
-                    "Gemini 제품 보강에 텍스트 결과가 없습니다.");
+            throw new GeminiCandidateRejectedException("제품 보강에 텍스트 결과가 없습니다.");
         }
 
         ProductEnrichmentResult result = objectMapper.readValue(outputText, ProductEnrichmentResult.class);
         JsonNode usage = envelope.path("usage");
         return new Response(
                 result,
-                envelope.path("model").asString(geminiProperties.getModel()),
+                envelope.path("model").asString(requestedModel),
                 usage.path("total_input_tokens").asLong(),
                 usage.path("total_output_tokens").asLong(),
                 searchCalls,

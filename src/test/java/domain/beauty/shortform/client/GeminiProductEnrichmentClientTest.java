@@ -10,6 +10,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 
 import domain.beauty.config.GeminiProperties;
+import domain.beauty.shortform.config.ShortformAiFallbackProperties;
 import domain.beauty.shortform.config.ShortformProductEnrichmentProperties;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -35,7 +36,8 @@ class GeminiProductEnrichmentClientTest {
                 geminiProperties,
                 new ShortformProductEnrichmentProperties(),
                 new GeminiProductEnrichmentPromptResources(objectMapper),
-                objectMapper
+                objectMapper,
+                new GeminiModelRouter(geminiProperties, new ShortformAiFallbackProperties())
         );
         server.expect(requestTo("https://gemini.test/v1beta/interactions"))
                 .andExpect(method(HttpMethod.POST))
@@ -63,7 +65,7 @@ class GeminiProductEnrichmentClientTest {
     }
 
     @Test
-    void retriesOnceWhenGeminiReturnsRateLimit() throws Exception {
+    void routesToNextProductModelWhenGeminiReturnsRateLimit() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper();
         GeminiProperties geminiProperties = new GeminiProperties();
         geminiProperties.setApiKey("test-gemini-key");
@@ -71,7 +73,8 @@ class GeminiProductEnrichmentClientTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         GeminiProductEnrichmentClient client = new GeminiProductEnrichmentClient(
                 builder.build(), geminiProperties, new ShortformProductEnrichmentProperties(),
-                new GeminiProductEnrichmentPromptResources(objectMapper), objectMapper);
+                new GeminiProductEnrichmentPromptResources(objectMapper), objectMapper,
+                new GeminiModelRouter(geminiProperties, new ShortformAiFallbackProperties()));
         server.expect(requestTo("https://gemini.test/v1beta/interactions"))
                 .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS)
                         .header(HttpHeaders.RETRY_AFTER, "0"));
@@ -97,7 +100,8 @@ class GeminiProductEnrichmentClientTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         GeminiProductEnrichmentClient client = new GeminiProductEnrichmentClient(
                 builder.build(), geminiProperties, new ShortformProductEnrichmentProperties(),
-                new GeminiProductEnrichmentPromptResources(objectMapper), objectMapper);
+                new GeminiProductEnrichmentPromptResources(objectMapper), objectMapper,
+                new GeminiModelRouter(geminiProperties, new ShortformAiFallbackProperties()));
         server.expect(requestTo("https://gemini.test/v1beta/interactions"))
                 .andExpect(content().string(containsString("모델 지식으로 보완")))
                 .andRespond(withSuccess(knowledgeResponse(objectMapper), MediaType.APPLICATION_JSON));
