@@ -59,6 +59,7 @@ public class ShortformAnalysisJobHandler {
 
     @Async("shortformAnalysisExecutor")
     public void analyze(Long analysisId) {
+        long jobStartedAt = System.nanoTime();
         try {
             JobContext context = stateService.loadJobContext(analysisId);
             if (stopIfCancelled(analysisId)) {
@@ -70,10 +71,12 @@ public class ShortformAnalysisJobHandler {
                     ShortformAnalysisStatus.EXTRACTING_VIDEO,
                     "영상 속 핵심 제품과 사용 단계를 추출하고 있습니다."
             );
+            long stageStartedAt = System.nanoTime();
             ExtractionResult extraction = extractionService.getOrAnalyze(
                     context.videoId(), context.youtubeUrl());
             validateSkincare(extraction.result().analysis());
             stateService.attachExtraction(analysisId, extraction.entity());
+            logStage(analysisId, "video-extraction", stageStartedAt, jobStartedAt);
 
             if (stopIfCancelled(analysisId)) {
                 return;
@@ -83,8 +86,18 @@ public class ShortformAnalysisJobHandler {
                     ShortformAnalysisStatus.MATCHING_PRODUCTS,
                     "영상 제품을 서비스의 제품 정보와 연결하고 있습니다."
             );
+            stageStartedAt = System.nanoTime();
             BatchResult enrichment = productEnrichmentService.getOrEnrich(
                     extraction.result().analysis().steps());
+            log.info(
+                    "숏폼 분석 단계 완료: analysisId={}, stage=video-product-enrichment, durationMs={}, "
+                            + "totalElapsedMs={}, cacheHits={}, cacheMisses={}",
+                    analysisId,
+                    elapsedMillis(stageStartedAt),
+                    elapsedMillis(jobStartedAt),
+                    enrichment.cacheHits(),
+                    enrichment.cacheMisses());
+            stageStartedAt = System.nanoTime();
             List<MatchedVideoStep> matchedSteps = productMatcher.match(
                     extraction.result().analysis().steps(), enrichment.productsByOrder());
             Set<domain.inventory.ProductCategory> videoCategories = matchedSteps.stream()
@@ -92,6 +105,7 @@ public class ShortformAnalysisJobHandler {
                     .collect(Collectors.toSet());
             Map<Long, InventoryProductEvidence> inventoryEvidence = inventoryEvidenceService
                     .enrichMatchingCategories(context.inventory(), videoCategories);
+            logStage(analysisId, "inventory-evidence", stageStartedAt, jobStartedAt);
 
             if (stopIfCancelled(analysisId)) {
                 return;
@@ -103,7 +117,9 @@ public class ShortformAnalysisJobHandler {
             );
             RoutinePersonalizationInput input = assembler.toInput(
                     context, extraction.result().analysis(), matchedSteps, inventoryEvidence);
+            stageStartedAt = System.nanoTime();
             Response aiResponse = openAiClient.analyze(input);
+            logStage(analysisId, "personalization", stageStartedAt, jobStartedAt);
 
             if (stopIfCancelled(analysisId)) {
                 return;
@@ -113,8 +129,10 @@ public class ShortformAnalysisJobHandler {
                     ShortformAnalysisStatus.OPTIMIZING,
                     "인벤토리 제품과의 궁합을 확인하고 있습니다."
             );
+            stageStartedAt = System.nanoTime();
             AssembledResult assembled = assembler.assemble(
                     context, matchedSteps, aiResponse, extraction.entity(), enrichment, inventoryEvidence);
+            logStage(analysisId, "optimization-assembly", stageStartedAt, jobStartedAt);
 
             if (stopIfCancelled(analysisId)) {
                 return;
@@ -140,6 +158,8 @@ public class ShortformAnalysisJobHandler {
                     aiResponse.inputTokens(),
                     aiResponse.outputTokens()
             );
+            log.info("숏폼 분석 작업 완료: analysisId={}, totalDurationMs={}",
+                    analysisId, elapsedMillis(jobStartedAt));
         } catch (CustomException exception) {
             stateService.fail(
                     analysisId,
@@ -154,6 +174,15 @@ public class ShortformAnalysisJobHandler {
                     "예상하지 못한 오류로 루틴 분석에 실패했습니다."
             );
         }
+    }
+
+    private void logStage(Long analysisId, String stage, long stageStartedAt, long jobStartedAt) {
+        log.info("숏폼 분석 단계 완료: analysisId={}, stage={}, durationMs={}, totalElapsedMs={}",
+                analysisId, stage, elapsedMillis(stageStartedAt), elapsedMillis(jobStartedAt));
+    }
+
+    private long elapsedMillis(long startedAt) {
+        return (System.nanoTime() - startedAt) / 1_000_000L;
     }
 
     private void validateSkincare(BeautyRoutineAnalysis analysis) {
