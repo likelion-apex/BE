@@ -19,7 +19,7 @@ class SwaggerDocumentationTests {
 	void documentsEveryProductionApiWithExpectedSecurityAndResponses() throws Exception {
 		mockMvc.perform(get("/v3/api-docs"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.paths.length()").value(41))
+			.andExpect(jsonPath("$.paths.length()").value(42))
 			.andExpect(jsonPath("$.paths['/api/auth/kakao/login'].post.summary").value("카카오 로그인/회원가입"))
 			.andExpect(jsonPath("$.paths['/api/auth/kakao/login'].post.security").doesNotExist())
 			.andExpect(jsonPath("$.paths['/api/auth/reissue'].post.responses['401']").exists())
@@ -73,6 +73,7 @@ class SwaggerDocumentationTests {
 			.andExpect(jsonPath("$.paths['/api/shortform-analyses/{analysisId}/status'].get.summary").value("루틴 분석 진행 상태 조회"))
 			.andExpect(jsonPath("$.paths['/api/shortform-analyses/{analysisId}/cancel'].post.summary").value("루틴 분석 취소"))
 			.andExpect(jsonPath("$.paths['/api/shortform-analyses/{analysisId}/results/{resultId}'].get.summary").value("루틴 단계별 제품 분석 상세 조회"))
+			.andExpect(jsonPath("$.paths['/api/shortform-analyses/{analysisId}/reanalyze-ingredients'].post.summary").value("성분 정보가 부족한 기존 루틴 재분석"))
 			.andExpect(jsonPath("$.paths['/api/shortform-analyses/{analysisId}/optimize'].post.summary").value("내 인벤토리 기반 루틴 최적화"))
 			.andExpect(jsonPath("$.paths['/api/shortform-analyses/{analysisId}/apply'].post.summary").value("분석한 루틴 적용 또는 보관"));
 	}

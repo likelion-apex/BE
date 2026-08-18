@@ -1,7 +1,7 @@
 import './styles.css';
 import { ApiClient } from './api.js';
 import { optimizationPresentation, optimizationScorePresentation } from './optimization.js';
-import { reasonPresentation } from './product-detail.js';
+import { needsIngredientReanalysis, reasonPresentation } from './product-detail.js';
 import {
   buildGeneratedRoutineCreatePayload,
   buildKakaoAuthorizeUrl,
@@ -822,13 +822,23 @@ async function showProductDetail({ inventoryId, productId, resultId }) {
       throw new Error('제품 식별자가 없습니다.');
     }
     state.debug = detail;
-    renderProductDetailDialog(detail, { inventoryId, ingredients });
+    renderProductDetailDialog(detail, {
+      inventoryId,
+      ingredients,
+      analysisId: resultId ? state.analysisId : null,
+      resultId,
+    });
   } catch (error) {
     openDialog(dialogFrame('제품 분석', `<div class="dialog-error"><b>제품 정보를 불러오지 못했어요.</b><p>${escapeHtml(error.message)}</p></div>`));
   }
 }
 
-function renderProductDetailDialog(detail, { inventoryId, ingredients } = {}) {
+function renderProductDetailDialog(detail, {
+  inventoryId,
+  ingredients,
+  analysisId,
+  resultId,
+} = {}) {
   const score = detail.matchScore ?? detail.score;
   const reasons = detail.reasons || [];
   const ingredientItems = detail.ingredients || ingredients?.ingredients || [];
@@ -836,6 +846,7 @@ function renderProductDetailDialog(detail, { inventoryId, ingredients } = {}) {
     detail.ingredientMarketOrVariant,
     categoryLabels[detail.category] || detail.category,
   ].filter(Boolean);
+  const canReanalyzeIngredients = analysisId && resultId && needsIngredientReanalysis(detail);
   const reasonCards = reasons.map((reason) => {
     const presentation = reasonPresentation(reason);
     return `<article class="reason-card ${presentation.category}"><span class="reason-card-icon"><img src="${presentation.iconUrl}" alt=""></span><div><b>${escapeHtml(reason.title || reason.keyword)}</b><p>${escapeHtml(reason.description || reason.reason)}</p></div></article>`;
@@ -845,9 +856,34 @@ function renderProductDetailDialog(detail, { inventoryId, ingredients } = {}) {
     ${score == null ? '' : `<div class="personal-score"><img src="/assets/ai-orb.png" alt=""><span><small>내 피부 프로필 맞춤</small><b>AI 매칭 점수 ${Number(score)}점</b></span></div>`}
     <div class="detail-tabs"><button class="active" type="button" data-detail-tab="analysis">AI 맞춤 분석</button><button type="button" data-detail-tab="ingredients">전체 성분</button></div>
     <section class="detail-pane active" data-detail-pane="analysis"><h3>이 제품이 ${score ?? '-'}점인 이유</h3>${reasons.length ? reasonCards : '<div class="empty-inline">분석 근거가 제공되지 않았어요.</div>'}${detail.disclaimer ? `<p class="disclaimer">${escapeHtml(detail.disclaimer)}</p>` : ''}</section>
-    <section class="detail-pane" data-detail-pane="ingredients"><h3>전성분 ${ingredientItems.length}개</h3>${ingredientItems.length ? `<ul class="ingredient-list">${ingredientItems.map((item, index) => `<li><i class="risk-${String(item.riskLevel || 'unknown').toLowerCase()}">${item.riskScore ?? index + 1}</i><span><b>${escapeHtml(item.name || item.ingredientName)}</b><small>${escapeHtml((item.purposes || item.purposeTags || []).join(', ') || '배합 목적 미확인')}</small></span></li>`).join('')}</ul>` : '<div class="empty-inline">전체 성분 정보가 아직 없어요.</div>'}</section>
+    <section class="detail-pane" data-detail-pane="ingredients"><h3>전성분 ${ingredientItems.length}개</h3>${ingredientItems.length ? `<ul class="ingredient-list">${ingredientItems.map((item, index) => `<li><i class="risk-${String(item.riskLevel || 'unknown').toLowerCase()}">${item.riskScore ?? index + 1}</i><span><b>${escapeHtml(item.name || item.ingredientName)}</b><small>${escapeHtml((item.purposes || item.purposeTags || []).join(', ') || '배합 목적 미확인')}</small></span></li>`).join('')}</ul>` : `<div class="empty-inline ingredient-reanalysis"><p>전체 성분 정보가 아직 없어요.</p>${canReanalyzeIngredients ? `<button class="secondary-button" type="button" data-action="reanalyze-ingredients" data-analysis-id="${analysisId}">성분 정보 다시 분석하기</button><small>확인된 캐시는 유지하고 비어 있는 제품만 다시 확인해요.</small>` : ''}</div>`}</section>
     ${inventoryId ? `<button class="danger-text" type="button" data-action="delete-inventory" data-inventory-id="${inventoryId}">인벤토리에서 삭제</button>` : ''}
   `), 'product-detail-dialog');
+}
+
+async function reanalyzeIngredients(analysisId) {
+  if (!analysisId || state.isDemo) return;
+  const button = dialog.querySelector('[data-action="reanalyze-ingredients"]');
+  if (button) button.disabled = true;
+  try {
+    const created = await api.data(`/api/shortform-analyses/${analysisId}/reanalyze-ingredients`, {
+      method: 'POST',
+    });
+    closeDialog();
+    state.analysisId = created.analysisId;
+    state.analysisStatus = created;
+    state.analysisResult = null;
+    state.optimization = null;
+    state.activeView = 'analysis';
+    state.debug = created;
+    render();
+    toast(created.reused ? '진행 중인 성분 재분석을 이어서 확인해요.' : '비어 있는 성분 정보를 다시 분석하고 있어요.', 'success');
+    if (created.status === 'COMPLETED') await loadAnalysisDetail(created.analysisId);
+    else pollAnalysis();
+  } catch (error) {
+    toast(`성분 재분석 요청에 실패했습니다. ${error.message}`, 'error');
+    if (button) button.disabled = false;
+  }
 }
 
 async function hydrateApp({ forceOnboarding = false } = {}) {
@@ -1770,6 +1806,8 @@ dialog.addEventListener('click', (event) => {
   if (applyRoutineButton) applyArchivedRoutine(applyRoutineButton.dataset.routineId);
   const deleteRoutineButton = event.target.closest('[data-action="delete-routine"]');
   if (deleteRoutineButton) deleteArchivedRoutine(deleteRoutineButton.dataset.routineId);
+  const reanalysisButton = event.target.closest('[data-action="reanalyze-ingredients"]');
+  if (reanalysisButton) reanalyzeIngredients(reanalysisButton.dataset.analysisId);
 });
 
 dialog.addEventListener('submit', async (event) => {

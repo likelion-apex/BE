@@ -98,6 +98,23 @@ public class ShortformAnalysisController {
         return ApiResponse.success(service.productDetail(memberId, analysisId, resultId));
     }
 
+    @PostMapping("/{analysisId}/reanalyze-ingredients")
+    @Operation(summary = "성분 정보가 부족한 기존 루틴 재분석")
+    public ResponseEntity<ApiResponse<Created>> reanalyzeIngredients(
+            @AuthenticationPrincipal Long memberId,
+            @PathVariable Long analysisId
+    ) {
+        Created result = service.reanalyzeIngredients(memberId, analysisId);
+        HttpStatus status = result.reused() ? HttpStatus.OK : HttpStatus.ACCEPTED;
+        String message = result.status() == domain.beauty.shortform.domain.ShortformAnalysisStatus.COMPLETED
+                ? "이미 성분 정보가 확인된 분석입니다."
+                : result.reused()
+                        ? "진행 중인 성분 재분석을 반환합니다."
+                        : "성분 정보를 다시 분석합니다.";
+        return ResponseEntity.status(status)
+                .body(ApiResponse.success(message, result));
+    }
+
     @PostMapping("/{analysisId}/optimize")
     @Operation(summary = "내 인벤토리 기반 루틴 최적화")
     public ApiResponse<Optimization> optimize(

@@ -88,6 +88,31 @@ public class ShortformAnalysisStateService {
         return new CreateResult(analysis, true);
     }
 
+    @Transactional
+    public CreateResult reanalyze(Long memberId, Long sourceAnalysisId) {
+        ShortformAnalysis source = findOwned(memberId, sourceAnalysisId);
+        requireCompleted(source);
+        ShortformAnalysis latest = analysisRepository
+                .findFirstByMemberIdAndAnalysisFingerprintOrderByCreatedAtDesc(
+                        memberId, source.getAnalysisFingerprint())
+                .orElse(null);
+        if (latest != null
+                && !latest.getId().equals(source.getId())
+                && !latest.getStatus().isTerminal()) {
+            return new CreateResult(latest, false);
+        }
+
+        ShortformAnalysis replacement = new ShortformAnalysis(
+                source.getMember(),
+                source.getVideoId(),
+                source.getYoutubeUrl(),
+                source.getAnalysisFingerprint());
+        replacement.cacheThumbnailUrl(source.getThumbnailUrl());
+        analysisRepository.save(replacement);
+        eventPublisher.publishEvent(new ShortformAnalysisRequested(replacement.getId(), true));
+        return new CreateResult(replacement, true);
+    }
+
     @Transactional(readOnly = true)
     public JobContext loadJobContext(Long analysisId) {
         ShortformAnalysis analysis = find(analysisId);

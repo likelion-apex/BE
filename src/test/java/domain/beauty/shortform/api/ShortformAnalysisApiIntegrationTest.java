@@ -322,6 +322,53 @@ class ShortformAnalysisApiIntegrationTest {
     }
 
     @Test
+    void createsOneReplacementAnalysisForMissingIngredientsAndReusesItWhileRunning() throws Exception {
+        Member member = saveMember("ingredient-reanalysis-member");
+        ShortformAnalysis source = completedAnalysisWithMissingIngredients(member);
+        analysisRepository.saveAndFlush(source);
+        clearInvocations(jobHandler);
+
+        mockMvc.perform(post("/api/shortform-analyses/{analysisId}/reanalyze-ingredients", source.getId())
+                        .with(authentication(memberAuthentication(member.getId()))))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.data.status").value("PENDING"))
+                .andExpect(jsonPath("$.data.reused").value(false));
+
+        ShortformAnalysis replacement = analysisRepository.findAll().stream()
+                .filter(candidate -> !candidate.getId().equals(source.getId()))
+                .findFirst()
+                .orElseThrow();
+        verify(jobHandler).analyze(replacement.getId(), true);
+
+        mockMvc.perform(post("/api/shortform-analyses/{analysisId}/reanalyze-ingredients", source.getId())
+                        .with(authentication(memberAuthentication(member.getId()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.analysisId").value(replacement.getId()))
+                .andExpect(jsonPath("$.data.reused").value(true));
+
+        assertThat(analysisRepository.count()).isEqualTo(2);
+        verify(jobHandler, times(1)).analyze(replacement.getId(), true);
+    }
+
+    @Test
+    void doesNotReanalyzeCompletedResultThatAlreadyHasIngredients() throws Exception {
+        Member member = saveMember("complete-ingredient-member");
+        ShortformAnalysis source = completedAnalysisWithIngredients(member);
+        analysisRepository.saveAndFlush(source);
+        clearInvocations(jobHandler);
+
+        mockMvc.perform(post("/api/shortform-analyses/{analysisId}/reanalyze-ingredients", source.getId())
+                        .with(authentication(memberAuthentication(member.getId()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.analysisId").value(source.getId()))
+                .andExpect(jsonPath("$.data.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.data.reused").value(true));
+
+        assertThat(analysisRepository.count()).isEqualTo(1);
+        verifyNoInteractions(jobHandler);
+    }
+
+    @Test
     void refreshesLegacyOptimizationReasonsOnlyOnceAndKeepsNormalizedProducts() throws Exception {
         Member member = saveMember("optimization-member");
         String resultJson = """
@@ -594,6 +641,75 @@ class ShortformAnalysisApiIntegrationTest {
                 .build();
         member.updateSkinType(SkinType.DEHYDRATED_OILY);
         return memberRepository.saveAndFlush(member);
+    }
+
+    private ShortformAnalysis completedAnalysisWithMissingIngredients(Member member) {
+        return completedAnalysis(member, "missing-ingredients", """
+                "ingredientDataStatus":"UNAVAILABLE",
+                "ingredientVerificationStatus":"UNVERIFIED",
+                "ingredientStats":null,
+                "ingredients":[]
+                """);
+    }
+
+    private ShortformAnalysis completedAnalysisWithIngredients(Member member) {
+        return completedAnalysis(member, "availableIngredient", """
+                "ingredientDataStatus":"AVAILABLE",
+                "ingredientVerificationStatus":"OFFICIAL",
+                "ingredientStats":{"totalCount":1,"lowRiskCount":1,"moderateRiskCount":0,"highRiskCount":0,"unknownRiskCount":0,"caution20Count":0,"allergenCount":0},
+                "ingredients":[{"order":1,"name":"히알루론산","purposes":["보습제"],"skinBenefits":["수분 공급"],"riskScore":1,"riskLevel":"LOW","caution20":false,"allergen":false,"source":"TEST","regulated":false}]
+                """);
+    }
+
+    private ShortformAnalysis completedAnalysis(Member member, String videoId, String ingredientFields) {
+        String resultJson = """
+                {
+                  "schemaVersion":"3.0",
+                  "videoId":"%s",
+                  "youtubeUrl":"https://www.youtube.com/watch?v=%s",
+                  "title":"성분 재분석 테스트",
+                  "tag":"맞춤",
+                  "overallScore":70,
+                  "highlights":[],
+                  "coreGoal":"보습",
+                  "synergyCombo":"수분 공급",
+                  "summary":"테스트 결과",
+                  "warnings":[],
+                  "disclaimer":"안내",
+                  "steps":[{
+                    "resultId":1,
+                    "order":1,
+                    "category":"앰플",
+                    "brand":"테스트",
+                    "productName":"수분 앰플",
+                    "displayBrand":"테스트",
+                    "displayProductName":"수분 앰플",
+                    "productResolutionStatus":"AI_NORMALIZED",
+                    "productResolutionConfidence":0.9,
+                    "identificationConfidence":0.9,
+                    "matchScore":70,
+                    "matchSummary":"수분 공급",
+                    "keyBenefits":["수분 공급"],
+                    "scoreBreakdown":{"skinTypeFit":30,"benefitFit":25,"ingredientSafety":15},
+                    "safetyLevel":"CAUTION",
+                    "primaryAssessmentCategory":"CAUTION",
+                    "safetyTitle":"사용 시 주의",
+                    "safetySummary":"피부 반응을 살피며 사용해 주세요.",
+                    "reasons":[],
+                    %s
+                  }],
+                  "aiMetadata":null
+                }
+                """.formatted(videoId, videoId, ingredientFields);
+        ShortformAnalysis analysis = new ShortformAnalysis(
+                member,
+                videoId,
+                "https://www.youtube.com/watch?v=" + videoId,
+                videoId + "-fingerprint");
+        analysis.complete(
+                null, resultJson, "{}", "성분 재분석 테스트", 1, 70,
+                "gpt-test", "3.5", 1, 1);
+        return analysis;
     }
 
     private UsernamePasswordAuthenticationToken memberAuthentication(Long memberId) {

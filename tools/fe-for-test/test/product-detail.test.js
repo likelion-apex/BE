@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { reasonPresentation } from '../src/product-detail.js';
+import { needsIngredientReanalysis, reasonPresentation } from '../src/product-detail.js';
 
 test('Figma 4단계 분석 카드를 서로 다른 스타일과 아이콘으로 매핑한다', () => {
   assert.deepEqual(reasonPresentation({ assessmentCategory: 'SAFE' }), {
@@ -26,4 +26,14 @@ test('분류가 없거나 잘못되면 보수적으로 주의 스타일을 사�
     category: 'caution',
     iconUrl: '/assets/reason-caution.svg',
   });
+});
+
+test('성분 상태가 미확인이거나 성분 배열이 비어 있으면 재분석 대상으로 본다', () => {
+  assert.equal(needsIngredientReanalysis({ ingredientDataStatus: 'UNAVAILABLE', ingredients: [] }), true);
+  assert.equal(needsIngredientReanalysis({ ingredientDataStatus: 'AVAILABLE', ingredients: [] }), true);
+  assert.equal(needsIngredientReanalysis({ ingredientDataStatus: 'NOT_ELIGIBLE', ingredients: [] }), false);
+  assert.equal(needsIngredientReanalysis({
+    ingredientDataStatus: 'AVAILABLE',
+    ingredients: [{ name: '히알루론산' }],
+  }), false);
 });

@@ -32,8 +32,9 @@ SHORTFORM_GEMINI_PRODUCT_MODELS=gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.
 3. `GET /api/shortform-analyses/{analysisId}/status`를 `COMPLETED`까지 polling
 4. `GET /api/shortform-analyses/{analysisId}`
 5. 필요 시 `GET /api/shortform-analyses/{analysisId}/results/{resultId}`
-6. `POST /api/shortform-analyses/{analysisId}/optimize`
-7. `POST /api/shortform-analyses/{analysisId}/apply` with `saveType=TODAY|LIBRARY`, `routineType=DAY|NIGHT`
+6. 기존 완료 결과의 성분이 비어 있으면 `POST /api/shortform-analyses/{analysisId}/reanalyze-ingredients`
+7. `POST /api/shortform-analyses/{analysisId}/optimize`
+8. `POST /api/shortform-analyses/{analysisId}/apply` with `saveType=TODAY|LIBRARY`, `routineType=DAY|NIGHT`
    - `routineType`을 생략한 기존 요청은 서울 시간 기준 06:00~17:59 `DAY`, 그 외 `NIGHT`로 저장됩니다.
 
 분석 상태는 `PENDING → EXTRACTING_VIDEO → MATCHING_PRODUCTS → PERSONALIZING → OPTIMIZING → COMPLETED` 순서다. 사용자는 진행 중 `POST /cancel`로 취소할 수 있다.
@@ -41,6 +42,8 @@ SHORTFORM_GEMINI_PRODUCT_MODELS=gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.
 미리보기 API는 분석 데이터를 생성하지 않는다. 미리보기와 분석 시작 시점 사이에 영상의 공개 상태나 길이가 바뀔 수 있으므로 분석 요청에서도 YouTube 정보를 다시 검증한다. 게시자는 YouTube 채널 제목이며 채널 핸들은 아니다.
 
 분석 생성 시 YouTube 응답의 썸네일 URL을 분석 레코드에 저장한다. 최근 분석 목록은 저장된 URL만 조회하므로 목록을 열거나 새로고침할 때 YouTube Data API를 호출하지 않는다. 기존 분석은 `videoId` 기반 정적 썸네일 URL로 보정한다.
+
+성분 재분석은 기존 완료 결과를 덮어쓰지 않고 새 분석 ID를 만든다. 영상 추출과 확인된 제품·성분 캐시는 재사용하며, 성분이 비어 있는 불완전 제품 캐시만 건너뛴다. 새 결과의 점수·경고·인벤토리 최적화도 다시 확인된 성분 기준으로 함께 계산한다. 같은 원본의 재분석이 진행 중이면 해당 작업을 재사용해 외부 호출을 중복하지 않는다.
 
 ## AI와 데이터 근거
 

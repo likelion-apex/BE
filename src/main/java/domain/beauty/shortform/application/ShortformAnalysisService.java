@@ -14,6 +14,7 @@ import domain.beauty.shortform.application.ShortformAnalysisStateService.Analysi
 import domain.beauty.shortform.application.ShortformAnalysisStateService.CreateResult;
 import domain.beauty.shortform.client.YouTubeMetadataClient;
 import domain.beauty.shortform.client.YouTubeVideoMetadata;
+import domain.beauty.shortform.domain.IngredientDataStatus;
 import domain.beauty.shortform.domain.RoutineOptimizationSnapshot;
 import domain.beauty.shortform.domain.RoutineSaveType;
 import domain.beauty.shortform.domain.ShortformAnalysis;
@@ -132,6 +133,28 @@ public class ShortformAnalysisService {
         return new ProductDetail(analysisId, result, snapshot.disclaimer());
     }
 
+    public Created reanalyzeIngredients(Long memberId, Long analysisId) {
+        ShortformAnalysis analysis = stateService.getOwned(memberId, analysisId);
+        stateService.requireCompleted(analysis);
+        ShortformAnalysisSnapshot snapshot = readAnalysis(analysis);
+        boolean hasMissingIngredients = safe(snapshot.steps()).stream()
+                .anyMatch(step -> step.ingredientDataStatus() == IngredientDataStatus.UNAVAILABLE
+                        || (step.ingredientDataStatus() == IngredientDataStatus.AVAILABLE
+                                && (step.ingredients() == null || step.ingredients().isEmpty())));
+        if (!hasMissingIngredients) {
+            return new Created(
+                    analysis.getId(), analysis.getStatus(), analysis.getProgress(), true);
+        }
+
+        CreateResult result = stateService.reanalyze(memberId, analysisId);
+        ShortformAnalysis replacement = result.analysis();
+        return new Created(
+                replacement.getId(),
+                replacement.getStatus(),
+                replacement.getProgress(),
+                !result.created());
+    }
+
     public Optimization optimize(Long memberId, Long analysisId) {
         ShortformAnalysis existing = stateService.getOwned(memberId, analysisId);
         stateService.requireCompleted(existing);
@@ -233,5 +256,9 @@ public class ShortformAnalysisService {
     private ShortformAnalysisSnapshot readAnalysis(ShortformAnalysis analysis) {
         return snapshotNormalizer.normalize(
                 jsonMapper.read(analysis.getResultJson(), ShortformAnalysisSnapshot.class));
+    }
+
+    private <T> List<T> safe(List<T> values) {
+        return values == null ? List.of() : values;
     }
 }
