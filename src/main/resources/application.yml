@@ -88,6 +88,10 @@ gemini:
   cache-maximum-size: 10000
 
 shortform:
+  ai-fallback:
+    gemini-enabled: ${SHORTFORM_GEMINI_FALLBACK_ENABLED:true}
+    gemini-max-output-tokens: 6000
+    gemini-max-attempts: 2
   product-enrichment:
     cache-enabled: ${SHORTFORM_PRODUCT_CACHE_ENABLED:true}
     gemini-fallback-enabled: ${SHORTFORM_GEMINI_FALLBACK_ENABLED:true}

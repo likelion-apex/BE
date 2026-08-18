@@ -193,6 +193,44 @@ class ShortformProductEnrichmentServiceTest {
     }
 
     @Test
+    void goesDirectlyToGeminiWhenOpenAiProviderIsUnavailable() {
+        ShortformProductEnrichmentRepository repository = mock(ShortformProductEnrichmentRepository.class);
+        OpenAiProductEnrichmentClient openAiClient = mock(OpenAiProductEnrichmentClient.class);
+        GeminiProductEnrichmentClient geminiClient = mock(GeminiProductEnrichmentClient.class);
+        OpenAiRoutineProperties properties = new OpenAiRoutineProperties();
+        ShortformProductEnrichmentProperties enrichmentProperties = new ShortformProductEnrichmentProperties();
+        ShortformProductEnrichmentService service = new ShortformProductEnrichmentService(
+                repository,
+                openAiClient,
+                geminiClient,
+                properties,
+                enrichmentProperties,
+                new GeminiProperties(),
+                new ShortformAnalysisJsonMapper(new ObjectMapper()));
+        when(repository.findByCacheKeyIn(any())).thenReturn(List.of());
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(openAiClient.enrich(any())).thenThrow(new CustomException(
+                ErrorCode.SHORTFORM_EXTERNAL_API_UNAVAILABLE));
+        when(geminiClient.enrich(any())).thenAnswer(invocation -> {
+            ProductEnrichmentInput input = invocation.getArgument(0);
+            return response(
+                    input.products().getFirst().requestKey(),
+                    "gemini-test",
+                    List.of(ingredient()));
+        });
+
+        ShortformProductEnrichmentService.BatchResult result = service.getOrEnrich(
+                List.of(exactStep(1, "1025 Dokdo Toner")));
+
+        assertThat(result.model()).isEqualTo("gemini-test");
+        assertThat(result.productsByOrder().get(1).ingredients()).hasSize(1);
+        verify(openAiClient).enrich(any());
+        verify(openAiClient, never()).enrich(any(), anyString());
+        verify(openAiClient, never()).enrich(any(), anyString(), anyInt());
+        verify(geminiClient).enrich(any());
+    }
+
+    @Test
     void usesGeminiSearchForOpenAiUnresolvedProductAndKeepsEstimatedIngredients() {
         ShortformProductEnrichmentRepository repository = mock(ShortformProductEnrichmentRepository.class);
         OpenAiProductEnrichmentClient openAiClient = mock(OpenAiProductEnrichmentClient.class);

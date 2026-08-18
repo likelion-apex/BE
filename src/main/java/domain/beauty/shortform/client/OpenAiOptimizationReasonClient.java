@@ -2,6 +2,7 @@ package domain.beauty.shortform.client;
 
 import domain.beauty.shortform.client.OptimizationReasonResult.Response;
 import domain.beauty.shortform.config.OpenAiRoutineProperties;
+import domain.beauty.shortform.config.ShortformAiFallbackProperties;
 import global.exception.CustomException;
 import global.exception.ErrorCode;
 import java.util.LinkedHashMap;
@@ -26,21 +27,47 @@ public class OpenAiOptimizationReasonClient {
     private final RestClient restClient;
     private final OpenAiRoutineProperties properties;
     private final OpenAiOptimizationReasonPromptResources promptResources;
+    private final GeminiStructuredOutputClient geminiClient;
+    private final ShortformAiFallbackProperties fallbackProperties;
     private final ObjectMapper objectMapper;
 
     public OpenAiOptimizationReasonClient(
             @Qualifier("shortformOpenAiRestClient") RestClient restClient,
             OpenAiRoutineProperties properties,
             OpenAiOptimizationReasonPromptResources promptResources,
+            GeminiStructuredOutputClient geminiClient,
+            ShortformAiFallbackProperties fallbackProperties,
             ObjectMapper objectMapper
     ) {
         this.restClient = restClient;
         this.properties = properties;
         this.promptResources = promptResources;
+        this.geminiClient = geminiClient;
+        this.fallbackProperties = fallbackProperties;
         this.objectMapper = objectMapper;
     }
 
     public Response generate(OptimizationReasonInput input) {
+        try {
+            return generateWithOpenAi(input);
+        } catch (CustomException openAiFailure) {
+            if (!fallbackProperties.isGeminiEnabled()) {
+                throw openAiFailure;
+            }
+            log.warn("OpenAI 최적화 이유 생성 실패 후 Gemini로 전환합니다: reason={}",
+                    openAiFailure.getErrorCode());
+            try {
+                return generateWithGemini(input);
+            } catch (CustomException geminiFailure) {
+                log.warn("Gemini 최적화 이유 생성 폴백 실패: reason={}", geminiFailure.getErrorCode());
+                throw new CustomException(
+                        ErrorCode.SHORTFORM_EXTERNAL_API_UNAVAILABLE,
+                        "OpenAI와 Gemini 분석 서비스를 일시적으로 사용할 수 없습니다.");
+            }
+        }
+    }
+
+    private Response generateWithOpenAi(OptimizationReasonInput input) {
         if (properties.getApiKey() == null || properties.getApiKey().isBlank()) {
             throw new CustomException(ErrorCode.SHORTFORM_CONFIGURATION_MISSING, "OPENAI_API_KEY 환경변수가 필요합니다.");
         }
@@ -82,9 +109,35 @@ public class OpenAiOptimizationReasonClient {
         }
     }
 
+    private Response generateWithGemini(OptimizationReasonInput input) {
+        try {
+            GeminiStructuredOutputClient.Response response = geminiClient.generate(
+                    "최적화 이유 생성",
+                    promptResources.systemPrompt(),
+                    "다음 JSON 데이터만 근거로 이유 문구를 작성하세요.\n"
+                            + objectMapper.writeValueAsString(input),
+                    promptResources.responseSchema(),
+                    Math.min(properties.getMaxOutputTokens(), 2_000));
+            OptimizationReasonResult result = objectMapper.readValue(
+                    response.outputText(), OptimizationReasonResult.class);
+            return new Response(
+                    result,
+                    response.model(),
+                    response.inputTokens(),
+                    response.outputTokens());
+        } catch (CustomException exception) {
+            throw exception;
+        } catch (JacksonException exception) {
+            throw new CustomException(
+                    ErrorCode.SHORTFORM_INVALID_AI_RESPONSE,
+                    "Gemini 이유 응답 JSON을 해석할 수 없습니다.");
+        }
+    }
+
     private JsonNode execute(Map<String, Object> body) {
         RestClientException lastFailure = null;
-        for (int attempt = 0; attempt < 3; attempt++) {
+        int maxAttempts = fallbackProperties.isGeminiEnabled() ? 1 : 3;
+        for (int attempt = 0; attempt < maxAttempts; attempt++) {
             try {
                 return restClient.post()
                         .uri(properties.getApiUrl())
@@ -106,7 +159,7 @@ public class OpenAiOptimizationReasonClient {
             } catch (RestClientException exception) {
                 lastFailure = exception;
             }
-            if (!waitBeforeRetry(attempt)) {
+            if (!waitBeforeRetry(attempt, maxAttempts)) {
                 break;
             }
         }
@@ -116,9 +169,9 @@ public class OpenAiOptimizationReasonClient {
                 lastFailure == null ? "OpenAI 이유 생성 요청에 실패했습니다." : "OpenAI 분석 서비스를 일시적으로 사용할 수 없습니다.");
     }
 
-    private boolean waitBeforeRetry(int attempt) {
-        if (attempt >= 2) {
-            return true;
+    private boolean waitBeforeRetry(int attempt, int maxAttempts) {
+        if (attempt >= maxAttempts - 1) {
+            return false;
         }
         try {
             Thread.sleep(250L << attempt);

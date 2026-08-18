@@ -15,7 +15,7 @@ YOUTUBE_API_KEY=...
 MFDS_SERVICE_KEY=...
 KAKAO_IMAGE_SEARCH_KEY=... # 선택
 SHORTFORM_PRODUCT_CACHE_ENABLED=true # false면 제품·전성분 캐시 조회/저장 모두 우회
-SHORTFORM_GEMINI_FALLBACK_ENABLED=true # OpenAI 미확인 제품의 Gemini 보강
+SHORTFORM_GEMINI_FALLBACK_ENABLED=true # 숏폼 OpenAI 장애 및 미확인 제품의 Gemini 폴백
 ```
 
 비밀값은 저장소에 커밋하거나 API 응답·로그에 출력하지 않는다. `YOUTUBE_API_KEY`는 Gemini 호출 전에 공개 여부와 5분 제한을 확인하는 데 필요하다.
@@ -40,7 +40,8 @@ SHORTFORM_GEMINI_FALLBACK_ENABLED=true # OpenAI 미확인 제품의 Gemini 보�
 ## AI와 데이터 근거
 
 - 영상 단계·제품 식별: `gemini-3.6-flash`, 기존 프롬프트/검증기/캐시 재사용
-- 개인화·점수·조합·인벤토리 추천: `gpt-4o-mini`, 전체 루틴당 Chat Completions 1회, strict JSON Schema
+- 개인화·점수·조합·인벤토리 추천: `gpt-4o-mini` 우선, 실패 시 동일 프롬프트·스키마로 Gemini 폴백
+- 기존 분석의 optimize 맞춤 이유 생성도 OpenAI 실패 시 Gemini로 전환하며, 두 공급자가 모두 실패하면 확인된 제품·성분 기반 서버 문구를 사용한다.
 - Gemini 영상 추출은 DB에도 모델·프롬프트 버전 기준으로 저장해 서버 재시작 후 재사용한다.
 - OpenAI가 추천한 단계 번호와 inventory ID는 서버 입력 집합으로 다시 제한한다.
 - 인벤토리 대체 추천은 영상 제품과 동일한 DB `ProductCategory`에서만 허용하며, 서버가 AI 응답을 다시 검증한다. `ETC` 또는 카테고리 불일치 추천은 영상 제품 유지로 처리한다.
@@ -50,7 +51,7 @@ SHORTFORM_GEMINI_FALLBACK_ENABLED=true # OpenAI 미확인 제품의 Gemini 보�
 - 단계 대표 판정이 CAUTION 또는 WARNING이면 상세 이유에도 같은 단계의 근거 카드가 반드시 포함된다. 기존 완료 분석도 조회 시 저장된 성분 통계와 성분 정보만으로 정규화하며 추가 AI 호출은 하지 않는다.
 - `ingredientMarketOrVariant`는 기존 필드명을 유지하지만 `100ml`, `50g`처럼 확인된 단일 용량만 반환한다. 국가·판매처 문구는 제거하며 용량이 없거나 서로 충돌하면 `null`이다.
 - 최적화의 제품 선택은 분석 시점 인벤토리 스냅샷을 유지한다. 신규 분석은 저장된 맞춤 이유를 그대로 반환하며, 이유 버전이 `3.3`보다 오래된 기존 분석만 최초 `POST /optimize`에서 현재 피부 프로필로 문구를 한 번 갱신하고 버전을 저장한다. 갱신 실패 시 확인된 제품·성분으로 서버 문구를 생성해 API 응답을 유지한다.
-- 제품·전성분은 OpenAI 웹 검색을 먼저 사용하고, 미확인 제품만 Gemini Google Search로 재조사한다.
+- 제품·전성분은 OpenAI 웹 검색을 먼저 사용한다. OpenAI 호출 자체가 실패하면 다른 OpenAI 모델을 재시도하지 않고 Gemini Google Search로 바로 전환하며, OpenAI 정상 응답의 미확인 제품도 Gemini로 재조사한다.
 - Gemini Search 쿼터까지 사용할 수 없으면 MVP 폴백으로 Gemini 모델 지식에서 대표 처방을 생성하되 `ESTIMATED`로 구분하고 안전도를 강제로 `UNKNOWN`으로 낮춘다.
 - 웹 출처가 검증된 성분은 `OFFICIAL/CORROBORATED/THIRD_PARTY`, 출처 없는 최선 추정은 `ESTIMATED`로 응답한다.
 - 테스트 중 응답을 매번 새로 받고 싶으면 서버에서 `SHORTFORM_PRODUCT_CACHE_ENABLED=false`로 설정한 뒤 재시작한다. 운영 기본값은 비용 절감을 위해 `true`다.
