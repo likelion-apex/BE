@@ -451,10 +451,14 @@ class ShortformAnalysisApiIntegrationTest {
                         new OptimizationReasonResult(List.of(
                                 new OptimizationReasonResult.StepReason(
                                         1,
-                                        "보유하신 보유 수분 세럼으로 영상 수분 앰플의 수분 공급 단계를 추가 구매 없이 이어갈 수 있어요."),
+                                        "보유하신 보유 수분 세럼으로 영상 수분 앰플의 수분 공급 단계를 추가 구매 없이 이어갈 수 있어요.",
+                                        new domain.beauty.shortform.client.RoutinePersonalizationResult.ScoreBreakdown(35, 25),
+                                        List.of()),
                                 new OptimizationReasonResult.StepReason(
                                         2,
-                                        "영상 진정 앰플은 피부 진정 역할을 해요. 이 역할을 대신할 확인된 보유 제품이 없어요."))),
+                                        "영상 진정 앰플은 피부 진정 역할을 해요. 이 역할을 대신할 확인된 보유 제품이 없어요.",
+                                        new domain.beauty.shortform.client.RoutinePersonalizationResult.ScoreBreakdown(30, 25),
+                                        List.of()))),
                         "gpt-test",
                         20,
                         10));
@@ -465,6 +469,9 @@ class ShortformAnalysisApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.result.optimizationReasonVersion").doesNotExist())
                 .andExpect(jsonPath("$.data.result.compatibleCount").doesNotExist())
+                .andExpect(jsonPath("$.data.result.overallScore").value(76))
+                .andExpect(jsonPath("$.data.result.highlights[0]").value("수부지 맞춤 성분 0개 매칭"))
+                .andExpect(jsonPath("$.data.result.highlights[1]").value("알레르기 유발 성분 0개"))
                 .andExpect(jsonPath("$.data.result.replacedCount").value(1))
                 .andExpect(jsonPath("$.data.result.missingCount").value(1))
                 .andExpect(jsonPath("$.data.result.steps[0].status").value("REPLACED"))
@@ -483,9 +490,99 @@ class ShortformAnalysisApiIntegrationTest {
         String savedOptimization = analysisRepository.findById(analysis.getId()).orElseThrow().getOptimizationJson();
         assertThat(savedOptimization).doesNotContain("compatibleCount", "COMPATIBLE", "NO_INVENTORY_MATCH");
         assertThat(analysisRepository.findById(analysis.getId()).orElseThrow().getOptimizationReasonVersion())
-                .isEqualTo("3.3");
+                .isEqualTo("3.5");
         verify(openAiOptimizationReasonClient, times(1)).generate(any());
         verifyNoInteractions(youtubeMetadataClient, jobHandler, openAiRoutineAnalysisClient, openAiCategoryClassifier);
+    }
+
+    @Test
+    void returnsPrecomputedOptimizationScoreWithoutAdditionalAiCall() throws Exception {
+        Member member = saveMember("precomputed-optimization-score-member");
+        String resultJson = """
+                {
+                  "schemaVersion":"3.0",
+                  "videoId":"precomputedScore",
+                  "youtubeUrl":"https://www.youtube.com/watch?v=precomputedScore",
+                  "title":"수분 루틴",
+                  "tag":"맞춤",
+                  "overallScore":80,
+                  "highlights":["수분 공급"],
+                  "coreGoal":"보습",
+                  "synergyCombo":"히알루론산",
+                  "summary":"영상 제품을 활용한 루틴입니다.",
+                  "warnings":[],
+                  "disclaimer":"안내",
+                  "steps":[{
+                    "resultId":1,
+                    "order":1,
+                    "category":"앰플",
+                    "productName":"영상 수분 앰플",
+                    "displayBrand":"영상 브랜드",
+                    "displayProductName":"영상 수분 앰플",
+                    "productResolutionStatus":"CATALOG_MATCH",
+                    "productResolutionConfidence":1,
+                    "productId":10,
+                    "identificationConfidence":1,
+                    "matchScore":80,
+                    "matchSummary":"수분 공급",
+                    "keyBenefits":["수분 공급"],
+                    "scoreBreakdown":{"skinTypeFit":30,"benefitFit":25,"ingredientSafety":25},
+                    "safetyLevel":"SAFE",
+                    "primaryAssessmentCategory":"SAFE",
+                    "safetyTitle":"피부 안전도 평가",
+                    "safetySummary":"부담이 적어요.",
+                    "reasons":[],
+                    "ingredientDataStatus":"AVAILABLE",
+                    "ingredientVerificationStatus":"OFFICIAL",
+                    "ingredientSources":[],
+                    "estimatedIngredientCount":1,
+                    "ingredientStats":{"totalCount":1,"lowRiskCount":1,"moderateRiskCount":0,"highRiskCount":0,"unknownRiskCount":0,"caution20Count":0,"allergenCount":0},
+                    "ingredients":[{"order":1,"name":"히알루론산","purposes":["보습제"],"skinBenefits":["수분 공급"],"riskScore":1,"riskLevel":"LOW","caution20":false,"allergen":false,"source":"TEST","regulated":false}]
+                  }],
+                  "aiMetadata":null
+                }
+                """;
+        String optimizationJson = """
+                {
+                  "overallScore":80,
+                  "highlights":["수부지 맞춤 성분 1개 매칭","알레르기 유발 성분 0개"],
+                  "newProductCount":1,
+                  "replacedCount":0,
+                  "missingCount":1,
+                  "summary":"영상 제품을 유지합니다.",
+                  "steps":[{
+                    "sourceResultId":1,
+                    "order":1,
+                    "status":"VIDEO_PRODUCT",
+                    "inventoryId":null,
+                    "productId":10,
+                    "category":"SERUM",
+                    "productName":"영상 수분 앰플",
+                    "replaceName":null,
+                    "brand":"영상 브랜드",
+                    "imageUrl":"/video.png",
+                    "reason":"대체할 확인된 보유 제품이 없어요."
+                  }]
+                }
+                """;
+        ShortformAnalysis analysis = new ShortformAnalysis(
+                member,
+                "precomputedScore",
+                "https://www.youtube.com/watch?v=precomputedScore",
+                "precomputed-score-fingerprint");
+        analysis.complete(
+                null, resultJson, optimizationJson, "수분 루틴", 1, 80,
+                "gpt-test", "3.5", 1, 1);
+        analysisRepository.saveAndFlush(analysis);
+        clearInvocations(openAiOptimizationReasonClient);
+
+        mockMvc.perform(post("/api/shortform-analyses/{analysisId}/optimize", analysis.getId())
+                        .with(authentication(memberAuthentication(member.getId()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.result.overallScore").value(80))
+                .andExpect(jsonPath("$.data.result.highlights[0]").value("수부지 맞춤 성분 1개 매칭"));
+
+        verifyNoInteractions(openAiOptimizationReasonClient);
     }
 
     private Member saveMember(String providerId) {

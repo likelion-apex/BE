@@ -18,8 +18,17 @@ public record RoutinePersonalizationResult(
             int order,
             ScoreBreakdown scoreBreakdown,
             List<String> keyBenefits,
-            List<Reason> reasons
+            List<Reason> reasons,
+            List<String> matchedIngredientNames
     ) {
+        public StepAnalysis(
+                int order,
+                ScoreBreakdown scoreBreakdown,
+                List<String> keyBenefits,
+                List<Reason> reasons
+        ) {
+            this(order, scoreBreakdown, keyBenefits, reasons, List.of());
+        }
     }
 
     public record ScoreBreakdown(int skinTypeFit, int benefitFit) {
@@ -28,7 +37,16 @@ public record RoutinePersonalizationResult(
     public record Reason(AssessmentCategory assessmentCategory, String title, String description, String evidenceSource) {
     }
 
-    public record InventoryRecommendation(int order, Long inventoryId, String reason) {
+    public record InventoryRecommendation(
+            int order,
+            Long inventoryId,
+            String reason,
+            ScoreBreakdown scoreBreakdown,
+            List<String> matchedIngredientNames
+    ) {
+        public InventoryRecommendation(int order, Long inventoryId, String reason) {
+            this(order, inventoryId, reason, null, List.of());
+        }
     }
 
     public record Response(

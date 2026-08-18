@@ -47,10 +47,12 @@ SHORTFORM_GEMINI_FALLBACK_ENABLED=true # 숏폼 OpenAI 장애 및 미확인 제�
 - 인벤토리 대체 추천은 영상 제품과 동일한 DB `ProductCategory`에서만 허용하며, 서버가 AI 응답을 다시 검증한다. `ETC` 또는 카테고리 불일치 추천은 영상 제품 유지로 처리한다.
 - 같은 카테고리의 인벤토리 후보는 DB 성분과 제품 보강 캐시를 우선 사용하고, 근거가 없을 때만 제품 보강 API를 호출한다. 확인된 성분·효능만 개인화 입력과 대체 이유에 사용한다.
 - 최적화 응답은 `REPLACED`와 `VIDEO_PRODUCT`만 반환한다. 대체 시 `productName`은 인벤토리 제품명, `replaceName`은 영상 제품명이며, 대체품이 없으면 `replaceName`은 `null`이다.
+- 최적화 응답의 `overallScore`는 서버가 확정한 최종 제품 구성으로 다시 계산한다. 단계별 피부 타입 적합도 40점, 피부 고민·효능 적합도 35점, 성분 안전도 25점의 평균이며 원본 점수보다 낮아질 수도 있다.
+- 최적화 응답의 `highlights`는 AI가 입력 성분 중 실제 점수 근거로 선택한 성분명을 서버가 검증·중복 제거한 맞춤 성분 수와, 최종 제품들의 알레르기 유발 성분 수를 최대 두 문장으로 제공한다.
 - 제품 상세 이유의 공식 4단계는 `assessmentCategory`의 `SAFE`, `BENEFICIAL`, `CAUTION`, `WARNING`이다. `tone`은 하위 호환용 표현 분류로 SAFE/BENEFICIAL은 `POSITIVE`, CAUTION은 `CAUTION`, WARNING은 `WARNING`으로 반환한다.
 - 단계 대표 판정이 CAUTION 또는 WARNING이면 상세 이유에도 같은 단계의 근거 카드가 반드시 포함된다. 기존 완료 분석도 조회 시 저장된 성분 통계와 성분 정보만으로 정규화하며 추가 AI 호출은 하지 않는다.
 - `ingredientMarketOrVariant`는 기존 필드명을 유지하지만 `100ml`, `50g`처럼 확인된 단일 용량만 반환한다. 국가·판매처 문구는 제거하며 용량이 없거나 서로 충돌하면 `null`이다.
-- 최적화의 제품 선택은 분석 시점 인벤토리 스냅샷을 유지한다. 신규 분석은 저장된 맞춤 이유를 그대로 반환하며, 이유 버전이 `3.3`보다 오래된 기존 분석만 최초 `POST /optimize`에서 현재 피부 프로필로 문구를 한 번 갱신하고 버전을 저장한다. 갱신 실패 시 확인된 제품·성분으로 서버 문구를 생성해 API 응답을 유지한다.
+- 최적화의 제품 선택과 점수는 분석 시점 인벤토리 스냅샷을 유지한다. 신규 분석은 저장된 맞춤 이유와 재계산 점수를 추가 AI 호출 없이 반환한다. 최적화 결과 버전이 `3.5`보다 오래된 기존 분석만 최초 `POST /optimize`에서 현재 피부 프로필로 문구와 점수를 한 번 갱신하고 저장한다. 갱신 실패 시 확인된 제품·성분 기반 서버 문구와 보수적인 점수로 API 응답을 유지한다.
 - 제품·전성분은 OpenAI 웹 검색을 먼저 사용한다. OpenAI 호출 자체가 실패하면 다른 OpenAI 모델을 재시도하지 않고 Gemini Google Search로 바로 전환하며, OpenAI 정상 응답의 미확인 제품도 Gemini로 재조사한다.
 - Gemini Search 쿼터까지 사용할 수 없으면 MVP 폴백으로 Gemini 모델 지식에서 대표 처방을 생성하되 `ESTIMATED`로 구분하고 안전도를 강제로 `UNKNOWN`으로 낮춘다.
 - 웹 출처가 검증된 성분은 `OFFICIAL/CORROBORATED/THIRD_PARTY`, 출처 없는 최선 추정은 `ESTIMATED`로 응답한다.
@@ -66,7 +68,7 @@ SHORTFORM_GEMINI_FALLBACK_ENABLED=true # 숏폼 OpenAI 장애 및 미확인 제�
 - 기본 Shorts 샘플 `https://www.youtube.com/shorts/t1S24pgO2XQ`
 - URL 입력 후 자동으로 조회되는 YouTube 영상 정보 카드
 - 4단계 진행률, 취소, AI 브리핑과 제품 상세 모달
-- 인벤토리 최적화와 TODAY/LIBRARY 저장
+- 최종 루틴 AI 매칭 점수가 포함된 인벤토리 최적화와 TODAY/LIBRARY 저장
 - 모델·토큰·원시 JSON 디버그 패널
 
 JWT는 기존 페이지와 동일하게 브라우저 메모리에만 유지하며 localStorage에 저장하지 않는다.

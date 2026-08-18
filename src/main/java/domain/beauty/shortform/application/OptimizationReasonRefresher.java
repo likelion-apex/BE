@@ -2,6 +2,7 @@ package domain.beauty.shortform.application;
 
 import domain.beauty.shortform.application.ShortformAnalysisStateService.AnalysisProfile;
 import domain.beauty.shortform.application.ShortformAnalysisStateService.InventoryFact;
+import domain.beauty.shortform.application.OptimizationScoreCalculator.ScoreHint;
 import domain.beauty.shortform.client.OpenAiOptimizationReasonClient;
 import domain.beauty.shortform.client.OptimizationReasonInput;
 import domain.beauty.shortform.client.OptimizationReasonResult;
@@ -25,20 +26,23 @@ import org.springframework.stereotype.Service;
 @Service
 public class OptimizationReasonRefresher {
 
-    public static final String CURRENT_VERSION = "3.3";
+    public static final String CURRENT_VERSION = "3.5";
 
     private final InventoryProductEvidenceService evidenceService;
     private final OpenAiOptimizationReasonClient reasonClient;
     private final OptimizationReasonComposer reasonComposer;
+    private final OptimizationScoreCalculator scoreCalculator;
 
     public OptimizationReasonRefresher(
             InventoryProductEvidenceService evidenceService,
             OpenAiOptimizationReasonClient reasonClient,
-            OptimizationReasonComposer reasonComposer
+            OptimizationReasonComposer reasonComposer,
+            OptimizationScoreCalculator scoreCalculator
     ) {
         this.evidenceService = evidenceService;
         this.reasonClient = reasonClient;
         this.reasonComposer = reasonComposer;
+        this.scoreCalculator = scoreCalculator;
     }
 
     public RoutineOptimizationSnapshot refresh(
@@ -78,11 +82,17 @@ public class OptimizationReasonRefresher {
                         .toList());
 
         Map<Integer, String> aiReasons = new LinkedHashMap<>();
+        Map<Integer, ScoreHint> scoreHints = new LinkedHashMap<>();
         if (!input.steps().isEmpty()) {
             try {
                 OptimizationReasonResult.Response response = reasonClient.generate(input);
-                safe(response.result() == null ? null : response.result().steps()).forEach(item ->
-                        aiReasons.putIfAbsent(item.order(), item.reason()));
+                safe(response.result() == null ? null : response.result().steps()).forEach(item -> {
+                    aiReasons.putIfAbsent(item.order(), item.reason());
+                    scoreHints.putIfAbsent(item.order(), new ScoreHint(
+                            item.scoreBreakdown() == null ? null : item.scoreBreakdown().skinTypeFit(),
+                            item.scoreBreakdown() == null ? null : item.scoreBreakdown().benefitFit(),
+                            safe(item.matchedIngredientNames())));
+                });
                 log.info("기존 최적화 맞춤 이유 갱신 완료: steps={}, model={}, inputTokens={}, outputTokens={}",
                         input.steps().size(), response.model(), response.inputTokens(), response.outputTokens());
             } catch (CustomException exception) {
@@ -105,12 +115,16 @@ public class OptimizationReasonRefresher {
                     profile, source, step, evidence, aiReasons.get(step.order()));
             refreshed.add(withReason(step, reason));
         }
-        return new RoutineOptimizationSnapshot(
+        RoutineOptimizationSnapshot refreshedOptimization = new RoutineOptimizationSnapshot(
+                optimization.overallScore(),
+                optimization.highlights(),
                 optimization.newProductCount(),
                 optimization.replacedCount(),
                 optimization.missingCount(),
                 optimization.summary(),
                 List.copyOf(refreshed));
+        return scoreCalculator.apply(
+                profile.skinType(), analysis, refreshedOptimization, availableEvidence, scoreHints);
     }
 
     private OptimizationReasonInput.Step toInput(

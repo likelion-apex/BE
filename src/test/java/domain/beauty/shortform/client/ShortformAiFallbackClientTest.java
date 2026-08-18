@@ -60,7 +60,7 @@ class ShortformAiFallbackClientTest {
         GeminiStructuredOutputClient geminiClient = mock(GeminiStructuredOutputClient.class);
         when(geminiClient.generate(anyString(), anyString(), anyString(), any(JsonNode.class), anyInt()))
                 .thenReturn(new GeminiStructuredOutputClient.Response(
-                        "{\"steps\":[{\"order\":1,\"reason\":\"진정 성분을 확인한 보유 제품으로 대체할 수 있어요.\"}]}",
+                        "{\"steps\":[{\"order\":1,\"reason\":\"진정 성분을 확인한 보유 제품으로 대체할 수 있어요.\",\"scoreBreakdown\":{\"skinTypeFit\":32,\"benefitFit\":28},\"matchedIngredientNames\":[\"판테놀\"]}]}",
                         "gemini-test", 40, 20));
         OpenAiOptimizationReasonClient client = new OpenAiOptimizationReasonClient(
                 RestClient.create(),
@@ -77,7 +77,11 @@ class ShortformAiFallbackClientTest {
 
         assertThat(response.model()).isEqualTo("gemini-test");
         assertThat(response.result().steps()).singleElement()
-                .satisfies(step -> assertThat(step.reason()).contains("보유 제품"));
+                .satisfies(step -> {
+                    assertThat(step.reason()).contains("보유 제품");
+                    assertThat(step.scoreBreakdown().skinTypeFit()).isEqualTo(32);
+                    assertThat(step.matchedIngredientNames()).containsExactly("판테놀");
+                });
         verify(geminiClient).generate(anyString(), anyString(), anyString(), any(JsonNode.class), anyInt());
     }
 
@@ -128,12 +132,13 @@ class ShortformAiFallbackClientTest {
                     "order":1,
                     "scoreBreakdown":{"skinTypeFit":30,"benefitFit":25},
                     "keyBenefits":["피부 진정"],
+                    "matchedIngredientNames":[],
                     "reasons":[
                       {"assessmentCategory":"SAFE","title":"순한 사용","description":"확인된 단계 목적에 맞아요.","evidenceSource":"영상"},
                       {"assessmentCategory":"BENEFICIAL","title":"피부 진정","description":"피부 진정 단계로 사용할 수 있어요.","evidenceSource":"영상"}
                     ]
                   }],
-                  "inventoryRecommendations":[{"order":1,"inventoryId":null,"reason":"확인된 대체 제품이 없어요."}]
+                  "inventoryRecommendations":[{"order":1,"inventoryId":null,"reason":"확인된 대체 제품이 없어요.","scoreBreakdown":{"skinTypeFit":0,"benefitFit":0},"matchedIngredientNames":[]}]
                 }
                 """;
     }

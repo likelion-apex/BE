@@ -31,7 +31,10 @@ class OptimizationReasonRefresherTest {
     private final InventoryProductEvidenceService evidenceService = mock(InventoryProductEvidenceService.class);
     private final OpenAiOptimizationReasonClient reasonClient = mock(OpenAiOptimizationReasonClient.class);
     private final OptimizationReasonRefresher refresher = new OptimizationReasonRefresher(
-            evidenceService, reasonClient, new OptimizationReasonComposer());
+            evidenceService,
+            reasonClient,
+            new OptimizationReasonComposer(),
+            new OptimizationScoreCalculator());
 
     @Test
     void savesGroundedFallbackWhenAiRefreshFails() {
@@ -57,6 +60,10 @@ class OptimizationReasonRefresherTest {
         assertThat(refreshed.steps()).singleElement().satisfies(item -> assertThat(item.reason())
                 .contains("영상 수분 앰플", "수분 공급", "속건조", "확인된 보유 제품")
                 .doesNotContain("같은 카테고리", "님"));
+        assertThat(refreshed.overallScore()).isEqualTo(80);
+        assertThat(refreshed.highlights()).containsExactly(
+                "수부지 맞춤 성분 0개 매칭",
+                "알레르기 유발 성분 0개");
         verify(reasonClient).generate(any());
     }
 

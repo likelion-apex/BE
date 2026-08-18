@@ -9,3 +9,12 @@ export function optimizationPresentation(step = {}) {
     sourceLabel: step.replaceName ? `영상 속 루틴: ${step.replaceName}` : label,
   };
 }
+
+export function optimizationScorePresentation(result = {}) {
+  const rawScore = Number(result.overallScore);
+  const score = Number.isFinite(rawScore) ? Math.max(0, Math.min(100, Math.round(rawScore))) : 0;
+  const highlights = Array.isArray(result.highlights)
+    ? result.highlights.filter((item) => typeof item === 'string' && item.trim()).slice(0, 2)
+    : [];
+  return { score, highlights };
+}

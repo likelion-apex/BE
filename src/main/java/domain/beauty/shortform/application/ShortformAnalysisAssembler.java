@@ -4,6 +4,7 @@ import domain.beauty.domain.BeautyRoutineAnalysis;
 import domain.beauty.domain.BeautyRoutineAnalysis.IdentificationLevel;
 import domain.beauty.shortform.application.ShortformAnalysisStateService.InventoryFact;
 import domain.beauty.shortform.application.ShortformAnalysisStateService.JobContext;
+import domain.beauty.shortform.application.OptimizationScoreCalculator.ScoreHint;
 import domain.beauty.shortform.client.RoutinePersonalizationInput;
 import domain.beauty.shortform.client.RoutinePersonalizationResult;
 import domain.beauty.shortform.client.RoutinePersonalizationResult.Response;
@@ -59,6 +60,7 @@ public class ShortformAnalysisAssembler {
     private final OptimizationReasonComposer reasonComposer;
     private final ReasonCardNormalizer reasonCardNormalizer;
     private final ProductCapacityNormalizer capacityNormalizer;
+    private final OptimizationScoreCalculator optimizationScoreCalculator;
 
     public ShortformAnalysisAssembler(
             RegulationInfoCache regulationInfoCache,
@@ -66,7 +68,8 @@ public class ShortformAnalysisAssembler {
             ShortformProductCategoryResolver categoryResolver,
             OptimizationReasonComposer reasonComposer,
             ReasonCardNormalizer reasonCardNormalizer,
-            ProductCapacityNormalizer capacityNormalizer
+            ProductCapacityNormalizer capacityNormalizer,
+            OptimizationScoreCalculator optimizationScoreCalculator
     ) {
         this.regulationInfoCache = regulationInfoCache;
         this.openAiProperties = openAiProperties;
@@ -74,6 +77,7 @@ public class ShortformAnalysisAssembler {
         this.reasonComposer = reasonComposer;
         this.reasonCardNormalizer = reasonCardNormalizer;
         this.capacityNormalizer = capacityNormalizer;
+        this.optimizationScoreCalculator = optimizationScoreCalculator;
     }
 
     public RoutinePersonalizationInput toInput(
@@ -216,7 +220,7 @@ public class ShortformAnalysisAssembler {
         );
 
         return new AssembledResult(snapshot, optimize(
-                context, matchedSteps, steps, recommendations, inventoryEvidence));
+                context, matchedSteps, snapshot, aiSteps, recommendations, inventoryEvidence));
     }
 
     private StepResult toStepResult(
@@ -489,7 +493,8 @@ public class ShortformAnalysisAssembler {
     private RoutineOptimizationSnapshot optimize(
             JobContext context,
             List<MatchedVideoStep> matchedSteps,
-            List<StepResult> analysisSteps,
+            ShortformAnalysisSnapshot analysis,
+            Map<Integer, RoutinePersonalizationResult.StepAnalysis> aiSteps,
             Map<Integer, RoutinePersonalizationResult.InventoryRecommendation> recommendations,
             Map<Long, InventoryProductEvidence> inventoryEvidence
     ) {
@@ -497,7 +502,8 @@ public class ShortformAnalysisAssembler {
         Map<Long, InventoryFact> inventoryById = new HashMap<>();
         inventory.forEach(item -> inventoryById.put(item.inventoryId(), item));
         Map<Integer, StepResult> analysisByOrder = new HashMap<>();
-        analysisSteps.forEach(step -> analysisByOrder.put(step.order(), step));
+        safe(analysis.steps()).forEach(step -> analysisByOrder.put(step.order(), step));
+        Map<Integer, ScoreHint> scoreHints = new HashMap<>();
         List<OptimizedStep> steps = new ArrayList<>();
         int newProductCount = 0;
         int replacedCount = 0;
@@ -538,6 +544,11 @@ public class ShortformAnalysisAssembler {
                         selected,
                         inventoryEvidence.get(selected.productId()),
                         recommendation.reason());
+                RoutinePersonalizationResult.ScoreBreakdown score = recommendation.scoreBreakdown();
+                scoreHints.put(source.order(), new ScoreHint(
+                        score == null ? null : score.skinTypeFit(),
+                        score == null ? null : score.benefitFit(),
+                        safe(recommendation.matchedIngredientNames())));
             } else {
                 status = OptimizationStatus.VIDEO_PRODUCT;
                 missingCount++;
@@ -554,6 +565,16 @@ public class ShortformAnalysisAssembler {
                         null,
                         null,
                         recommendation == null ? null : recommendation.reason());
+                RoutinePersonalizationResult.StepAnalysis sourceAnalysis = aiSteps.get(source.order());
+                RoutinePersonalizationResult.ScoreBreakdown score = sourceAnalysis == null
+                        ? null
+                        : sourceAnalysis.scoreBreakdown();
+                scoreHints.put(source.order(), new ScoreHint(
+                        score == null ? null : score.skinTypeFit(),
+                        score == null ? null : score.benefitFit(),
+                        sourceAnalysis == null
+                                ? List.of()
+                                : safe(sourceAnalysis.matchedIngredientNames())));
             }
 
             boolean alreadyOwned = matched.productId() != null && inventory.stream()
@@ -580,8 +601,10 @@ public class ShortformAnalysisAssembler {
         String summary = replacedCount > 0
                 ? "영상 속 제품 중 %d개를 같은 카테고리의 인벤토리 제품으로 교체했습니다.".formatted(replacedCount)
                 : "영상 속 루틴과 현재 인벤토리의 조합을 확인했습니다.";
-        return new RoutineOptimizationSnapshot(
+        RoutineOptimizationSnapshot optimization = new RoutineOptimizationSnapshot(
                 newProductCount, replacedCount, missingCount, summary, List.copyOf(steps));
+        return optimizationScoreCalculator.apply(
+                context.skinType(), analysis, optimization, inventoryEvidence, scoreHints);
     }
 
     private Map<Integer, RoutinePersonalizationResult.StepAnalysis> indexSteps(
@@ -605,6 +628,7 @@ public class ShortformAnalysisAssembler {
                 order,
                 new RoutinePersonalizationResult.ScoreBreakdown(20, 18),
                 List.of("피부 컨디션 관리"),
+                List.of(),
                 List.of()
         );
     }
