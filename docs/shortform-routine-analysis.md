@@ -46,6 +46,8 @@ SHORTFORM_GEMINI_PRODUCT_MODELS=gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.
 
 - 영상 단계·제품 식별은 Gemini만 사용한다. `GEMINI_MODEL`을 최우선으로 시도한 뒤 3.7 Flash를 포함한 영상 후보를 한 번씩 순회한다.
 - 개인화 분석·optimize·제품 보강은 OpenAI를 먼저 최대 2회 시도하고 429·5xx·연결 장애에만 Gemini 후보로 전환한다. 설정·권한 오류나 잘못된 요청은 Gemini로 숨기지 않는다.
+- OpenAI 제품 검색으로 성분 근거가 부족하면 별도 OpenAI 보완 모델을 생략하고 Gemini 검색으로 바로 확인한다. 영상 제품과 같은 카테고리의 인벤토리 후보는 기존처럼 DB 성분·캐시·외부 보강을 모두 사용한다.
+- 서버 로그의 `숏폼 분석 단계 완료`에서 영상 추출, 영상 제품 보강, 인벤토리 근거, 개인화, 최적화 조립의 `durationMs`와 누적 `totalElapsedMs`를 확인할 수 있다.
 - Gemini 후보 호출은 서로 직렬화하지 않는다. 429 모델은 공유 쿨다운 동안 건너뛰되 같은 요청에서 대기 후 전체 후보를 다시 순회하지 않는다.
 - 개인화·점수·조합·인벤토리 추천은 `gpt-4o-mini`를 우선 사용한다. 실패 시 Gemini JSON 모드에서 `3.5 Flash Lite → 3.1 Flash Lite → 3.5 Flash → 3.6 Flash → 3 Flash Preview` 순서로 전환하고, 기존 JSON Schema는 프롬프트 계약과 서버 검증에 사용한다.
 - 제품 검색·성분 보강의 Gemini 순서는 `3.5 Flash → 3.5 Flash Lite → 3.1 Flash Lite → 3.6 Flash → 3 Flash Preview`다. Google Search 할당량이 소진되면 같은 라우터를 사용하는 모델 지식 보강으로 전환한다.

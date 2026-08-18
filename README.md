@@ -78,6 +78,7 @@ SHORTFORM_GEMINI_PRODUCT_MODELS=gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.
 - API 키는 프론트엔드나 Git에 포함하지 않고 서버 환경변수로만 주입합니다.
 - `GEMINI_MODEL`을 생략하면 샘플 영상의 OCR 정확도와 단계 재현율이 더 높았던 `gemini-3.6-flash`를 사용합니다.
 - 개인화 분석·optimize·제품 보강은 OpenAI를 먼저 최대 2회 시도하고, 429·5xx·연결 장애일 때만 Gemini로 전환합니다. 영상 추출은 Gemini만 사용합니다.
+- OpenAI 제품 검색으로 성분 근거가 부족하면 별도 OpenAI 보완 모델을 거치지 않고 Gemini 검색으로 바로 확인해 외부 호출 한 단계를 줄입니다. DB 성분과 제품 보강 캐시는 그대로 우선 사용합니다.
 - Gemini는 작업별 모델 목록을 한 번만 순회하며 429 모델은 쿨다운 동안 건너뜁니다. 네트워크 호출을 직렬화하거나 한 요청에서 지연 재순회하지 않습니다.
 - `SHORTFORM_GEMINI_MODEL_ROUTING_ENABLED=false`이면 모든 Gemini 작업이 `GEMINI_MODEL` 하나만 사용하므로 배포 후 다중 모델 라우팅을 즉시 끌 수 있습니다.
 - 개인화 분석과 optimize의 Gemini 폴백은 모델별 JSON Schema 지원 차이를 피하기 위해 JSON 모드를 사용하고, 반환값은 서버에서 입력 단계·성분·인벤토리 ID 기준으로 다시 검증합니다.

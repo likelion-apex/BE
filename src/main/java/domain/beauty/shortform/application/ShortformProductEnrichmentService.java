@@ -108,7 +108,6 @@ public class ShortformProductEnrichmentService {
         }
 
         Response primary = emptyResponse(properties.getProductModel());
-        boolean primaryUsesFallbackModel = false;
         boolean openAiUnavailable = false;
         try {
             primary = openAiClient.enrich(toInput(misses, false));
@@ -128,7 +127,6 @@ public class ShortformProductEnrichmentService {
                         properties.getProductModel(), properties.getProductFallbackModel(), exception.getErrorCode());
                 try {
                     primary = openAiClient.enrich(toInput(misses, true), properties.getProductFallbackModel());
-                    primaryUsesFallbackModel = true;
                 } catch (CustomException fallbackException) {
                     if (!enrichmentProperties.isGeminiFallbackEnabled()) {
                         throw fallbackException;
@@ -139,39 +137,9 @@ public class ShortformProductEnrichmentService {
             }
         }
         Map<String, ProductEnrichmentResult.Product> enriched = indexValid(primary, misses);
-        List<RequestedProduct> fallbackTargets = properties.isProductFallbackEnabled()
-                && !primaryUsesFallbackModel
-                && !openAiUnavailable
-                ? misses.stream().filter(item -> needsFallback(enriched.get(item.cacheKey()))).toList()
-                : List.of();
-
         long inputTokens = primary.inputTokens();
         long outputTokens = primary.outputTokens();
         String model = openAiUnavailable ? "" : primary.model();
-        if (!fallbackTargets.isEmpty()) {
-            log.info("숏폼 제품 보완 모델 호출: targets={}, model={}",
-                    fallbackTargets.size(), properties.getProductFallbackModel());
-            try {
-                Response fallback = openAiClient.enrich(
-                        toInput(fallbackTargets, true), properties.getProductFallbackModel(), 1);
-                inputTokens += fallback.inputTokens();
-                outputTokens += fallback.outputTokens();
-                model = primary.model() + "+" + fallback.model();
-                Map<String, ProductEnrichmentResult.Product> fallbackProducts = indexValid(
-                        fallback, fallbackTargets);
-                for (RequestedProduct target : fallbackTargets) {
-                    ProductEnrichmentResult.Product candidate = fallbackProducts.get(target.cacheKey());
-                    ProductEnrichmentResult.Product current = enriched.get(target.cacheKey());
-                    if (quality(candidate) > quality(current)) {
-                        enriched.put(target.cacheKey(), candidate);
-                    }
-                }
-            } catch (CustomException exception) {
-                log.warn("숏폼 제품 보완 모델을 건너뜁니다: model={}, targets={}, reason={}",
-                        properties.getProductFallbackModel(), fallbackTargets.size(), exception.getErrorCode());
-            }
-        }
-
         List<RequestedProduct> geminiTargets = enrichmentProperties.isGeminiFallbackEnabled()
                 ? misses.stream().filter(item -> needsGeminiFallback(enriched.get(item.cacheKey()))).toList()
                 : List.of();
@@ -321,10 +289,6 @@ public class ShortformProductEnrichmentService {
                 sources,
                 ingredients
         );
-    }
-
-    private boolean needsFallback(ProductEnrichmentResult.Product product) {
-        return product == null || !toData(product).hasVerifiedIngredients();
     }
 
     private boolean needsGeminiFallback(ProductEnrichmentResult.Product product) {
