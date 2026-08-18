@@ -35,7 +35,7 @@ gemini:
 groq:
   api-key: test-groq-api-key
   base-url: https://api.groq.com/openai/v1
-  model: llama-3.3-70b-versatile
+  model: openai/gpt-oss-120b
 
 cors:
   allowed-origins: http://localhost:3000
@@ -48,7 +48,7 @@ product:
 inventory:
   ai-cache-ttl: 30d
   connect-timeout: 1s
-  read-timeout: 3s
+  read-timeout: 10s
   gemini-connect-timeout: 3s
   gemini-read-timeout: 5s
   groq-connect-timeout: 1s

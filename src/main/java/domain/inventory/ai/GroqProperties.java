@@ -8,7 +8,7 @@ public class GroqProperties {
 
     private String apiKey = "";
     private URI baseUrl = URI.create("https://api.groq.com/openai/v1");
-    private String model = "llama-3.3-70b-versatile";
+    private String model = "openai/gpt-oss-120b";
 
     public String getApiKey() {
         return apiKey;
