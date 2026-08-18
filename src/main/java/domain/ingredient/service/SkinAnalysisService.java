@@ -12,7 +12,7 @@ import domain.ingredient.dto.response.SkinAnalysisResponse.RiskDistribution;
 import domain.ingredient.repository.ProductIngredientRepository;
 import domain.inventory.Product;
 import domain.inventory.service.ProductService;
-import domain.inventory.client.OpenAiPersonalizedAnalysisClient;
+import domain.inventory.ai.PersonalizedAnalysisAiClient;
 import domain.inventory.client.PersonalizedAnalysisResult;
 import domain.member.Member;
 import domain.member.MemberRepository;
@@ -25,7 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 제품 피부적합도 분석(4.4). ChatGPT 맞춤 분석을 우선 사용해 matchScore/aiAnalysis를 산출하고,
+ * 제품 피부적합도 분석(4.4). Gemini 맞춤 분석으로 matchScore/aiAnalysis를 산출하고,
  * AI 호출이 실패(null)하면 저장된 성분의 EWG 등급 기반 규칙으로 matchScore를 대체 산출한다.
  * safetyEvaluation 한 줄 요약은 AI 성패와 무관하게 항상 EWG 등급 분포 기반 규칙으로 생성한다.
  */
@@ -43,7 +43,7 @@ public class SkinAnalysisService {
     private final ProductService productService;
     private final MemberRepository memberRepository;
     private final ProductIngredientRepository productIngredientRepository;
-    private final OpenAiPersonalizedAnalysisClient personalizedAnalysisClient;
+    private final PersonalizedAnalysisAiClient personalizedAnalysisClient;
 
     public SkinAnalysisResponse analyze(Long memberId, Long productId) {
         Product product = productService.getById(productId);
