@@ -12,7 +12,7 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 @Configuration
-@EnableConfigurationProperties({InventoryAiProperties.class, GeminiProperties.class})
+@EnableConfigurationProperties({InventoryAiProperties.class, GeminiProperties.class, GroqProperties.class})
 public class InventoryAiConfiguration {
 
     @Bean
@@ -32,6 +32,17 @@ public class InventoryAiConfiguration {
                 ? "https://generativelanguage.googleapis.com"
                 : geminiProperties.getBaseUrl().toString();
         return restClient(baseUrl, properties.getGeminiConnectTimeout(), properties.getGeminiReadTimeout());
+    }
+
+    @Bean
+    @Qualifier("inventoryGroqRestClient")
+    RestClient inventoryGroqRestClient(
+            GroqProperties groqProperties,
+            InventoryAiProperties properties) {
+        String baseUrl = groqProperties.getBaseUrl() == null
+                ? "https://api.groq.com/openai/v1"
+                : groqProperties.getBaseUrl().toString();
+        return restClient(baseUrl, properties.getGroqConnectTimeout(), properties.getGroqReadTimeout());
     }
 
     private RestClient restClient(String baseUrl, Duration connectTimeout, Duration readTimeout) {

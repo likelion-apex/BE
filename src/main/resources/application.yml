@@ -87,6 +87,11 @@ gemini:
   cache-ttl: 30d
   cache-maximum-size: 10000
 
+groq:
+  api-key: ${GROQ_API_KEY:}
+  base-url: ${GROQ_BASE_URL:https://api.groq.com/openai/v1}
+  model: ${GROQ_MODEL:llama-3.3-70b-versatile}
+
 shortform:
   ai-fallback:
     gemini-enabled: ${SHORTFORM_GEMINI_FALLBACK_ENABLED:true}
@@ -125,9 +130,10 @@ inventory:
   ai-cache-ttl: 30d
   connect-timeout: 1s
   read-timeout: 3s
-  gemini-connect-timeout: 5s
-  gemini-read-timeout: 8s
-  openai-max-input-tokens: 600
+  gemini-connect-timeout: 3s
+  gemini-read-timeout: 5s
+  groq-connect-timeout: 1s
+  groq-read-timeout: 2s
   openai-max-output-tokens: 400
 
 cors:

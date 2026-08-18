@@ -32,6 +32,11 @@ gemini:
   base-url: https://generativelanguage.googleapis.com
   model: gemini-3.6-flash
 
+groq:
+  api-key: test-groq-api-key
+  base-url: https://api.groq.com/openai/v1
+  model: llama-3.3-70b-versatile
+
 cors:
   allowed-origins: http://localhost:3000
 
@@ -44,7 +49,8 @@ inventory:
   ai-cache-ttl: 30d
   connect-timeout: 1s
   read-timeout: 3s
-  gemini-connect-timeout: 5s
-  gemini-read-timeout: 8s
-  openai-max-input-tokens: 600
+  gemini-connect-timeout: 3s
+  gemini-read-timeout: 5s
+  groq-connect-timeout: 1s
+  groq-read-timeout: 2s
   openai-max-output-tokens: 400
