@@ -19,9 +19,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(classes = ApexBeApplication.class)
@@ -36,6 +36,9 @@ class RoutineArchiveListApiIntegrationTest {
 
     @Autowired
     private RoutineRepository routineRepository;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private Member member;
 
@@ -92,8 +95,7 @@ class RoutineArchiveListApiIntegrationTest {
             routine.addStep(new RoutineStep(routine, null, null, i + 1, "제품" + i, null, "CLEANSER", null, null));
         }
         Routine saved = routineRepository.saveAndFlush(routine);
-        ReflectionTestUtils.setField(saved, "createdAt", createdAt);
-        routineRepository.saveAndFlush(saved);
+        jdbcTemplate.update("UPDATE routines SET created_at = ? WHERE id = ?", createdAt, saved.getId());
     }
 
     private UsernamePasswordAuthenticationToken memberAuthentication(Long memberId) {
