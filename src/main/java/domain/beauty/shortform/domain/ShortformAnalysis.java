@@ -68,7 +68,7 @@ public class ShortformAnalysis {
     private String errorMessage;
 
     @Lob
-    @Column(name = "result_json", columnDefinition = "TEXT")
+    @Column(name = "result_json", columnDefinition = "MEDIUMTEXT")
     private String resultJson;
 
     @Column(name = "result_title", length = 100)
@@ -81,7 +81,7 @@ public class ShortformAnalysis {
     private Integer resultOverallScore;
 
     @Lob
-    @Column(name = "optimization_json", columnDefinition = "TEXT")
+    @Column(name = "optimization_json", columnDefinition = "MEDIUMTEXT")
     private String optimizationJson;
 
     @Column(name = "optimization_reason_version", length = 20)
