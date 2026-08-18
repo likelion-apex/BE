@@ -1,48 +1,83 @@
 package domain.inventory.ai;
 
+import domain.cosmetic.client.GroqIngredientClient;
 import domain.cosmetic.client.OpenAiIngredientClient;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.JsonNode;
 
+/**
+ * 전성분/배합목적 조회를 캐시 → OpenAI(1차) → Gemini(폴백1) → Groq(폴백2) 순서로 시도한다.
+ * 각 단계는 실제 예외가 발생했을 때만 다음 provider로 넘어가며, 사전 토큰 추정은 사용하지 않는다.
+ */
 @Slf4j
 @Component
 public class IngredientAiClient {
 
-    private final InventoryGeminiJsonClient geminiJsonClient;
+    private static final List<AiProvider> ORDER = List.of(AiProvider.OPENAI, AiProvider.GEMINI, AiProvider.GROQ);
 
-    public IngredientAiClient(InventoryGeminiJsonClient geminiJsonClient) {
+    private final OpenAiIngredientClient openAiIngredientClient;
+    private final InventoryGeminiJsonClient geminiJsonClient;
+    private final GroqIngredientClient groqIngredientClient;
+    private final AiProviderSkipGate skipGate;
+
+    public IngredientAiClient(
+            OpenAiIngredientClient openAiIngredientClient,
+            InventoryGeminiJsonClient geminiJsonClient,
+            GroqIngredientClient groqIngredientClient,
+            AiProviderSkipGate skipGate) {
+        this.openAiIngredientClient = openAiIngredientClient;
         this.geminiJsonClient = geminiJsonClient;
+        this.groqIngredientClient = groqIngredientClient;
+        this.skipGate = skipGate;
     }
 
     public List<String> fetchIngredientNames(String productName) {
         if (productName == null || productName.isBlank()) {
             return List.of();
         }
-        try {
-            JsonNode payload = geminiJsonClient.generateJson(
-                    OpenAiIngredientClient.SYSTEM_PROMPT, "제품명: " + productName);
-            return InventoryAiJsonSupport.parseIngredientNames(payload);
-        } catch (AiProviderUnavailableException e) {
-            log.warn("전성분 Gemini 실패: productName={}, message={}", productName, e.getMessage());
-            return List.of();
+        String userPrompt = "제품명: " + productName;
+        for (AiProvider provider : ORDER) {
+            if (skipGate.shouldSkip(provider)) {
+                continue;
+            }
+            try {
+                return switch (provider) {
+                    case OPENAI -> openAiIngredientClient.fetchIngredientNames(productName);
+                    case GEMINI -> InventoryAiJsonSupport.parseIngredientNames(
+                            geminiJsonClient.generateJson(OpenAiIngredientClient.SYSTEM_PROMPT, userPrompt));
+                    case GROQ -> groqIngredientClient.fetchIngredientNames(productName);
+                };
+            } catch (AiProviderUnavailableException e) {
+                log.warn("전성분 {} 실패: productName={}, message={}", provider, productName, e.getMessage());
+                skipGate.markFrom(provider, e);
+            }
         }
+        return List.of();
     }
 
     public Map<String, List<String>> fetchIngredientPurposes(List<String> ingredientNames) {
         if (ingredientNames == null || ingredientNames.isEmpty()) {
             return Map.of();
         }
-        try {
-            JsonNode payload = geminiJsonClient.generateJson(
-                    OpenAiIngredientClient.PURPOSE_SYSTEM_PROMPT,
-                    "성분 목록: " + String.join(", ", ingredientNames));
-            return InventoryAiJsonSupport.parsePurposes(payload);
-        } catch (AiProviderUnavailableException e) {
-            log.warn("배합목적 Gemini 실패: message={}", e.getMessage());
-            return Map.of();
+        String userPrompt = "성분 목록: " + String.join(", ", ingredientNames);
+        for (AiProvider provider : ORDER) {
+            if (skipGate.shouldSkip(provider)) {
+                continue;
+            }
+            try {
+                return switch (provider) {
+                    case OPENAI -> openAiIngredientClient.fetchIngredientPurposes(ingredientNames);
+                    case GEMINI -> InventoryAiJsonSupport.parsePurposes(geminiJsonClient.generateJson(
+                            OpenAiIngredientClient.PURPOSE_SYSTEM_PROMPT, userPrompt));
+                    case GROQ -> groqIngredientClient.fetchIngredientPurposes(ingredientNames);
+                };
+            } catch (AiProviderUnavailableException e) {
+                log.warn("배합목적 {} 실패: message={}", provider, e.getMessage());
+                skipGate.markFrom(provider, e);
+            }
         }
+        return Map.of();
     }
 }
