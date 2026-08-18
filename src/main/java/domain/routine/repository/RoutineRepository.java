@@ -8,6 +8,7 @@ import java.util.Optional;
 import domain.routine.domain.Routine;
 import domain.routine.domain.RoutineStatus;
 import domain.routine.domain.RoutineType;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -29,10 +30,13 @@ public interface RoutineRepository extends JpaRepository<Routine, Long> {
     @EntityGraph(attributePaths = "steps")
     Optional<Routine> findByIdAndMemberId(Long id, Long memberId);
 
-    /** 6.9 보관함 목록 - period=ALL. */
-    List<Routine> findByMemberIdAndStatusOrderByCreatedAtDesc(Long memberId, RoutineStatus status);
+    /** 6.9 보관함 목록 - year 지정(해당 연도 1/1 00:00 ~ 12/31 23:59:59). */
+    @EntityGraph(attributePaths = "steps")
+    List<Routine> findByMemberIdAndStatusAndCreatedAtBetween(
+            Long memberId, RoutineStatus status, LocalDateTime start, LocalDateTime end, Sort sort);
 
-    /** 6.9 보관함 목록 - period=3M/6M 등 기간 제한. */
-    List<Routine> findByMemberIdAndStatusAndCreatedAtAfterOrderByCreatedAtDesc(
-            Long memberId, RoutineStatus status, LocalDateTime after);
+    /** 6.9 보관함 목록 - year 미지정(최근 3년 기본값). */
+    @EntityGraph(attributePaths = "steps")
+    List<Routine> findByMemberIdAndStatusAndCreatedAtAfter(
+            Long memberId, RoutineStatus status, LocalDateTime after, Sort sort);
 }
