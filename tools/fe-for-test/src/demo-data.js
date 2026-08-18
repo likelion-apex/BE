@@ -237,8 +237,8 @@ export const demoOptimization = {
   missingCount: 1,
   summary: '영상 속 제품 중 3개를 같은 카테고리의 인벤토리 제품으로 교체했어요.',
   steps: [
-    { order: 1, productName: '초미세먼지 세정 클렌저', replaceName: null, imageUrl: '/assets/product-jar.png', status: 'VIDEO_PRODUCT', reason: '같은 카테고리의 대체 제품이 인벤토리에 없어요.' },
-    { order: 2, productName: '셀퓨전씨 쿨링 패드', replaceName: '라운드랩 1025 독도 토너', imageUrl: '/assets/product-jar.png', status: 'REPLACED', reason: '같은 카테고리에서 사용할 수 있는 보유 제품이에요.' },
+    { order: 1, productName: '초미세먼지 세정 클렌저', replaceName: null, imageUrl: '/assets/product-jar.png', status: 'VIDEO_PRODUCT', reason: '영상 속 클렌저는 미세먼지 세정을 위한 제품이에요. 이 역할을 맡길 확인된 보유 클렌저가 없어 영상 속 제품을 사용해 주세요.' },
+    { order: 2, productName: '셀퓨전씨 쿨링 패드', replaceName: '라운드랩 1025 독도 토너', imageUrl: '/assets/product-jar.png', status: 'REPLACED', reason: '보유하신 셀퓨전씨 쿨링 패드는 영상 속 독도 토너의 피부 결 정돈 역할을 이어갈 수 있어요. 추가 구매 없이 보유 제품으로 관리해 보세요.' },
     { order: 3, productName: '메디힐 수분 앰플', replaceName: '자작나무 수분 앰플', imageUrl: '/assets/product-jar.png', status: 'REPLACED', reason: '동일한 히알루론산 기반 보유 제품이에요.' },
     { order: 4, productName: '에스트라 아토베리어 로션', replaceName: '판테놀 장벽 로션', imageUrl: '/assets/product-jar.png', status: 'REPLACED', reason: '손상된 장벽을 보호하는 보유 제품이에요.' },
   ],

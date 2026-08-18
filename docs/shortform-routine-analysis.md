@@ -44,8 +44,9 @@ SHORTFORM_GEMINI_FALLBACK_ENABLED=true # OpenAI 미확인 제품의 Gemini 보�
 - Gemini 영상 추출은 DB에도 모델·프롬프트 버전 기준으로 저장해 서버 재시작 후 재사용한다.
 - OpenAI가 추천한 단계 번호와 inventory ID는 서버 입력 집합으로 다시 제한한다.
 - 인벤토리 대체 추천은 영상 제품과 동일한 DB `ProductCategory`에서만 허용하며, 서버가 AI 응답을 다시 검증한다. `ETC` 또는 카테고리 불일치 추천은 영상 제품 유지로 처리한다.
+- 같은 카테고리의 인벤토리 후보는 DB 성분과 제품 보강 캐시를 우선 사용하고, 근거가 없을 때만 제품 보강 API를 호출한다. 확인된 성분·효능만 개인화 입력과 대체 이유에 사용한다.
 - 최적화 응답은 `REPLACED`와 `VIDEO_PRODUCT`만 반환한다. 대체 시 `productName`은 인벤토리 제품명, `replaceName`은 영상 제품명이며, 대체품이 없으면 `replaceName`은 `null`이다.
-- 최적화는 분석 시점 인벤토리 스냅샷을 사용하고 `POST /optimize`에서는 외부 AI나 제품 분류 API를 다시 호출하지 않는다.
+- 최적화의 제품 선택은 분석 시점 인벤토리 스냅샷을 유지한다. 신규 분석은 저장된 맞춤 이유를 그대로 반환하며, 이유 버전이 `3.3`보다 오래된 기존 분석만 최초 `POST /optimize`에서 현재 피부 프로필로 문구를 한 번 갱신하고 버전을 저장한다. 갱신 실패 시 확인된 제품·성분으로 서버 문구를 생성해 API 응답을 유지한다.
 - 제품·전성분은 OpenAI 웹 검색을 먼저 사용하고, 미확인 제품만 Gemini Google Search로 재조사한다.
 - Gemini Search 쿼터까지 사용할 수 없으면 MVP 폴백으로 Gemini 모델 지식에서 대표 처방을 생성하되 `ESTIMATED`로 구분하고 안전도를 강제로 `UNKNOWN`으로 낮춘다.
 - 웹 출처가 검증된 성분은 `OFFICIAL/CORROBORATED/THIRD_PARTY`, 출처 없는 최선 추정은 `ESTIMATED`로 응답한다.

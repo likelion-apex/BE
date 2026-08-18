@@ -1,6 +1,9 @@
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -11,6 +14,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import domain.beauty.shortform.application.ShortformAnalysisJobHandler;
 import domain.beauty.shortform.client.OpenAiRoutineAnalysisClient;
+import domain.beauty.shortform.client.OpenAiOptimizationReasonClient;
+import domain.beauty.shortform.client.OptimizationReasonResult;
+import domain.beauty.shortform.application.InventoryProductEvidenceService;
 import domain.beauty.shortform.client.YouTubeMetadataClient;
 import domain.beauty.shortform.client.YouTubeVideoMetadata;
 import domain.beauty.shortform.domain.ShortformAnalysis;
@@ -24,6 +30,7 @@ import domain.inventory.client.OpenAiCategoryClassifier;
 import java.math.BigInteger;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,6 +66,12 @@ class ShortformAnalysisApiIntegrationTest {
     private OpenAiRoutineAnalysisClient openAiRoutineAnalysisClient;
 
     @MockitoBean
+    private OpenAiOptimizationReasonClient openAiOptimizationReasonClient;
+
+    @MockitoBean
+    private InventoryProductEvidenceService inventoryProductEvidenceService;
+
+    @MockitoBean
     private OpenAiCategoryClassifier openAiCategoryClassifier;
 
     @BeforeEach
@@ -73,6 +86,7 @@ class ShortformAnalysisApiIntegrationTest {
                 "테스트 채널",
                 BigInteger.valueOf(123_456)
         ));
+        when(inventoryProductEvidenceService.enrich(any())).thenReturn(Map.of());
     }
 
     @Test
@@ -217,7 +231,7 @@ class ShortformAnalysisApiIntegrationTest {
     }
 
     @Test
-    void normalizesLegacyOptimizationWithoutCallingExternalApis() throws Exception {
+    void refreshesLegacyOptimizationReasonsOnlyOnceAndKeepsNormalizedProducts() throws Exception {
         Member member = saveMember("optimization-member");
         String resultJson = """
                 {
@@ -341,23 +355,45 @@ class ShortformAnalysisApiIntegrationTest {
                 null, resultJson, optimizationJson, "기존 최적화", 2, 80,
                 "gpt-test", "3.1", 1, 1);
         analysisRepository.saveAndFlush(analysis);
+        when(openAiOptimizationReasonClient.generate(any())).thenReturn(
+                new OptimizationReasonResult.Response(
+                        new OptimizationReasonResult(List.of(
+                                new OptimizationReasonResult.StepReason(
+                                        1,
+                                        "보유하신 보유 수분 세럼으로 영상 수분 앰플의 수분 공급 단계를 추가 구매 없이 이어갈 수 있어요."),
+                                new OptimizationReasonResult.StepReason(
+                                        2,
+                                        "영상 진정 앰플은 피부 진정 역할을 해요. 이 역할을 대신할 확인된 보유 제품이 없어요."))),
+                        "gpt-test",
+                        20,
+                        10));
         clearInvocations(youtubeMetadataClient, jobHandler, openAiRoutineAnalysisClient, openAiCategoryClassifier);
 
         mockMvc.perform(post("/api/shortform-analyses/{analysisId}/optimize", analysis.getId())
                         .with(authentication(memberAuthentication(member.getId()))))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.result.optimizationReasonVersion").doesNotExist())
                 .andExpect(jsonPath("$.data.result.compatibleCount").doesNotExist())
                 .andExpect(jsonPath("$.data.result.replacedCount").value(1))
                 .andExpect(jsonPath("$.data.result.missingCount").value(1))
                 .andExpect(jsonPath("$.data.result.steps[0].status").value("REPLACED"))
                 .andExpect(jsonPath("$.data.result.steps[0].productName").value("보유 수분 세럼"))
                 .andExpect(jsonPath("$.data.result.steps[0].replaceName").value("영상 수분 앰플"))
+                .andExpect(jsonPath("$.data.result.steps[0].reason").value(
+                        "보유하신 보유 수분 세럼으로 영상 수분 앰플의 수분 공급 단계를 추가 구매 없이 이어갈 수 있어요."))
                 .andExpect(jsonPath("$.data.result.steps[1].status").value("VIDEO_PRODUCT"))
                 .andExpect(jsonPath("$.data.result.steps[1].productName").value("영상 진정 앰플"))
                 .andExpect(jsonPath("$.data.result.steps[1].replaceName").value((Object) null));
 
+        mockMvc.perform(post("/api/shortform-analyses/{analysisId}/optimize", analysis.getId())
+                        .with(authentication(memberAuthentication(member.getId()))))
+                .andExpect(status().isOk());
+
         String savedOptimization = analysisRepository.findById(analysis.getId()).orElseThrow().getOptimizationJson();
         assertThat(savedOptimization).doesNotContain("compatibleCount", "COMPATIBLE", "NO_INVENTORY_MATCH");
+        assertThat(analysisRepository.findById(analysis.getId()).orElseThrow().getOptimizationReasonVersion())
+                .isEqualTo("3.3");
+        verify(openAiOptimizationReasonClient, times(1)).generate(any());
         verifyNoInteractions(youtubeMetadataClient, jobHandler, openAiRoutineAnalysisClient, openAiCategoryClassifier);
     }
 

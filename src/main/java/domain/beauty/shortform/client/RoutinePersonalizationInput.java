@@ -48,7 +48,9 @@ public record RoutinePersonalizationInput(
             Long productId,
             String category,
             String brand,
-            String productName
+            String productName,
+            IngredientDataStatus ingredientDataStatus,
+            List<Ingredient> ingredients
     ) {
     }
 }

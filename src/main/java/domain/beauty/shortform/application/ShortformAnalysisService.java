@@ -27,6 +27,7 @@ import domain.routine.domain.RoutineType;
 import global.exception.CustomException;
 import global.exception.ErrorCode;
 import java.util.List;
+import java.util.Objects;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -38,6 +39,7 @@ public class ShortformAnalysisService {
     private final AnalysisFingerprint fingerprint;
     private final ShortformAnalysisJsonMapper jsonMapper;
     private final RoutineOptimizationNormalizer optimizationNormalizer;
+    private final OptimizationReasonRefresher reasonRefresher;
     private final RoutineCreationService routineCreationService;
     private final ShortformRoutineTypeResolver routineTypeResolver;
 
@@ -48,6 +50,7 @@ public class ShortformAnalysisService {
             AnalysisFingerprint fingerprint,
             ShortformAnalysisJsonMapper jsonMapper,
             RoutineOptimizationNormalizer optimizationNormalizer,
+            OptimizationReasonRefresher reasonRefresher,
             RoutineCreationService routineCreationService,
             ShortformRoutineTypeResolver routineTypeResolver
     ) {
@@ -57,6 +60,7 @@ public class ShortformAnalysisService {
         this.fingerprint = fingerprint;
         this.jsonMapper = jsonMapper;
         this.optimizationNormalizer = optimizationNormalizer;
+        this.reasonRefresher = reasonRefresher;
         this.routineCreationService = routineCreationService;
         this.routineTypeResolver = routineTypeResolver;
     }
@@ -128,9 +132,21 @@ public class ShortformAnalysisService {
     public Optimization optimize(Long memberId, Long analysisId) {
         ShortformAnalysis existing = stateService.getOwned(memberId, analysisId);
         stateService.requireCompleted(existing);
-        RoutineOptimizationSnapshot normalized = readOptimization(existing);
+        ShortformAnalysisSnapshot analysisSnapshot = readAnalysis(existing);
+        RoutineOptimizationSnapshot normalized = optimizationNormalizer.normalize(
+                analysisSnapshot,
+                jsonMapper.read(existing.getOptimizationJson(), RoutineOptimizationSnapshot.class));
+        if (!Objects.equals(
+                OptimizationReasonRefresher.CURRENT_VERSION,
+                existing.getOptimizationReasonVersion())) {
+            normalized = reasonRefresher.refresh(
+                    stateService.loadProfile(memberId), analysisSnapshot, normalized);
+        }
         ShortformAnalysis analysis = stateService.markOptimized(
-                memberId, analysisId, jsonMapper.write(normalized));
+                memberId,
+                analysisId,
+                jsonMapper.write(normalized),
+                OptimizationReasonRefresher.CURRENT_VERSION);
         return new Optimization(
                 analysis.getId(),
                 analysis.getOptimizedAt(),
