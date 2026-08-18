@@ -15,7 +15,7 @@
           "requestKey": {"type": "string", "minLength": 1, "maxLength": 64},
           "displayBrand": {"type": ["string", "null"], "maxLength": 100},
           "displayProductName": {"type": ["string", "null"], "maxLength": 160},
-          "marketOrVariant": {"type": ["string", "null"], "maxLength": 120},
+          "marketOrVariant": {"type": ["string", "null"], "description": "국가·판매처 문구를 제외한 단일 제품 용량. 예: 100ml, 50g", "maxLength": 120},
           "lookupStatus": {"type": "string", "enum": ["FOUND", "ESTIMATED", "AMBIGUOUS", "NOT_FOUND"]},
           "resolutionConfidence": {"type": "number", "minimum": 0, "maximum": 1},
           "notes": {"type": ["string", "null"], "maxLength": 500},

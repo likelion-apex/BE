@@ -1,6 +1,7 @@
 import './styles.css';
 import { ApiClient } from './api.js';
 import { optimizationPresentation } from './optimization.js';
+import { reasonPresentation } from './product-detail.js';
 import {
   buildGeneratedRoutineCreatePayload,
   buildKakaoAuthorizeUrl,
@@ -829,11 +830,19 @@ function renderProductDetailDialog(detail, { inventoryId, ingredients } = {}) {
   const score = detail.matchScore ?? detail.score;
   const reasons = detail.reasons || [];
   const ingredientItems = detail.ingredients || ingredients?.ingredients || [];
+  const productChips = [
+    detail.ingredientMarketOrVariant,
+    categoryLabels[detail.category] || detail.category,
+  ].filter(Boolean);
+  const reasonCards = reasons.map((reason) => {
+    const presentation = reasonPresentation(reason);
+    return `<article class="reason-card ${presentation.category}"><span class="reason-card-icon"><img src="${presentation.iconUrl}" alt=""></span><div><b>${escapeHtml(reason.title || reason.keyword)}</b><p>${escapeHtml(reason.description || reason.reason)}</p></div></article>`;
+  }).join('');
   openDialog(dialogFrame('제품 상세', `
-    <section class="product-detail-head"><img src="${safeImageUrl(detail.imageUrl)}" alt=""><div><small>${escapeHtml(detail.displayBrand || detail.brand || '브랜드 미확인')}</small><h2>${escapeHtml(detail.displayProductName || detail.productName || '제품명 미확인')}</h2><span>${escapeHtml(categoryLabels[detail.category] || detail.category || '')}</span></div></section>
+    <section class="product-detail-head"><img src="${safeImageUrl(detail.imageUrl)}" alt=""><div><small>${escapeHtml(detail.displayBrand || detail.brand || '브랜드 미확인')}</small><h2>${escapeHtml(detail.displayProductName || detail.productName || '제품명 미확인')}</h2><div class="product-detail-chips">${productChips.map((chip) => `<span>${escapeHtml(chip)}</span>`).join('')}</div></div></section>
     ${score == null ? '' : `<div class="personal-score"><img src="/assets/ai-orb.png" alt=""><span><small>내 피부 프로필 맞춤</small><b>AI 매칭 점수 ${Number(score)}점</b></span></div>`}
     <div class="detail-tabs"><button class="active" type="button" data-detail-tab="analysis">AI 맞춤 분석</button><button type="button" data-detail-tab="ingredients">전체 성분</button></div>
-    <section class="detail-pane active" data-detail-pane="analysis"><h3>이 제품이 ${score ?? '-'}점인 이유</h3>${reasons.length ? reasons.map((reason) => `<article class="reason-card ${String(reason.assessmentCategory || 'CAUTION').toLowerCase()}"><b>${escapeHtml(reason.title || reason.keyword)}</b><p>${escapeHtml(reason.description || reason.reason)}</p></article>`).join('') : '<div class="empty-inline">분석 근거가 제공되지 않았어요.</div>'}${detail.disclaimer ? `<p class="disclaimer">${escapeHtml(detail.disclaimer)}</p>` : ''}</section>
+    <section class="detail-pane active" data-detail-pane="analysis"><h3>이 제품이 ${score ?? '-'}점인 이유</h3>${reasons.length ? reasonCards : '<div class="empty-inline">분석 근거가 제공되지 않았어요.</div>'}${detail.disclaimer ? `<p class="disclaimer">${escapeHtml(detail.disclaimer)}</p>` : ''}</section>
     <section class="detail-pane" data-detail-pane="ingredients"><h3>전성분 ${ingredientItems.length}개</h3>${ingredientItems.length ? `<ul class="ingredient-list">${ingredientItems.map((item, index) => `<li><i class="risk-${String(item.riskLevel || 'unknown').toLowerCase()}">${item.riskScore ?? index + 1}</i><span><b>${escapeHtml(item.name || item.ingredientName)}</b><small>${escapeHtml((item.purposes || item.purposeTags || []).join(', ') || '배합 목적 미확인')}</small></span></li>`).join('')}</ul>` : '<div class="empty-inline">전체 성분 정보가 아직 없어요.</div>'}</section>
     ${inventoryId ? `<button class="danger-text" type="button" data-action="delete-inventory" data-inventory-id="${inventoryId}">인벤토리에서 삭제</button>` : ''}
   `), 'product-detail-dialog');

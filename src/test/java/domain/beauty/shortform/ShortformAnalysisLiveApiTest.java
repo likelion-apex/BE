@@ -116,7 +116,7 @@ class ShortformAnalysisLiveApiTest {
             assertThat(step.keyBenefits()).hasSizeBetween(1, 2);
             assertThat(step.primaryAssessmentCategory()).isIn((Object[]) AssessmentCategory.values());
             assertThat(step.safetyLevel()).isIn((Object[]) SafetyLevel.values());
-            assertThat(step.reasons()).hasSizeBetween(2, 3).allSatisfy(reason -> {
+            assertThat(step.reasons()).hasSizeBetween(2, 4).allSatisfy(reason -> {
                 assertThat(reason.assessmentCategory()).isIn((Object[]) AssessmentCategory.values());
                 assertThat(reason.title()).doesNotContain("추정", "AI가", "AI는", "대표 처방", "식별");
                 assertThat(reason.description()).doesNotContain("추정", "AI가", "AI는", "대표 처방", "식별");

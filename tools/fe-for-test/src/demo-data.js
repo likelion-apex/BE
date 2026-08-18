@@ -251,9 +251,12 @@ export const demoProductDetail = {
   category: '앰플',
   imageUrl: '/assets/product-jar.png',
   ingredientDataStatus: 'AVAILABLE',
+  ingredientMarketOrVariant: '50ml',
   reasons: [
-    { title: '속보습 강화', description: '히알루론산이 피부 안쪽 수분 유지에 도움을 줘요.', assessmentCategory: 'BENEFICIAL' },
-    { title: '민감 피부 적합', description: '주의 성분이 적어 현재 피부 프로필에 잘 맞아요.', assessmentCategory: 'SAFE' },
+    { title: '주의 성분 부담이 적어요', description: '확인된 성분에서 알레르기 주의 표시가 확인되지 않았어요.', assessmentCategory: 'SAFE' },
+    { title: '속보습을 채워주는 히알루론산', description: '히알루론산이 피부 안쪽 수분 유지에 도움을 줄 수 있어요.', assessmentCategory: 'BENEFICIAL' },
+    { title: '마무리 보습은 조금 아쉬워요', description: '앰플 사용 후 보습막을 채워줄 크림으로 마무리해 주세요.', assessmentCategory: 'CAUTION' },
+    { title: '민감한 날에는 사용량 조절', description: '피부가 예민한 날에는 적은 양부터 사용하고 피부 반응을 확인해 주세요.', assessmentCategory: 'WARNING' },
   ],
   ingredientStats: {
     totalCount: 18,

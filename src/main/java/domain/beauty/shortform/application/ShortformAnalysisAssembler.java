@@ -24,7 +24,6 @@ import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.IngredientDetail
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.IngredientSource;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.IngredientStats;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.ReasonCard;
-import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.ReasonTone;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.ScoreBreakdown;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.StepResult;
 import domain.beauty.shortform.domain.VideoRoutineExtraction;
@@ -58,17 +57,23 @@ public class ShortformAnalysisAssembler {
     private final OpenAiRoutineProperties openAiProperties;
     private final ShortformProductCategoryResolver categoryResolver;
     private final OptimizationReasonComposer reasonComposer;
+    private final ReasonCardNormalizer reasonCardNormalizer;
+    private final ProductCapacityNormalizer capacityNormalizer;
 
     public ShortformAnalysisAssembler(
             RegulationInfoCache regulationInfoCache,
             OpenAiRoutineProperties openAiProperties,
             ShortformProductCategoryResolver categoryResolver,
-            OptimizationReasonComposer reasonComposer
+            OptimizationReasonComposer reasonComposer,
+            ReasonCardNormalizer reasonCardNormalizer,
+            ProductCapacityNormalizer capacityNormalizer
     ) {
         this.regulationInfoCache = regulationInfoCache;
         this.openAiProperties = openAiProperties;
         this.categoryResolver = categoryResolver;
         this.reasonComposer = reasonComposer;
+        this.reasonCardNormalizer = reasonCardNormalizer;
+        this.capacityNormalizer = capacityNormalizer;
     }
 
     public RoutinePersonalizationInput toInput(
@@ -230,19 +235,23 @@ public class ShortformAnalysisAssembler {
         IngredientStats ingredientStats = ingredientAvailable ? toIngredientStats(ingredients) : null;
         List<ReasonCard> reasons = safe(normalized.reasons()).stream()
                 .filter(Objects::nonNull)
-                .map(reason -> new ReasonCard(
-                        toneOf(reason.assessmentCategory()),
-                        reason.assessmentCategory() == null
-                                ? AssessmentCategory.CAUTION
-                                : reason.assessmentCategory(),
-                        userCopy(reason.title(), fallbackReasonTitle(reason.assessmentCategory())),
-                        userCopy(reason.description(), fallbackReasonDescription(reason.assessmentCategory())),
-                        textOr(reason.evidenceSource(), "PERSONALIZED_ANALYSIS")
-                ))
-                .limit(3)
+                .map(reason -> {
+                    AssessmentCategory category = reason.assessmentCategory() == null
+                            ? AssessmentCategory.CAUTION
+                            : reason.assessmentCategory();
+                    return new ReasonCard(
+                            reasonCardNormalizer.toneOf(category),
+                            category,
+                            userCopy(reason.title(), fallbackReasonTitle(category)),
+                            userCopy(reason.description(), fallbackReasonDescription(category)),
+                            textOr(reason.evidenceSource(), "PERSONALIZED_ANALYSIS")
+                    );
+                })
+                .limit(4)
                 .toList();
         AssessmentCategory primaryCategory = primaryCategory(ingredientStats, reasons);
-        reasons = ensureReasonCards(reasons, primaryCategory);
+        reasons = reasonCardNormalizer.normalize(
+                reasons, primaryCategory, ingredientStats, ingredients, null);
         SafetyLevel safetyLevel = safetyLevel(primaryCategory);
         int skinTypeFit = normalized.scoreBreakdown() == null
                 ? 20
@@ -284,7 +293,10 @@ public class ShortformAnalysisAssembler {
                 reasons,
                 matched.ingredientDataStatus(),
                 verificationStatus,
-                matched.enrichment().marketOrVariant(),
+                capacityNormalizer.normalize(
+                        matched.enrichment().marketOrVariant(),
+                        matched.displayProductName(),
+                        source.productName()),
                 safe(matched.enrichment().sources()).stream()
                         .map(ingredientSource -> new IngredientSource(
                                 ingredientSource.url(), ingredientSource.title(), ingredientSource.sourceType()))
@@ -365,34 +377,6 @@ public class ShortformAnalysisAssembler {
         return reasons.stream().anyMatch(reason -> reason.assessmentCategory() == category);
     }
 
-    private List<ReasonCard> ensureReasonCards(
-            List<ReasonCard> reasons,
-            AssessmentCategory primaryCategory
-    ) {
-        List<ReasonCard> completed = new ArrayList<>(reasons);
-        if (completed.isEmpty()) {
-            completed.add(fallbackReason(primaryCategory));
-        }
-        if (completed.size() < 2) {
-            AssessmentCategory secondary = primaryCategory == AssessmentCategory.SAFE
-                    ? AssessmentCategory.BENEFICIAL
-                    : AssessmentCategory.SAFE;
-            completed.add(fallbackReason(secondary));
-        }
-        return List.copyOf(completed.stream().limit(3).toList());
-    }
-
-    private ReasonCard fallbackReason(AssessmentCategory category) {
-        AssessmentCategory safeCategory = category == null ? AssessmentCategory.CAUTION : category;
-        return new ReasonCard(
-                toneOf(safeCategory),
-                safeCategory,
-                fallbackReasonTitle(safeCategory),
-                fallbackReasonDescription(safeCategory),
-                "SERVER_FALLBACK"
-        );
-    }
-
     private String fallbackReasonTitle(AssessmentCategory category) {
         return switch (category == null ? AssessmentCategory.CAUTION : category) {
             case SAFE -> "부담이 적은 성분 구성";
@@ -415,7 +399,7 @@ public class ShortformAnalysisAssembler {
         return reasons.stream()
                 .filter(reason -> reason.assessmentCategory() == primaryCategory)
                 .findFirst()
-                .orElseGet(() -> fallbackReason(primaryCategory));
+                .orElseThrow();
     }
 
     private SafetyLevel safetyLevel(AssessmentCategory category) {
@@ -489,17 +473,6 @@ public class ShortformAnalysisAssembler {
             return IngredientRiskLevel.MODERATE;
         }
         return IngredientRiskLevel.HIGH;
-    }
-
-    private ReasonTone toneOf(AssessmentCategory category) {
-        if (category == null) {
-            return ReasonTone.NEUTRAL;
-        }
-        return switch (category) {
-            case SAFE, BENEFICIAL -> ReasonTone.POSITIVE;
-            case CAUTION -> ReasonTone.CAUTION;
-            case WARNING -> ReasonTone.WARNING;
-        };
     }
 
     private String regulationSummary(RegulationInfo info) {

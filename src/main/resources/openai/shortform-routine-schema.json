@@ -48,7 +48,9 @@
           "reasons": {
             "type": "array",
             "minItems": 2,
-            "maxItems": 3,
+            "maxItems": 4,
+            "uniqueItems": true,
+            "description": "근거가 있는 4단계 평가 카드. assessmentCategory는 서로 중복하지 않는다.",
             "items": {
               "type": "object",
               "additionalProperties": false,

@@ -46,6 +46,9 @@ SHORTFORM_GEMINI_FALLBACK_ENABLED=true # OpenAI 미확인 제품의 Gemini 보�
 - 인벤토리 대체 추천은 영상 제품과 동일한 DB `ProductCategory`에서만 허용하며, 서버가 AI 응답을 다시 검증한다. `ETC` 또는 카테고리 불일치 추천은 영상 제품 유지로 처리한다.
 - 같은 카테고리의 인벤토리 후보는 DB 성분과 제품 보강 캐시를 우선 사용하고, 근거가 없을 때만 제품 보강 API를 호출한다. 확인된 성분·효능만 개인화 입력과 대체 이유에 사용한다.
 - 최적화 응답은 `REPLACED`와 `VIDEO_PRODUCT`만 반환한다. 대체 시 `productName`은 인벤토리 제품명, `replaceName`은 영상 제품명이며, 대체품이 없으면 `replaceName`은 `null`이다.
+- 제품 상세 이유의 공식 4단계는 `assessmentCategory`의 `SAFE`, `BENEFICIAL`, `CAUTION`, `WARNING`이다. `tone`은 하위 호환용 표현 분류로 SAFE/BENEFICIAL은 `POSITIVE`, CAUTION은 `CAUTION`, WARNING은 `WARNING`으로 반환한다.
+- 단계 대표 판정이 CAUTION 또는 WARNING이면 상세 이유에도 같은 단계의 근거 카드가 반드시 포함된다. 기존 완료 분석도 조회 시 저장된 성분 통계와 성분 정보만으로 정규화하며 추가 AI 호출은 하지 않는다.
+- `ingredientMarketOrVariant`는 기존 필드명을 유지하지만 `100ml`, `50g`처럼 확인된 단일 용량만 반환한다. 국가·판매처 문구는 제거하며 용량이 없거나 서로 충돌하면 `null`이다.
 - 최적화의 제품 선택은 분석 시점 인벤토리 스냅샷을 유지한다. 신규 분석은 저장된 맞춤 이유를 그대로 반환하며, 이유 버전이 `3.3`보다 오래된 기존 분석만 최초 `POST /optimize`에서 현재 피부 프로필로 문구를 한 번 갱신하고 버전을 저장한다. 갱신 실패 시 확인된 제품·성분으로 서버 문구를 생성해 API 응답을 유지한다.
 - 제품·전성분은 OpenAI 웹 검색을 먼저 사용하고, 미확인 제품만 Gemini Google Search로 재조사한다.
 - Gemini Search 쿼터까지 사용할 수 없으면 MVP 폴백으로 Gemini 모델 지식에서 대표 처방을 생성하되 `ESTIMATED`로 구분하고 안전도를 강제로 `UNKNOWN`으로 낮춘다.

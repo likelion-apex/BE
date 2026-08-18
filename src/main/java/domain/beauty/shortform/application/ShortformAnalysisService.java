@@ -42,6 +42,7 @@ public class ShortformAnalysisService {
     private final OptimizationReasonRefresher reasonRefresher;
     private final RoutineCreationService routineCreationService;
     private final ShortformRoutineTypeResolver routineTypeResolver;
+    private final ShortformAnalysisSnapshotNormalizer snapshotNormalizer;
 
     public ShortformAnalysisService(
             YouTubeUrlNormalizer urlNormalizer,
@@ -52,7 +53,8 @@ public class ShortformAnalysisService {
             RoutineOptimizationNormalizer optimizationNormalizer,
             OptimizationReasonRefresher reasonRefresher,
             RoutineCreationService routineCreationService,
-            ShortformRoutineTypeResolver routineTypeResolver
+            ShortformRoutineTypeResolver routineTypeResolver,
+            ShortformAnalysisSnapshotNormalizer snapshotNormalizer
     ) {
         this.urlNormalizer = urlNormalizer;
         this.youtubeMetadataClient = youtubeMetadataClient;
@@ -63,6 +65,7 @@ public class ShortformAnalysisService {
         this.reasonRefresher = reasonRefresher;
         this.routineCreationService = routineCreationService;
         this.routineTypeResolver = routineTypeResolver;
+        this.snapshotNormalizer = snapshotNormalizer;
     }
 
     public Created create(Long memberId, String videoUrl) {
@@ -228,6 +231,7 @@ public class ShortformAnalysisService {
     }
 
     private ShortformAnalysisSnapshot readAnalysis(ShortformAnalysis analysis) {
-        return jsonMapper.read(analysis.getResultJson(), ShortformAnalysisSnapshot.class);
+        return snapshotNormalizer.normalize(
+                jsonMapper.read(analysis.getResultJson(), ShortformAnalysisSnapshot.class));
     }
 }
