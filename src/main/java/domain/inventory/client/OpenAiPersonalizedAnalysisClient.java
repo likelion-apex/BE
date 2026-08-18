@@ -2,6 +2,7 @@ package domain.inventory.client;
 
 import domain.inventory.ai.AiProviderUnavailableException;
 import domain.inventory.ai.InventoryAiJsonSupport;
+import domain.inventory.ai.InventoryAiProperties;
 import domain.member.SkinConcern;
 import domain.member.SkinType;
 import java.util.ArrayList;
@@ -39,6 +40,7 @@ public class OpenAiPersonalizedAnalysisClient {
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
+    private final InventoryAiProperties inventoryAiProperties;
     private final String apiKey;
     private final String model;
     private final String organizationId;
@@ -48,12 +50,14 @@ public class OpenAiPersonalizedAnalysisClient {
             @Value("${openai.model}") String model,
             @Value("${openai.organization-id:}") String organizationId,
             @Qualifier("inventoryOpenAiRestClient") RestClient restClient,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            InventoryAiProperties inventoryAiProperties) {
         this.apiKey = apiKey;
         this.model = model;
         this.organizationId = organizationId;
         this.objectMapper = objectMapper;
         this.restClient = restClient;
+        this.inventoryAiProperties = inventoryAiProperties;
     }
 
     public PersonalizedAnalysisResult analyze(
@@ -65,7 +69,18 @@ public class OpenAiPersonalizedAnalysisClient {
             throw new AiProviderUnavailableException("OPENAI_API_KEY가 없습니다.");
         }
         try {
-            JsonNode response = restClient.post()
+            String requestJson = objectMapper.writeValueAsString(Map.of(
+                    "model", model,
+                    "temperature", 0,
+                    "max_tokens", inventoryAiProperties.getOpenaiMaxOutputTokens(),
+                    "response_format", Map.of("type", "json_object"),
+                    "messages", List.of(
+                            Map.of("role", "system", "content", SYSTEM_PROMPT),
+                            Map.of("role", "user", "content",
+                                    buildUserContent(productName, ingredientNames, skinType, skinConcerns))
+                    )
+            ));
+            String responseJson = restClient.post()
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
                     .headers(headers -> {
                         if (organizationId != null && !organizationId.isBlank()) {
@@ -73,18 +88,10 @@ public class OpenAiPersonalizedAnalysisClient {
                         }
                     })
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of(
-                            "model", model,
-                            "temperature", 0,
-                            "response_format", Map.of("type", "json_object"),
-                            "messages", List.of(
-                                    Map.of("role", "system", "content", SYSTEM_PROMPT),
-                                    Map.of("role", "user", "content",
-                                            buildUserContent(productName, ingredientNames, skinType, skinConcerns))
-                            )
-                    ))
+                    .body(requestJson)
                     .retrieve()
-                    .body(JsonNode.class);
+                    .body(String.class);
+            JsonNode response = InventoryAiJsonSupport.readObject(objectMapper, responseJson);
             String content = response == null
                     ? null
                     : response.path("choices").path(0).path("message").path("content").asText(null);

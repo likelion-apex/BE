@@ -97,7 +97,7 @@ public class InventoryService {
             return toAiResponse(inventory.getId(), productName, cached);
         }
 
-        List<String> ingredientNames = ingredientAiClient.fetchIngredientNames(productName);
+        List<String> ingredientNames = cachedIngredientNames(productName);
         PersonalizedAnalysisResult result = personalizedAnalysisAiClient.analyze(
                 productName, ingredientNames, member.getSkinType(), member.getSkinConcerns());
         if (result == null) {
@@ -126,6 +126,18 @@ public class InventoryService {
             saveCache(cacheKey, ingredientCachePayload(ingredients));
         }
         return new IngredientAnalysisResponse(inventory.getId(), productName, ingredients);
+    }
+
+    private List<String> cachedIngredientNames(String productName) {
+        List<IngredientAnalysisResponse.IngredientPurpose> cached =
+                findCachedIngredients(InventoryAiCacheService.ingredientKey(productName));
+        if (cached == null || cached.isEmpty()) {
+            return List.of();
+        }
+        return cached.stream()
+                .map(IngredientAnalysisResponse.IngredientPurpose::ingredientName)
+                .filter(name -> name != null && !name.isBlank())
+                .toList();
     }
 
     private PersonalizedAnalysisResult findCachedAnalysis(String cacheKey) {

@@ -7,8 +7,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class InventoryAiProperties {
 
     private Duration aiCacheTtl = Duration.ofDays(30);
-    private Duration connectTimeout = Duration.ofSeconds(5);
-    private Duration readTimeout = Duration.ofSeconds(20);
+    private Duration connectTimeout = Duration.ofSeconds(1);
+    private Duration readTimeout = Duration.ofSeconds(3);
+    private int openaiMaxInputTokens = 600;
+    private int openaiMaxOutputTokens = 400;
 
     public Duration getAiCacheTtl() {
         return aiCacheTtl;
@@ -32,5 +34,21 @@ public class InventoryAiProperties {
 
     public void setReadTimeout(Duration readTimeout) {
         this.readTimeout = readTimeout;
+    }
+
+    public int getOpenaiMaxInputTokens() {
+        return openaiMaxInputTokens;
+    }
+
+    public void setOpenaiMaxInputTokens(int openaiMaxInputTokens) {
+        this.openaiMaxInputTokens = openaiMaxInputTokens;
+    }
+
+    public int getOpenaiMaxOutputTokens() {
+        return openaiMaxOutputTokens;
+    }
+
+    public void setOpenaiMaxOutputTokens(int openaiMaxOutputTokens) {
+        this.openaiMaxOutputTokens = openaiMaxOutputTokens;
     }
 }

@@ -25,7 +25,8 @@ class InventoryGeminiJsonClientTest {
         properties.setModel("gemini-3.6-flash");
         RestClient.Builder builder = RestClient.builder().baseUrl("https://gemini.test");
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        InventoryGeminiJsonClient client = new InventoryGeminiJsonClient(builder.build(), properties, objectMapper);
+        InventoryGeminiJsonClient client = new InventoryGeminiJsonClient(
+                builder.build(), properties, new InventoryAiProperties(), objectMapper);
         server.expect(requestTo("https://gemini.test/v1beta/models/gemini-3.6-flash:generateContent"))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header("x-goog-api-key", "test-gemini-key"))

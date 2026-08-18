@@ -112,8 +112,10 @@ product:
 
 inventory:
   ai-cache-ttl: 30d
-  connect-timeout: 5s
-  read-timeout: 20s
+  connect-timeout: 1s
+  read-timeout: 3s
+  openai-max-input-tokens: 600
+  openai-max-output-tokens: 400
 
 cors:
   allowed-origins: http://localhost:3000
