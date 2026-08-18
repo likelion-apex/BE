@@ -18,7 +18,7 @@ import org.flywaydb.core.api.migration.Context;
 /**
  * 제품명 정규화 키를 추가하고, 같은 키를 가진 중복 상품을 하나로 합친다.
  */
-public class V3__add_product_normalized_name extends BaseJavaMigration {
+public class V4__add_product_normalized_name extends BaseJavaMigration {
 
     private static final String PRODUCTS = "products";
     private static final String NORMALIZED_NAME = "normalized_name";
