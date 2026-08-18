@@ -37,6 +37,7 @@ public class ShortformAnalysisService {
     private final ShortformAnalysisStateService stateService;
     private final AnalysisFingerprint fingerprint;
     private final ShortformAnalysisJsonMapper jsonMapper;
+    private final RoutineOptimizationNormalizer optimizationNormalizer;
     private final RoutineCreationService routineCreationService;
     private final ShortformRoutineTypeResolver routineTypeResolver;
 
@@ -46,6 +47,7 @@ public class ShortformAnalysisService {
             ShortformAnalysisStateService stateService,
             AnalysisFingerprint fingerprint,
             ShortformAnalysisJsonMapper jsonMapper,
+            RoutineOptimizationNormalizer optimizationNormalizer,
             RoutineCreationService routineCreationService,
             ShortformRoutineTypeResolver routineTypeResolver
     ) {
@@ -54,6 +56,7 @@ public class ShortformAnalysisService {
         this.stateService = stateService;
         this.fingerprint = fingerprint;
         this.jsonMapper = jsonMapper;
+        this.optimizationNormalizer = optimizationNormalizer;
         this.routineCreationService = routineCreationService;
         this.routineTypeResolver = routineTypeResolver;
     }
@@ -123,11 +126,15 @@ public class ShortformAnalysisService {
     }
 
     public Optimization optimize(Long memberId, Long analysisId) {
-        ShortformAnalysis analysis = stateService.markOptimized(memberId, analysisId);
+        ShortformAnalysis existing = stateService.getOwned(memberId, analysisId);
+        stateService.requireCompleted(existing);
+        RoutineOptimizationSnapshot normalized = readOptimization(existing);
+        ShortformAnalysis analysis = stateService.markOptimized(
+                memberId, analysisId, jsonMapper.write(normalized));
         return new Optimization(
                 analysis.getId(),
                 analysis.getOptimizedAt(),
-                jsonMapper.read(analysis.getOptimizationJson(), RoutineOptimizationSnapshot.class)
+                normalized
         );
     }
 
@@ -149,7 +156,7 @@ public class ShortformAnalysisService {
                 saveType,
                 routineType,
                 readAnalysis(analysis),
-                jsonMapper.read(analysis.getOptimizationJson(), RoutineOptimizationSnapshot.class)
+                readOptimization(analysis)
         );
         return new Applied(
                 analysisId,
@@ -171,6 +178,12 @@ public class ShortformAnalysisService {
                 analysis.getErrorMessage(),
                 analysis.getUpdatedAt()
         );
+    }
+
+    private RoutineOptimizationSnapshot readOptimization(ShortformAnalysis analysis) {
+        return optimizationNormalizer.normalize(
+                readAnalysis(analysis),
+                jsonMapper.read(analysis.getOptimizationJson(), RoutineOptimizationSnapshot.class));
     }
 
     private HistoryItem toHistoryItem(HistorySummary analysis) {

@@ -159,6 +159,6 @@ class RoutineCreationServiceTest {
     }
 
     private RoutineOptimizationSnapshot emptyOptimization() {
-        return new RoutineOptimizationSnapshot(0, 0, 0, 0, "최적화 완료", List.of());
+        return new RoutineOptimizationSnapshot(0, 0, 0, "최적화 완료", List.of());
     }
 }

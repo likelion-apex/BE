@@ -6,6 +6,7 @@ import domain.beauty.shortform.domain.IngredientDataStatus;
 import domain.beauty.shortform.domain.ProductResolutionStatus;
 import domain.cosmetic.client.KakaoImageClient;
 import domain.inventory.Product;
+import domain.inventory.ProductCategory;
 import domain.inventory.ProductRepository;
 import java.util.List;
 import java.util.Map;
@@ -16,10 +17,16 @@ public class ShortformProductMatcher {
 
     private final ProductRepository productRepository;
     private final KakaoImageClient imageClient;
+    private final ShortformProductCategoryResolver categoryResolver;
 
-    public ShortformProductMatcher(ProductRepository productRepository, KakaoImageClient imageClient) {
+    public ShortformProductMatcher(
+            ProductRepository productRepository,
+            KakaoImageClient imageClient,
+            ShortformProductCategoryResolver categoryResolver
+    ) {
         this.productRepository = productRepository;
         this.imageClient = imageClient;
+        this.categoryResolver = categoryResolver;
     }
 
     public List<MatchedVideoStep> match(
@@ -38,7 +45,8 @@ public class ShortformProductMatcher {
                 && enrichment.resolutionConfidence() >= 0.60;
         if (!videoHasExactProduct && !aiResolvedProduct) {
             return new MatchedVideoStep(
-                    step, null, null, step.brand(), step.category(), ProductResolutionStatus.UNRESOLVED,
+                    step, null, categoryResolver.resolve(step.category(), step.productName()), null,
+                    step.brand(), step.category(), ProductResolutionStatus.UNRESOLVED,
                     0, IngredientDataStatus.NOT_ELIGIBLE, ProductEnrichmentData.unresolved());
         }
 
@@ -65,6 +73,7 @@ public class ShortformProductMatcher {
             return new MatchedVideoStep(
                     step,
                     product.getId(),
+                    product.getCategory() == null ? ProductCategory.ETC : product.getCategory(),
                     product.getImageUrl(),
                     displayBrand,
                     displayProductName,
@@ -78,6 +87,7 @@ public class ShortformProductMatcher {
         return new MatchedVideoStep(
                 step,
                 null,
+                categoryResolver.resolve(step.category(), displayProductName),
                 imageClient.searchImageUrl(query),
                 displayBrand,
                 displayProductName,

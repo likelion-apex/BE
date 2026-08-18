@@ -26,6 +26,7 @@ import domain.beauty.shortform.domain.SafetyLevel;
 import domain.beauty.shortform.domain.VideoRoutineExtraction;
 import domain.cosmetic.cache.RegulationInfoCache;
 import domain.cosmetic.client.CsmtcsReglMaterialClient;
+import domain.inventory.ProductCategory;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
@@ -35,7 +36,8 @@ class ShortformAnalysisAssemblerTest {
     private final RegulationInfoCache regulationInfoCache =
             new RegulationInfoCache(mock(CsmtcsReglMaterialClient.class));
     private final ShortformAnalysisAssembler assembler =
-            new ShortformAnalysisAssembler(regulationInfoCache, new OpenAiRoutineProperties());
+            new ShortformAnalysisAssembler(
+                    regulationInfoCache, new OpenAiRoutineProperties(), new ShortformProductCategoryResolver());
 
     @Test
     void forcesUnknownForCategoryOnlyStepAndIgnoresUnknownInventoryId() {
@@ -45,7 +47,7 @@ class ShortformAnalysisAssemblerTest {
                 "https://www.youtube.com/watch?v=t1S24pgO2XQ",
                 "수부지",
                 List.of("민감성"),
-                List.of(new InventoryFact(100L, 20L, "진정 토너", "테스트", "TONER", null))
+                List.of(new InventoryFact(100L, 20L, "진정 토너", "테스트", "SKIN_TONER", null))
         );
         ProductEnrichmentData exactEnrichment = new ProductEnrichmentData(
                 "라운드랩",
@@ -62,11 +64,11 @@ class ShortformAnalysisAssemblerTest {
         );
         MatchedVideoStep exact = new MatchedVideoStep(
                 step(1, IdentificationLevel.EXACT_PRODUCT, "독도 토너"),
-                10L, null, "라운드랩", "1025 독도 토너", ProductResolutionStatus.CATALOG_MATCH,
+                10L, ProductCategory.SKIN_TONER, null, "라운드랩", "1025 독도 토너", ProductResolutionStatus.CATALOG_MATCH,
                 1, IngredientDataStatus.AVAILABLE, exactEnrichment);
         MatchedVideoStep categoryOnly = new MatchedVideoStep(
                 step(2, IdentificationLevel.CATEGORY_ONLY, null),
-                null, null, null, "토너", ProductResolutionStatus.UNRESOLVED,
+                null, ProductCategory.SKIN_TONER, null, null, "토너", ProductResolutionStatus.UNRESOLVED,
                 0, IngredientDataStatus.NOT_ELIGIBLE, ProductEnrichmentData.unresolved());
 
         RoutinePersonalizationResult result = new RoutinePersonalizationResult(
@@ -107,9 +109,87 @@ class ShortformAnalysisAssemblerTest {
         assertThat(assembled.analysis().steps().get(1).estimatedIngredientCount()).isNull();
         assertThat(assembled.analysis().steps().get(0).ingredientStats().totalCount()).isEqualTo(1);
         assertThat(assembled.optimization().steps().get(0).status()).isEqualTo(OptimizationStatus.REPLACED);
-        assertThat(assembled.optimization().steps().get(1).status()).isEqualTo(OptimizationStatus.NO_INVENTORY_MATCH);
+        assertThat(assembled.optimization().steps().get(1).status()).isEqualTo(OptimizationStatus.VIDEO_PRODUCT);
         assertThat(assembled.optimization().replacedCount()).isEqualTo(1);
         assertThat(assembled.optimization().missingCount()).isEqualTo(1);
+    }
+
+    @Test
+    void rejectsInventoryRecommendationFromDifferentProductCategory() {
+        JobContext context = new JobContext(
+                1L, "video", "https://www.youtube.com/watch?v=video", "수부지",
+                List.of(), List.of(new InventoryFact(
+                        100L, 20L, "진정 토너", "테스트", "SKIN_TONER", "/toner.png")));
+        ProductEnrichmentData product = enrichment(
+                IngredientVerificationStatus.OFFICIAL,
+                new ProductEnrichmentResult.Ingredient(
+                        1, "히알루론산", List.of("보습제"), List.of("수분 공급"), 1, false, false));
+        MatchedVideoStep ampoule = new MatchedVideoStep(
+                step(1, IdentificationLevel.EXACT_PRODUCT, "수분 앰플"),
+                10L, ProductCategory.SERUM, "/ampoule.png", "테스트", "수분 앰플",
+                ProductResolutionStatus.CATALOG_MATCH, 1, IngredientDataStatus.AVAILABLE, product);
+
+        AssembledResult assembled = assembleOneStep(
+                context, ampoule, resultWithRecommendation(100L, "보습 역할이 비슷합니다."));
+
+        assertThat(assembled.optimization().steps()).singleElement().satisfies(step -> {
+            assertThat(step.status()).isEqualTo(OptimizationStatus.VIDEO_PRODUCT);
+            assertThat(step.productName()).isEqualTo("수분 앰플");
+            assertThat(step.replaceName()).isNull();
+            assertThat(step.inventoryId()).isNull();
+        });
+        assertThat(assembled.optimization().replacedCount()).isZero();
+        assertThat(assembled.optimization().missingCount()).isEqualTo(1);
+    }
+
+    @Test
+    void combinesSameCategoryAndSameProductRecommendationIntoReplacement() throws Exception {
+        JobContext context = new JobContext(
+                1L, "video", "https://www.youtube.com/watch?v=video", "수부지",
+                List.of(), List.of(new InventoryFact(
+                        100L, 10L, "보유 수분 앰플", "테스트", "SERUM", "/owned.png")));
+        ProductEnrichmentData product = enrichment(
+                IngredientVerificationStatus.OFFICIAL,
+                new ProductEnrichmentResult.Ingredient(
+                        1, "히알루론산", List.of("보습제"), List.of("수분 공급"), 1, false, false));
+        MatchedVideoStep ampoule = new MatchedVideoStep(
+                step(1, IdentificationLevel.EXACT_PRODUCT, "영상 수분 앰플"),
+                10L, ProductCategory.SERUM, "/video.png", "영상 브랜드", "영상 수분 앰플",
+                ProductResolutionStatus.CATALOG_MATCH, 1, IngredientDataStatus.AVAILABLE, product);
+
+        AssembledResult assembled = assembleOneStep(
+                context, ampoule, resultWithRecommendation(100L, "같은 세럼 카테고리의 보유 제품입니다."));
+
+        assertThat(assembled.optimization().steps()).singleElement().satisfies(step -> {
+            assertThat(step.status()).isEqualTo(OptimizationStatus.REPLACED);
+            assertThat(step.productName()).isEqualTo("보유 수분 앰플");
+            assertThat(step.replaceName()).isEqualTo("영상 수분 앰플");
+            assertThat(step.inventoryId()).isEqualTo(100L);
+        });
+        assertThat(assembled.optimization().replacedCount()).isEqualTo(1);
+        String json = new ObjectMapper().writeValueAsString(assembled.optimization());
+        assertThat(json).doesNotContain("compatibleCount", "COMPATIBLE");
+    }
+
+    @Test
+    void neverReplacesUnclassifiedEtcVideoProduct() {
+        JobContext context = new JobContext(
+                1L, "video", "https://www.youtube.com/watch?v=video", "수부지",
+                List.of(), List.of(new InventoryFact(
+                        100L, 20L, "보유 기타 제품", "테스트", "ETC", null)));
+        MatchedVideoStep unknown = new MatchedVideoStep(
+                step(1, IdentificationLevel.CATEGORY_ONLY, null),
+                null, ProductCategory.ETC, null, null, "확인되지 않은 제품",
+                ProductResolutionStatus.UNRESOLVED, 0, IngredientDataStatus.NOT_ELIGIBLE,
+                ProductEnrichmentData.unresolved());
+
+        AssembledResult assembled = assembleOneStep(
+                context, unknown, resultWithRecommendation(100L, "기타 제품 추천"));
+
+        assertThat(assembled.optimization().steps()).singleElement().satisfies(step -> {
+            assertThat(step.status()).isEqualTo(OptimizationStatus.VIDEO_PRODUCT);
+            assertThat(step.replaceName()).isNull();
+        });
     }
 
     @Test
@@ -127,11 +207,11 @@ class ShortformAnalysisAssemblerTest {
                         1, "테스트 고위험 성분", List.of("향료"), List.of(), 8, true, true));
         MatchedVideoStep estimated = new MatchedVideoStep(
                 step(1, IdentificationLevel.CATEGORY_ONLY, null),
-                null, null, "추정 브랜드", "추정 수딩 크림", ProductResolutionStatus.AI_NORMALIZED,
+                null, ProductCategory.SKIN_TONER, null, "추정 브랜드", "추정 수딩 크림", ProductResolutionStatus.AI_NORMALIZED,
                 0.72, IngredientDataStatus.AVAILABLE, estimatedEnrichment);
         MatchedVideoStep highRisk = new MatchedVideoStep(
                 step(2, IdentificationLevel.EXACT_PRODUCT, "테스트 크림"),
-                null, null, "테스트", "테스트 크림", ProductResolutionStatus.AI_NORMALIZED,
+                null, ProductCategory.SKIN_TONER, null, "테스트", "테스트 크림", ProductResolutionStatus.AI_NORMALIZED,
                 0.95, IngredientDataStatus.AVAILABLE, highRiskEnrichment);
         RoutinePersonalizationResult result = new RoutinePersonalizationResult(
                 "테스트 루틴", "테스트", List.of(), "보습", "없음", "요약", List.of(),
@@ -173,7 +253,7 @@ class ShortformAnalysisAssemblerTest {
                         1, "판테놀", List.of("보습제"), List.of("장벽 보호"), 1, false, false));
         MatchedVideoStep matched = new MatchedVideoStep(
                 step(1, IdentificationLevel.EXACT_PRODUCT, "테스트 크림"),
-                10L, null, "테스트", "테스트 크림", ProductResolutionStatus.CATALOG_MATCH,
+                10L, ProductCategory.SKIN_TONER, null, "테스트", "테스트 크림", ProductResolutionStatus.CATALOG_MATCH,
                 0.95, IngredientDataStatus.AVAILABLE, product);
         BeautyRoutineAnalysis extraction = new BeautyRoutineAnalysis(
                 "1.0",
@@ -188,6 +268,7 @@ class ShortformAnalysisAssemblerTest {
 
         assertThat(json).doesNotContain("nickname");
         assertThat(json).contains("\"skinType\":\"수부지\"");
+        assertThat(json).contains("\"productCategory\":\"SKIN_TONER\"");
     }
 
     @Test
@@ -201,7 +282,7 @@ class ShortformAnalysisAssemblerTest {
                         1, "판테놀", List.of("보습제"), List.of("장벽 보호"), 1, false, false));
         MatchedVideoStep matched = new MatchedVideoStep(
                 step(1, IdentificationLevel.EXACT_PRODUCT, "테스트 크림"),
-                10L, null, "테스트", "테스트 크림", ProductResolutionStatus.CATALOG_MATCH,
+                10L, ProductCategory.SKIN_TONER, null, "테스트", "테스트 크림", ProductResolutionStatus.CATALOG_MATCH,
                 0.95, IngredientDataStatus.AVAILABLE, product);
         RoutinePersonalizationResult result = new RoutinePersonalizationResult(
                 "장선우님의 나이트 스킨케어 루틴 분석",
@@ -233,7 +314,7 @@ class ShortformAnalysisAssemblerTest {
                         1, "판테놀", List.of("보습제"), List.of("장벽 보호"), 1, false, false));
         MatchedVideoStep matched = new MatchedVideoStep(
                 step(1, IdentificationLevel.EXACT_PRODUCT, "테스트 크림"),
-                10L, null, "테스트", "테스트 크림", ProductResolutionStatus.CATALOG_MATCH,
+                10L, ProductCategory.SKIN_TONER, null, "테스트", "테스트 크림", ProductResolutionStatus.CATALOG_MATCH,
                 0.95, IngredientDataStatus.AVAILABLE, product);
         String summary = "수분 공급(테스트 크림)과 판테놀 성분을 중심으로 피부 장벽을 관리하는 루틴입니다.";
         RoutinePersonalizationResult result = new RoutinePersonalizationResult(
@@ -260,7 +341,7 @@ class ShortformAnalysisAssemblerTest {
                 List.of(), List.of());
         MatchedVideoStep unresolved = new MatchedVideoStep(
                 step(1, IdentificationLevel.CATEGORY_ONLY, null),
-                null, null, null, "토너", ProductResolutionStatus.UNRESOLVED,
+                null, ProductCategory.SKIN_TONER, null, null, "토너", ProductResolutionStatus.UNRESOLVED,
                 0, IngredientDataStatus.NOT_ELIGIBLE, ProductEnrichmentData.unresolved());
         RoutinePersonalizationResult result = new RoutinePersonalizationResult(
                 "피부 진정 루틴",
@@ -290,7 +371,7 @@ class ShortformAnalysisAssemblerTest {
                         1, "살리실산", List.of("각질 제거"), List.of(), 4, true, false));
         MatchedVideoStep matched = new MatchedVideoStep(
                 step(1, IdentificationLevel.EXACT_PRODUCT, "테스트 크림"),
-                10L, null, "테스트", "테스트 크림", ProductResolutionStatus.CATALOG_MATCH,
+                10L, ProductCategory.SKIN_TONER, null, "테스트", "테스트 크림", ProductResolutionStatus.CATALOG_MATCH,
                 0.95, IngredientDataStatus.AVAILABLE, product);
         RoutinePersonalizationResult result = new RoutinePersonalizationResult(
                 "각질 케어 루틴",
@@ -378,5 +459,13 @@ class ShortformAnalysisAssemblerTest {
                 List.of(new RoutinePersonalizationResult.Reason(
                         category, "보습 균형", "피부 컨디션에 필요한 보습을 채워줘요.", "INGREDIENT_PROFILE"))
         );
+    }
+
+    private RoutinePersonalizationResult resultWithRecommendation(Long inventoryId, String reason) {
+        return new RoutinePersonalizationResult(
+                "수분 루틴", "수부지 맞춤", List.of("수분 공급"), "수분 공급", "보습 성분",
+                "영상 속 제품으로 수분을 공급하는 루틴입니다.", List.of(),
+                List.of(aiStep(1, 30, 25, AssessmentCategory.BENEFICIAL)),
+                List.of(new RoutinePersonalizationResult.InventoryRecommendation(1, inventoryId, reason)));
     }
 }

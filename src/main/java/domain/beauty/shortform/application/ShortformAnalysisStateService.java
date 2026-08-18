@@ -161,9 +161,10 @@ public class ShortformAnalysisStateService {
     }
 
     @Transactional
-    public ShortformAnalysis markOptimized(Long memberId, Long analysisId) {
+    public ShortformAnalysis markOptimized(Long memberId, Long analysisId, String optimizationJson) {
         ShortformAnalysis analysis = findOwned(memberId, analysisId);
         requireCompleted(analysis);
+        analysis.replaceOptimization(optimizationJson);
         analysis.markOptimized();
         return analysis;
     }

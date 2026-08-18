@@ -11,6 +11,6 @@ Figma 분류에 맞는 이유 카드를 반드시 2~3개 생성하세요. assess
 title은 영상에 등장한 루틴의 핵심 목적이나 효과를 "속건조 타파 루틴"처럼 짧게 요약하세요. 사람 이름, "님", "내 루틴", "나의 루틴", "사용자의 루틴", "분석"처럼 영상 루틴이 사용자 소유라고 오해할 표현은 절대 사용하지 마세요.
 summary에도 사람 이름이나 사용자 소유 표현을 쓰지 마세요. 입력 steps에 실제로 존재하는 displayProductName 또는 ingredients.name 중 1~2개를 골라 효능과 연결해 설명하고, 주의할 단계가 있다면 해당 제품명이나 성분명과 함께 주의점을 덧붙이세요. 입력에 없는 제품명이나 성분명은 만들지 마세요.
 ingredientDataStatus가 AVAILABLE이 아니면 확인되지 않은 성분을 단정하지 말고 사용량·사용 빈도·피부 반응에 관한 일반적인 주의 근거를 제공하세요.
-inventoryRecommendations.inventoryId는 입력 inventory 배열에 있는 ID만 사용할 수 있습니다. 적절한 보유 제품이 없으면 null을 반환하세요.
+각 steps 항목의 productCategory는 서버가 정규화한 DB 카테고리입니다. inventoryRecommendations.inventoryId는 해당 단계의 productCategory와 inventory.category가 정확히 같은 입력 inventory ID만 사용할 수 있습니다. 카테고리가 다르거나 productCategory가 ETC이거나 적절한 보유 제품이 없으면 반드시 null을 반환하세요. 같은 카테고리 안에서도 제품의 효능과 주의 성분을 비교해 실제로 대체 가능한 경우에만 추천하세요.
 모든 영상 단계에 대해 정확히 하나의 steps 항목과 inventoryRecommendations 항목을 같은 order로 반환하세요.
 응답은 제공된 JSON Schema를 엄격히 따라야 합니다.

@@ -31,6 +31,7 @@ import domain.beauty.shortform.domain.VideoRoutineExtraction;
 import domain.beauty.shortform.application.ShortformProductEnrichmentService.BatchResult;
 import domain.cosmetic.cache.RegulationInfoCache;
 import domain.cosmetic.client.RegulationInfo;
+import domain.inventory.ProductCategory;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -55,13 +56,16 @@ public class ShortformAnalysisAssembler {
 
     private final RegulationInfoCache regulationInfoCache;
     private final OpenAiRoutineProperties openAiProperties;
+    private final ShortformProductCategoryResolver categoryResolver;
 
     public ShortformAnalysisAssembler(
             RegulationInfoCache regulationInfoCache,
-            OpenAiRoutineProperties openAiProperties
+            OpenAiRoutineProperties openAiProperties,
+            ShortformProductCategoryResolver categoryResolver
     ) {
         this.regulationInfoCache = regulationInfoCache;
         this.openAiProperties = openAiProperties;
+        this.categoryResolver = categoryResolver;
     }
 
     public RoutinePersonalizationInput toInput(
@@ -77,6 +81,7 @@ public class ShortformAnalysisAssembler {
                 matchedSteps.stream().map(step -> new RoutinePersonalizationInput.VideoStep(
                         step.source().order(),
                         step.source().category(),
+                        step.productCategory().name(),
                         step.source().brand(),
                         step.source().productName(),
                         step.displayBrand(),
@@ -475,7 +480,6 @@ public class ShortformAnalysisAssembler {
         inventory.forEach(item -> inventoryById.put(item.inventoryId(), item));
         List<OptimizedStep> steps = new ArrayList<>();
         int newProductCount = 0;
-        int compatibleCount = 0;
         int replacedCount = 0;
         int missingCount = 0;
 
@@ -483,37 +487,43 @@ public class ShortformAnalysisAssembler {
             BeautyRoutineAnalysis.Step source = matched.source();
             RoutinePersonalizationResult.InventoryRecommendation recommendation = recommendations.get(source.order());
             InventoryFact selected = recommendation == null ? null : inventoryById.get(recommendation.inventoryId());
+            boolean categoryMatches = selected != null
+                    && matched.productCategory() != ProductCategory.ETC
+                    && matched.productCategory() == categoryResolver.parseStored(selected.category());
+            if (!categoryMatches) {
+                selected = null;
+            }
             OptimizationStatus status;
             Long productId;
             String category;
             String productName;
+            String replaceName;
             String brand;
             String imageUrl;
             String reason;
 
             if (selected != null) {
-                boolean sameProduct = matched.productId() != null && matched.productId().equals(selected.productId());
-                status = sameProduct ? OptimizationStatus.COMPATIBLE : OptimizationStatus.REPLACED;
-                compatibleCount += sameProduct ? 1 : 0;
-                replacedCount += sameProduct ? 0 : 1;
+                status = OptimizationStatus.REPLACED;
+                replacedCount++;
                 productId = selected.productId();
                 category = selected.category();
                 productName = selected.productName();
+                replaceName = textOr(matched.displayProductName(), source.category());
                 brand = selected.brand();
                 imageUrl = selected.imageUrl();
-                reason = textOr(recommendation.reason(), sameProduct ? "영상 제품과 같은 보유 제품입니다." : "같은 단계에 사용할 보유 제품입니다.");
+                reason = textOr(recommendation.reason(), "같은 카테고리에서 사용할 수 있는 보유 제품입니다.");
             } else {
-                boolean exact = source.identificationLevel() == IdentificationLevel.EXACT_PRODUCT;
-                status = exact ? OptimizationStatus.VIDEO_PRODUCT : OptimizationStatus.NO_INVENTORY_MATCH;
+                status = OptimizationStatus.VIDEO_PRODUCT;
                 missingCount++;
                 productId = matched.productId();
                 category = source.category();
-                productName = matched.displayProductName();
+                productName = textOr(matched.displayProductName(), source.category());
+                replaceName = null;
                 brand = matched.displayBrand();
                 imageUrl = matched.imageUrl();
                 reason = recommendation == null
-                        ? "인벤토리에서 같은 역할의 제품을 찾지 못했습니다."
-                        : textOr(recommendation.reason(), "인벤토리 대체품이 없습니다.");
+                        ? "인벤토리에서 같은 카테고리의 대체 제품을 찾지 못했습니다."
+                        : "추천된 인벤토리 제품의 카테고리가 달라 영상 속 제품을 유지합니다.";
             }
 
             boolean alreadyOwned = matched.productId() != null && inventory.stream()
@@ -530,6 +540,7 @@ public class ShortformAnalysisAssembler {
                     productId,
                     category,
                     productName,
+                    replaceName,
                     brand,
                     imageUrl,
                     reason
@@ -537,10 +548,10 @@ public class ShortformAnalysisAssembler {
         }
 
         String summary = replacedCount > 0
-                ? "영상 속 제품 중 %d개를 인벤토리의 같은 역할 제품으로 교체했습니다.".formatted(replacedCount)
+                ? "영상 속 제품 중 %d개를 같은 카테고리의 인벤토리 제품으로 교체했습니다.".formatted(replacedCount)
                 : "영상 속 루틴과 현재 인벤토리의 조합을 확인했습니다.";
         return new RoutineOptimizationSnapshot(
-                newProductCount, compatibleCount, replacedCount, missingCount, summary, List.copyOf(steps));
+                newProductCount, replacedCount, missingCount, summary, List.copyOf(steps));
     }
 
     private Map<Integer, RoutinePersonalizationResult.StepAnalysis> indexSteps(

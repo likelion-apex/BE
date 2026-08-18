@@ -18,6 +18,7 @@ public record RoutinePersonalizationInput(
     public record VideoStep(
             int order,
             String category,
+            String productCategory,
             String brand,
             String productName,
             String displayBrand,
