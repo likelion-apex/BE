@@ -92,7 +92,7 @@ class RoutineArchiveListApiIntegrationTest {
     private void saveArchivedRoutine(String name, LocalDateTime createdAt, int stepCount) {
         Routine routine = new Routine(member, null, name, RoutineType.DAY, RoutineStatus.ARCHIVED, RoutineSaveType.LIBRARY);
         for (int i = 0; i < stepCount; i++) {
-            routine.addStep(new RoutineStep(routine, null, null, i + 1, "제품" + i, null, "CLEANSER", null, null));
+            routine.addStep(new RoutineStep(routine, null, null, i + 1, "제품" + i, null, "ETC", null, null));
         }
         Routine saved = routineRepository.saveAndFlush(routine);
         jdbcTemplate.update("UPDATE routines SET created_at = ? WHERE id = ?", createdAt, saved.getId());

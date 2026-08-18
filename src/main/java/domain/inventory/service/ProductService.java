@@ -1,7 +1,8 @@
 package domain.inventory.service;
 
-import domain.cosmetic.client.KakaoImageClient;
+import domain.inventory.CategoryImageResolver;
 import domain.inventory.Product;
+import domain.inventory.ProductCategory;
 import domain.inventory.ProductNameNormalizer;
 import domain.inventory.ProductRepository;
 import domain.inventory.cache.PopularProductCache;
@@ -21,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProductService {
 
     private final ProductRepository productRepository;
-    private final KakaoImageClient kakaoImageClient;
+    private final CategoryImageResolver categoryImageResolver;
     private final OpenAiCategoryClassifier categoryClassifier;
     private final PopularProductCache popularProductCache;
 
@@ -46,7 +47,7 @@ public class ProductService {
     }
 
     /**
-     * productName으로 마스터 DB에서 기존 상품을 찾거나, 없으면 Kakao 이미지 검색 + AI 카테고리 분류로 신규 상품을 등록한다.
+     * productName으로 마스터 DB에서 기존 상품을 찾거나, 없으면 AI 카테고리 분류 + 카테고리별 정적 이미지로 신규 상품을 등록한다.
      * (명세서의 화장품 검색 API는 등록/자동 생성을 하지 않으므로, 신규 상품 등록은 인벤토리 추가 시점에만 일어난다.)
      */
     public Product findOrCreate(String productName) {
@@ -61,11 +62,11 @@ public class ProductService {
     }
 
     private Product createProduct(String productName) {
-        String imageUrl = kakaoImageClient.searchImageUrl(productName);
+        ProductCategory category = categoryClassifier.classify(productName);
         Product product = Product.builder()
                 .name(productName)
-                .category(categoryClassifier.classify(productName))
-                .imageUrl(imageUrl)
+                .category(category)
+                .imageUrl(categoryImageResolver.resolve(category))
                 .build();
         return productRepository.save(product);
     }

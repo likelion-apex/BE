@@ -43,7 +43,6 @@ cors:
 product:
   seed:
     enabled: false
-    kakao-delay-ms: 0
 
 inventory:
   ai-cache-ttl: 30d

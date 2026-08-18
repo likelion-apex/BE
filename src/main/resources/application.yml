@@ -122,7 +122,6 @@ product:
   seed:
     enabled: true
     location: classpath:data/products-seed.csv
-    kakao-delay-ms: 300
   popular-cache:
     size: 100
 

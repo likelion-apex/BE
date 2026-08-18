@@ -134,7 +134,7 @@ class ShortformAnalysisAssemblerTest {
                         1, "히알루론산", List.of("보습제"), List.of("수분 공급"), 1, false, false));
         MatchedVideoStep ampoule = new MatchedVideoStep(
                 step(1, IdentificationLevel.EXACT_PRODUCT, "수분 앰플"),
-                10L, ProductCategory.SERUM, "/ampoule.png", "테스트", "수분 앰플",
+                10L, ProductCategory.ESSENCE_SERUM, "/ampoule.png", "테스트", "수분 앰플",
                 ProductResolutionStatus.CATALOG_MATCH, 1, IngredientDataStatus.AVAILABLE, product);
 
         AssembledResult assembled = assembleOneStep(
@@ -156,14 +156,14 @@ class ShortformAnalysisAssemblerTest {
         JobContext context = new JobContext(
                 1L, "video", "https://www.youtube.com/watch?v=video", "수부지",
                 List.of(), List.of(new InventoryFact(
-                        100L, 10L, "보유 수분 앰플", "테스트", "SERUM", "/owned.png")));
+                        100L, 10L, "보유 수분 앰플", "테스트", "ESSENCE_SERUM", "/owned.png")));
         ProductEnrichmentData product = enrichment(
                 IngredientVerificationStatus.OFFICIAL,
                 new ProductEnrichmentResult.Ingredient(
                         1, "히알루론산", List.of("보습제"), List.of("수분 공급"), 1, false, false));
         MatchedVideoStep ampoule = new MatchedVideoStep(
                 step(1, IdentificationLevel.EXACT_PRODUCT, "영상 수분 앰플"),
-                10L, ProductCategory.SERUM, "/video.png", "영상 브랜드", "영상 수분 앰플",
+                10L, ProductCategory.ESSENCE_SERUM, "/video.png", "영상 브랜드", "영상 수분 앰플",
                 ProductResolutionStatus.CATALOG_MATCH, 1, IngredientDataStatus.AVAILABLE, product);
 
         AssembledResult assembled = assembleOneStep(

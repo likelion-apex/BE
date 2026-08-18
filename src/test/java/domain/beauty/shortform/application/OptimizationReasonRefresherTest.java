@@ -48,7 +48,7 @@ class OptimizationReasonRefresherTest {
         RoutineOptimizationSnapshot optimization = new RoutineOptimizationSnapshot(
                 1, 0, 1, "확인했습니다.",
                 List.of(new OptimizedStep(
-                        1, 1, OptimizationStatus.VIDEO_PRODUCT, null, 10L, "SERUM",
+                        1, 1, OptimizationStatus.VIDEO_PRODUCT, null, 10L, "ESSENCE_SERUM",
                         "영상 수분 앰플", null, "영상 브랜드", "/video.png",
                         "인벤토리에서 같은 카테고리의 대체 제품을 찾지 못했습니다.")));
 

@@ -8,7 +8,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import domain.cosmetic.client.KakaoImageClient;
+import domain.inventory.CategoryImageResolver;
 import domain.inventory.Product;
 import domain.inventory.ProductCategory;
 import domain.inventory.ProductRepository;
@@ -30,12 +30,12 @@ class ProductFileSeederTest {
     @Mock
     private ProductRepository productRepository;
     @Mock
-    private KakaoImageClient kakaoImageClient;
+    private CategoryImageResolver categoryImageResolver;
     @Mock
     private PlatformTransactionManager transactionManager;
 
     @Test
-    void insertsNewProductAndFillsImageFromKakaoWhenCsvUrlBlank() {
+    void insertsNewProductAndFillsImageFromCategoryWhenCsvUrlBlank() {
         stubTransaction();
         String csv = """
                 name,brand,category,imageUrl
@@ -43,7 +43,7 @@ class ProductFileSeederTest {
                 """;
         ProductFileSeeder seeder = newSeeder(csv);
         when(productRepository.findByNormalizedName("라운드랩독도토너")).thenReturn(Optional.empty());
-        when(kakaoImageClient.searchImageUrl("라운드랩 1025 독도 토너")).thenReturn("https://img.example/toner.jpg");
+        when(categoryImageResolver.resolve(ProductCategory.SKIN_TONER)).thenReturn("/images/categories/skin_toner.png");
 
         seeder.seed();
 
@@ -53,7 +53,7 @@ class ProductFileSeederTest {
         assertThat(saved.getName()).isEqualTo("라운드랩 1025 독도 토너");
         assertThat(saved.getBrand()).isEqualTo("라운드랩");
         assertThat(saved.getCategory()).isEqualTo(ProductCategory.SKIN_TONER);
-        assertThat(saved.getImageUrl()).isEqualTo("https://img.example/toner.jpg");
+        assertThat(saved.getImageUrl()).isEqualTo("/images/categories/skin_toner.png");
     }
 
     @Test
@@ -79,7 +79,7 @@ class ProductFileSeederTest {
         assertThat(existing.getBrand()).isEqualTo("라운드랩");
         assertThat(existing.getCategory()).isEqualTo(ProductCategory.SKIN_TONER);
         assertThat(existing.getImageUrl()).isEqualTo("https://img.example/new.jpg");
-        verify(kakaoImageClient, never()).searchImageUrl(any());
+        verify(categoryImageResolver, never()).resolve(any());
     }
 
     @Test
@@ -114,7 +114,7 @@ class ProductFileSeederTest {
 
         seeder.seed();
 
-        verify(kakaoImageClient, never()).searchImageUrl(any());
+        verify(categoryImageResolver, never()).resolve(any());
         assertThat(existing.getImageUrl()).isEqualTo("https://img.example/kept.jpg");
         verify(transactionManager, times(1)).commit(any());
     }
@@ -126,11 +126,10 @@ class ProductFileSeederTest {
     private ProductFileSeeder newSeeder(String csv) {
         return new ProductFileSeeder(
                 productRepository,
-                kakaoImageClient,
+                categoryImageResolver,
                 transactionManager,
                 true,
-                new ByteArrayResource(csv.getBytes(StandardCharsets.UTF_8)),
-                0
+                new ByteArrayResource(csv.getBytes(StandardCharsets.UTF_8))
         );
     }
 }

@@ -1,6 +1,6 @@
 package domain.inventory.seed;
 
-import domain.cosmetic.client.KakaoImageClient;
+import domain.inventory.CategoryImageResolver;
 import domain.inventory.Product;
 import domain.inventory.ProductCategory;
 import domain.inventory.ProductNameNormalizer;
@@ -33,25 +33,22 @@ public class ProductFileSeeder {
     private static final String EXPECTED_HEADER = "name,brand,category,imageUrl";
 
     private final ProductRepository productRepository;
-    private final KakaoImageClient kakaoImageClient;
+    private final CategoryImageResolver categoryImageResolver;
     private final TransactionTemplate transactionTemplate;
     private final boolean enabled;
     private final Resource seedResource;
-    private final long kakaoDelayMs;
 
     public ProductFileSeeder(
             ProductRepository productRepository,
-            KakaoImageClient kakaoImageClient,
+            CategoryImageResolver categoryImageResolver,
             PlatformTransactionManager transactionManager,
             @Value("${product.seed.enabled:true}") boolean enabled,
-            @Value("${product.seed.location:classpath:data/products-seed.csv}") Resource seedResource,
-            @Value("${product.seed.kakao-delay-ms:300}") long kakaoDelayMs) {
+            @Value("${product.seed.location:classpath:data/products-seed.csv}") Resource seedResource) {
         this.productRepository = productRepository;
-        this.kakaoImageClient = kakaoImageClient;
+        this.categoryImageResolver = categoryImageResolver;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.enabled = enabled;
         this.seedResource = seedResource;
-        this.kakaoDelayMs = kakaoDelayMs;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -125,20 +122,7 @@ public class ProductFileSeeder {
         if (existing != null && StringUtils.hasText(existing.getImageUrl())) {
             return existing.getImageUrl();
         }
-        String searched = kakaoImageClient.searchImageUrl(row.name());
-        sleepQuietly();
-        return searched;
-    }
-
-    private void sleepQuietly() {
-        if (kakaoDelayMs <= 0) {
-            return;
-        }
-        try {
-            Thread.sleep(kakaoDelayMs);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+        return categoryImageResolver.resolve(row.category());
     }
 
     private List<SeedRow> parseCsv() throws Exception {

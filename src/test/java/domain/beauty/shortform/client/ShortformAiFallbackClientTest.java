@@ -111,7 +111,7 @@ class ShortformAiFallbackClientTest {
                 new RoutinePersonalizationInput.MemberProfile("민감성", List.of("피부 진정")),
                 new RoutinePersonalizationInput.VideoContext("video", "진정 루틴", List.of()),
                 List.of(new RoutinePersonalizationInput.VideoStep(
-                        1, "앰플", "SERUM", "브랜드", "진정 앰플", "브랜드", "진정 앰플",
+                        1, "앰플", "ESSENCE_SERUM", "브랜드", "진정 앰플", "브랜드", "진정 앰플",
                         "피부 진정", "영상에서 확인", 1.0, null,
                         IngredientDataStatus.UNAVAILABLE, List.of())),
                 List.of());

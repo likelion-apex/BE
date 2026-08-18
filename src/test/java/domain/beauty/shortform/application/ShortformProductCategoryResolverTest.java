@@ -11,9 +11,9 @@ class ShortformProductCategoryResolverTest {
 
     @Test
     void mapsVideoLabelsToStoredProductCategories() {
-        assertThat(resolver.resolve("앰플", "수분 앰플")).isEqualTo(ProductCategory.SERUM);
+        assertThat(resolver.resolve("앰플", "수분 앰플")).isEqualTo(ProductCategory.ESSENCE_SERUM);
         assertThat(resolver.resolve("토너", "진정 토너")).isEqualTo(ProductCategory.SKIN_TONER);
-        assertThat(resolver.resolve("토너 패드", "진정 패드")).isEqualTo(ProductCategory.MASK);
+        assertThat(resolver.resolve("토너 패드", "진정 패드")).isEqualTo(ProductCategory.SKIN_TONERPAD);
         assertThat(resolver.resolve("수딩 크림", null)).isEqualTo(ProductCategory.CREAM);
     }
 
