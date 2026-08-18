@@ -86,7 +86,7 @@ class OptimizationReasonComposerTest {
 
     private InventoryFact ownedProduct() {
         return new InventoryFact(
-                100L, 20L, "메디힐 티트리 진정 수분 앰플", "메디힐", "SERUM", "/owned.png");
+                100L, 20L, "메디힐 티트리 진정 수분 앰플", "메디힐", "ESSENCE_SERUM", "/owned.png");
     }
 
     private InventoryProductEvidence ownedEvidence() {
@@ -113,7 +113,7 @@ class OptimizationReasonComposerTest {
                         "앰플", "영상 브랜드", "영상 수분 앰플", null, "영상 수분 앰플",
                         null, List.of(EvidenceSource.ON_SCREEN_TEXT), "제품명을 확인", 1),
                 10L,
-                ProductCategory.SERUM,
+                ProductCategory.ESSENCE_SERUM,
                 "/video.png",
                 "영상 브랜드",
                 "영상 수분 앰플",

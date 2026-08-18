@@ -80,7 +80,7 @@ class OptimizationScoreCalculatorTest {
                 """);
         RoutineOptimizationSnapshot optimization = new RoutineOptimizationSnapshot(
                 0, 1, 0, "대체했습니다.", List.of(new OptimizedStep(
-                        1, 1, OptimizationStatus.REPLACED, 100L, 20L, "SERUM",
+                        1, 1, OptimizationStatus.REPLACED, 100L, 20L, "ESSENCE_SERUM",
                         "보유 앰플", "영상 앰플", "브랜드", "/owned.png", "대체 이유")));
         InventoryProductEvidence evidence = new InventoryProductEvidence(
                 IngredientVerificationStatus.CORROBORATED,
@@ -125,7 +125,7 @@ class OptimizationScoreCalculatorTest {
     private OptimizedStep videoStep(long sourceResultId, int order) {
         return new OptimizedStep(
                 sourceResultId, order, OptimizationStatus.VIDEO_PRODUCT, null, sourceResultId,
-                "SERUM", "영상 제품", null, "영상 브랜드", "/video.png", "대체품 없음");
+                "ESSENCE_SERUM", "영상 제품", null, "영상 브랜드", "/video.png", "대체품 없음");
     }
 
     private ProductEnrichmentResult.Ingredient ingredient(

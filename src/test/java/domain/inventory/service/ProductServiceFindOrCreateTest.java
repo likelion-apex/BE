@@ -6,7 +6,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import domain.cosmetic.client.KakaoImageClient;
+import domain.inventory.CategoryImageResolver;
 import domain.inventory.Product;
 import domain.inventory.ProductCategory;
 import domain.inventory.ProductRepository;
@@ -25,7 +25,7 @@ class ProductServiceFindOrCreateTest {
     @Mock
     private ProductRepository productRepository;
     @Mock
-    private KakaoImageClient kakaoImageClient;
+    private CategoryImageResolver categoryImageResolver;
     @Mock
     private OpenAiCategoryClassifier categoryClassifier;
     @Mock
@@ -36,7 +36,7 @@ class ProductServiceFindOrCreateTest {
     @BeforeEach
     void setUp() {
         productService = new ProductService(
-                productRepository, kakaoImageClient, categoryClassifier, popularProductCache);
+                productRepository, categoryImageResolver, categoryClassifier, popularProductCache);
     }
 
     @Test
@@ -51,6 +51,6 @@ class ProductServiceFindOrCreateTest {
 
         assertThat(found).isSameAs(existing);
         verify(productRepository, never()).save(any());
-        verify(kakaoImageClient, never()).searchImageUrl(any());
+        verify(categoryImageResolver, never()).resolve(any());
     }
 }

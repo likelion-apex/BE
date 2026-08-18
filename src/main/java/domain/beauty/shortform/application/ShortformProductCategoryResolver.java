@@ -34,25 +34,28 @@ public class ShortformProductCategoryResolver {
         }
 
         String normalized = value.toLowerCase(Locale.ROOT).replaceAll("[\\s_/-]", "");
-        if (containsAny(normalized, "선크림", "선스크린", "선로션", "선젤", "자외선차단", "sunscreen", "suncream")) {
-            return ProductCategory.SUNCREAM;
+        if (containsAny(normalized, "아이크림", "아이세럼", "아이케어", "eyecream", "eyeserum", "eyecare")) {
+            return ProductCategory.EYECARE;
         }
-        if (containsAny(normalized, "클렌저", "클렌징", "세안", "페이스워시", "cleansing", "cleanser", "facewash")) {
-            return ProductCategory.CLEANSER;
+        if (containsAny(normalized, "페이스오일", "오일", "faceoil")) {
+            return ProductCategory.FACEOIL;
         }
-        if (containsAny(normalized, "토너패드", "패드", "마스크", "팩", "sheetmask", "maskpack")) {
-            return ProductCategory.MASK;
+        if (containsAny(normalized, "미스트", "젤", "mist")) {
+            return ProductCategory.MIST;
         }
-        if (containsAny(normalized, "에센스", "essence")) {
-            return ProductCategory.ESSENCE;
+        if (containsAny(normalized, "토너패드", "패드")) {
+            return ProductCategory.SKIN_TONERPAD;
         }
-        if (containsAny(normalized, "세럼", "앰플", "serum", "ampoule")) {
-            return ProductCategory.SERUM;
+        if (containsAny(normalized, "밤", "멀티밤", "balm")) {
+            return ProductCategory.BAM;
+        }
+        if (containsAny(normalized, "에센스", "세럼", "앰플", "essence", "serum", "ampoule")) {
+            return ProductCategory.ESSENCE_SERUM;
         }
         if (containsAny(normalized, "로션", "에멀전", "에멀젼", "lotion", "emulsion")) {
             return ProductCategory.LOTION;
         }
-        if (containsAny(normalized, "크림", "수분밤", "보습밤", "cream")) {
+        if (containsAny(normalized, "크림", "cream")) {
             return ProductCategory.CREAM;
         }
         if (containsAny(normalized, "토너", "스킨", "toner")) {

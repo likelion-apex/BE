@@ -31,7 +31,7 @@ class InventoryProductEvidenceServiceTest {
         Product product = Product.builder()
                 .name("보유 수분 앰플")
                 .brand("테스트")
-                .category(ProductCategory.SERUM)
+                .category(ProductCategory.ESSENCE_SERUM)
                 .build();
         ReflectionTestUtils.setField(product, "id", 20L);
         Ingredient ingredient = Ingredient.builder()
@@ -48,8 +48,8 @@ class InventoryProductEvidenceServiceTest {
         when(repository.findByProduct_IdIn(anyList())).thenReturn(List.of(mapping));
 
         Map<Long, InventoryProductEvidence> result = service.enrichMatchingCategories(
-                List.of(new InventoryFact(100L, 20L, "보유 수분 앰플", "테스트", "SERUM", null)),
-                Set.of(ProductCategory.SERUM));
+                List.of(new InventoryFact(100L, 20L, "보유 수분 앰플", "테스트", "ESSENCE_SERUM", null)),
+                Set.of(ProductCategory.ESSENCE_SERUM));
 
         assertThat(result.get(20L).ingredients()).singleElement().satisfies(item -> {
             assertThat(item.name()).isEqualTo("히알루론산");
@@ -64,7 +64,7 @@ class InventoryProductEvidenceServiceTest {
                 List.of(
                         new InventoryFact(100L, 20L, "보유 토너", "테스트", "SKIN_TONER", null),
                         new InventoryFact(101L, 21L, "보유 기타", "테스트", "ETC", null)),
-                Set.of(ProductCategory.SERUM));
+                Set.of(ProductCategory.ESSENCE_SERUM));
 
         assertThat(result).isEmpty();
         verifyNoInteractions(repository, enrichmentService);
@@ -87,8 +87,8 @@ class InventoryProductEvidenceServiceTest {
                         Map.of(1, enriched), "gpt-test", "2.0", 1, 1, 0, 1));
 
         Map<Long, InventoryProductEvidence> result = service.enrichMatchingCategories(
-                List.of(new InventoryFact(100L, 20L, "보유 수분 앰플", "테스트", "SERUM", null)),
-                Set.of(ProductCategory.SERUM));
+                List.of(new InventoryFact(100L, 20L, "보유 수분 앰플", "테스트", "ESSENCE_SERUM", null)),
+                Set.of(ProductCategory.ESSENCE_SERUM));
 
         assertThat(result.get(20L).ingredients()).singleElement()
                 .extracting(item -> item.name())

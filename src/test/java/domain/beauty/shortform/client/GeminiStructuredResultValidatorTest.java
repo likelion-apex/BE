@@ -65,11 +65,11 @@ class GeminiStructuredResultValidatorTest {
                 new RoutinePersonalizationInput.MemberProfile("민감성", List.of("피부 진정")),
                 new RoutinePersonalizationInput.VideoContext("video", "진정 루틴", List.of()),
                 List.of(new RoutinePersonalizationInput.VideoStep(
-                        1, "앰플", "SERUM", "브랜드", "영상 앰플", "브랜드", "영상 앰플",
+                        1, "앰플", "ESSENCE_SERUM", "브랜드", "영상 앰플", "브랜드", "영상 앰플",
                         "피부 진정", "영상에서 확인", 1.0, null,
                         IngredientDataStatus.AVAILABLE, List.of(panthenol))),
                 List.of(new RoutinePersonalizationInput.InventoryProduct(
-                        1L, 10L, "SERUM", "브랜드", "보유 앰플",
+                        1L, 10L, "ESSENCE_SERUM", "브랜드", "보유 앰플",
                         IngredientDataStatus.AVAILABLE, List.of(panthenol))));
     }
 
@@ -103,7 +103,7 @@ class GeminiStructuredResultValidatorTest {
 
     private OptimizationReasonInput.Product optimizationProduct(String name, String ingredient) {
         return new OptimizationReasonInput.Product(
-                "SERUM",
+                "ESSENCE_SERUM",
                 name,
                 "피부 진정",
                 List.of("피부 진정"),

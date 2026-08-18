@@ -38,7 +38,7 @@ class RoutineOptimizationNormalizerTest {
                     "status": "COMPATIBLE",
                     "inventoryId": 100,
                     "productId": 20,
-                    "category": "SERUM",
+                    "category": "ESSENCE_SERUM",
                     "productName": "보유 수분 앰플",
                     "brand": "보유 브랜드",
                     "imageUrl": "/owned.png",
