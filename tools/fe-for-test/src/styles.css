@@ -474,7 +474,8 @@ body.is-busy::after { position: fixed; z-index: 999; top: 18px; left: 50%; width
 .product-detail-head > div { display: grid; gap: 6px; }
 .product-detail-head small { color: var(--gray-60); font-size: 10px; }
 .product-detail-head h2 { font-size: 16px; line-height: 22px; }
-.product-detail-head span { width: fit-content; padding: 4px 7px; border-radius: 12px; background: var(--blue-05); color: var(--blue); font-size: 9px; }
+.product-detail-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.product-detail-chips span { width: fit-content; padding: 4px 8px; border-radius: 4px; background: var(--blue-05); color: var(--blue); font-size: 10px; font-weight: 700; }
 .personal-score { display: flex; margin-top: 18px; padding: 10px 12px; align-items: center; gap: 10px; border-radius: 10px; background: var(--blue-05); }
 .personal-score img { width: 38px; height: 38px; border-radius: 50%; }
 .personal-score span { display: grid; gap: 3px; }
@@ -486,12 +487,20 @@ body.is-busy::after { position: fixed; z-index: 999; top: 18px; left: 50%; width
 .detail-pane { display: none; padding-top: 18px; }
 .detail-pane.active { display: block; }
 .detail-pane h3 { margin-bottom: 12px; font-size: 14px; }
-.reason-card { padding: 12px; border-radius: 10px; background: var(--green-05); }
-.reason-card + .reason-card { margin-top: 8px; }
-.reason-card.caution, .reason-card.warning { background: var(--red-02); }
-.reason-card b { color: var(--green); font-size: 11px; }
-.reason-card.caution b, .reason-card.warning b { color: var(--red); }
-.reason-card p { margin-top: 5px; color: var(--gray-60); font-size: 10px; line-height: 15px; }
+.reason-card { display: grid; padding: 16px 20px; align-items: start; grid-template-columns: 28px 1fr; gap: 16px; border: 1px solid; border-radius: 20px; }
+.reason-card + .reason-card { margin-top: 20px; }
+.reason-card.safe { border-color: #03fb8a; background: #e6fff3; }
+.reason-card.beneficial { border-color: var(--blue); background: var(--blue-05); }
+.reason-card.caution { border-color: #753ddb; background: #f9f6fd; }
+.reason-card.warning { border-color: var(--red); background: var(--red-02); }
+.reason-card-icon { display: grid; width: 28px; height: 28px; overflow: hidden; border-radius: 8px; place-items: center; }
+.reason-card.safe .reason-card-icon { background: #03fb8a; }
+.reason-card.beneficial .reason-card-icon { background: var(--blue); }
+.reason-card.caution .reason-card-icon { background: #753ddb; }
+.reason-card.warning .reason-card-icon { background: var(--red); }
+.reason-card-icon img { width: 20px; height: 20px; object-fit: contain; }
+.reason-card b { color: #171a1f; font-size: 14px; line-height: 20px; }
+.reason-card p { margin-top: 4px; color: var(--gray-60); font-size: 12px; line-height: 16px; }
 .disclaimer { margin-top: 16px; padding: 10px; border-radius: 8px; background: var(--gray-05); color: var(--gray-60); font-size: 9px; line-height: 14px; }
 .ingredient-list { display: grid; margin: 0; padding: 0; gap: 7px; list-style: none; }
 .ingredient-list li { display: grid; padding: 9px; align-items: center; grid-template-columns: 30px 1fr; gap: 10px; border: 1px solid var(--gray-10); border-radius: 8px; }

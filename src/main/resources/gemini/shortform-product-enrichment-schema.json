@@ -13,7 +13,7 @@
           "requestKey": {"type": "string"},
           "displayBrand": {"type": ["string", "null"]},
           "displayProductName": {"type": ["string", "null"]},
-          "marketOrVariant": {"type": ["string", "null"]},
+          "marketOrVariant": {"type": ["string", "null"], "description": "국가·판매처 문구를 제외한 단일 제품 용량. 예: 100ml, 50g"},
           "lookupStatus": {"type": "string", "enum": ["FOUND", "ESTIMATED", "AMBIGUOUS", "NOT_FOUND"]},
           "resolutionConfidence": {"type": "number", "minimum": 0, "maximum": 1},
           "notes": {"type": ["string", "null"]},

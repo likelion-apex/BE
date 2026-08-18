@@ -41,7 +41,9 @@ class ShortformAnalysisAssemblerTest {
                     regulationInfoCache,
                     new OpenAiRoutineProperties(),
                     new ShortformProductCategoryResolver(),
-                    new OptimizationReasonComposer());
+                    new OptimizationReasonComposer(),
+                    new ReasonCardNormalizer(),
+                    new ProductCapacityNormalizer());
 
     @Test
     void forcesUnknownForCategoryOnlyStepAndIgnoresUnknownInventoryId() {
@@ -56,7 +58,7 @@ class ShortformAnalysisAssemblerTest {
         ProductEnrichmentData exactEnrichment = new ProductEnrichmentData(
                 "라운드랩",
                 "1025 독도 토너",
-                "한국 판매 처방",
+                "한국 / 100ml",
                 0.96,
                 IngredientVerificationStatus.OFFICIAL,
                 List.of(new ProductEnrichmentResult.Source(
@@ -112,6 +114,7 @@ class ShortformAnalysisAssemblerTest {
         assertThat(assembled.analysis().steps().get(1).ingredients()).isEmpty();
         assertThat(assembled.analysis().steps().get(1).estimatedIngredientCount()).isNull();
         assertThat(assembled.analysis().steps().get(0).ingredientStats().totalCount()).isEqualTo(1);
+        assertThat(assembled.analysis().steps().get(0).ingredientMarketOrVariant()).isEqualTo("100ml");
         assertThat(assembled.optimization().steps().get(0).status()).isEqualTo(OptimizationStatus.REPLACED);
         assertThat(assembled.optimization().steps().get(1).status()).isEqualTo(OptimizationStatus.VIDEO_PRODUCT);
         assertThat(assembled.optimization().replacedCount()).isEqualTo(1);
@@ -237,12 +240,17 @@ class ShortformAnalysisAssemblerTest {
 
         assertThat(assembled.analysis().steps().get(0).primaryAssessmentCategory())
                 .isEqualTo(AssessmentCategory.BENEFICIAL);
-        assertThat(assembled.analysis().steps().get(0).reasons()).hasSizeBetween(2, 3);
+        assertThat(assembled.analysis().steps().get(0).reasons()).hasSizeBetween(2, 4);
         assertThat(assembled.analysis().steps().get(0).reasons())
                 .noneMatch(reason -> reason.title().contains("추정") || reason.description().contains("추정"));
         assertThat(assembled.analysis().steps().get(1).safetyLevel()).isEqualTo(SafetyLevel.WARNING);
         assertThat(assembled.analysis().steps().get(1).primaryAssessmentCategory())
                 .isEqualTo(AssessmentCategory.WARNING);
+        assertThat(assembled.analysis().steps().get(1).reasons())
+                .anySatisfy(reason -> {
+                    assertThat(reason.assessmentCategory()).isEqualTo(AssessmentCategory.WARNING);
+                    assertThat(reason.description()).contains("테스트 고위험 성분");
+                });
         assertThat(assembled.analysis().steps().get(1).scoreBreakdown().ingredientSafety()).isEqualTo(5);
     }
 

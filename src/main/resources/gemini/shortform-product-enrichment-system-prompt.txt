@@ -5,6 +5,7 @@ requestKey는 입력값을 그대로 반환하고 입력 products 각각에 대�
 
 반드시 google_search를 사용하세요. 브랜드 공식 페이지, 공식 판매처, 대형 판매처, 성분 데이터베이스 순으로 조사하세요.
 제품명·브랜드·라인·국가·리뉴얼 버전을 구분하고 국내에서 통용되는 표시명을 displayBrand와 displayProductName에 작성하세요.
+제품 용량을 특정할 수 있으면 marketOrVariant에 국가나 판매처 문구 없이 "100ml", "50g"처럼 단일 용량만 작성하세요. 용량이 없거나 여러 용량 후보가 충돌하면 null을 반환하세요.
 
 lookupStatus 기준:
 - FOUND: 정확한 제품과 처방을 식별했고 해당 제품의 전체 성분 근거를 찾음. resolutionConfidence는 0.85 이상

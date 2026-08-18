@@ -231,6 +231,97 @@ class ShortformAnalysisApiIntegrationTest {
     }
 
     @Test
+    void normalizesLegacyProductDetailReasonsAndCapacityWithoutExternalCalls() throws Exception {
+        Member member = saveMember("legacy-product-detail-member");
+        String resultJson = """
+                {
+                  "schemaVersion": "3.0",
+                  "videoId": "legacyDetail",
+                  "youtubeUrl": "https://www.youtube.com/watch?v=legacyDetail",
+                  "title": "기존 분석",
+                  "tag": "스킨케어",
+                  "overallScore": 72,
+                  "highlights": ["수분 공급"],
+                  "coreGoal": "보습",
+                  "synergyCombo": "히알루론산",
+                  "summary": "기존 분석 결과입니다.",
+                  "warnings": [],
+                  "disclaimer": "안내",
+                  "steps": [{
+                    "resultId": 2,
+                    "order": 1,
+                    "category": "앰플",
+                    "productName": "리얼 히알루로닉 블루 100 앰플 100ml",
+                    "displayBrand": "웰라쥬",
+                    "displayProductName": "리얼 히알루로닉 블루 100 앰플 100ml",
+                    "productResolutionStatus": "AI_NORMALIZED",
+                    "productResolutionConfidence": 0.9,
+                    "identificationConfidence": 0.9,
+                    "matchScore": 72,
+                    "matchSummary": "수분 공급",
+                    "keyBenefits": ["수분 공급"],
+                    "scoreBreakdown": {"skinTypeFit": 30, "benefitFit": 25, "ingredientSafety": 17},
+                    "safetyLevel": "CAUTION",
+                    "primaryAssessmentCategory": "CAUTION",
+                    "safetyTitle": "사용 시 주의",
+                    "safetySummary": "피부 반응을 살피며 사용해 주세요.",
+                    "reasons": [
+                      {"tone": "POSITIVE", "assessmentCategory": "SAFE", "title": "낮은 위험도", "description": "부담이 적어요.", "evidenceSource": "AI"},
+                      {"tone": "POSITIVE", "assessmentCategory": "BENEFICIAL", "title": "수분 공급", "description": "수분을 공급해요.", "evidenceSource": "AI"}
+                    ],
+                    "ingredientDataStatus": "AVAILABLE",
+                    "ingredientVerificationStatus": "OFFICIAL",
+                    "ingredientMarketOrVariant": "한국 판매 제품, 100mL",
+                    "ingredientSources": [],
+                    "estimatedIngredientCount": 1,
+                    "ingredientStats": {"totalCount": 1, "lowRiskCount": 0, "moderateRiskCount": 1, "highRiskCount": 0, "unknownRiskCount": 0, "caution20Count": 1, "allergenCount": 0},
+                    "ingredients": [{"order": 1, "name": "향료", "purposes": ["향료"], "skinBenefits": [], "riskScore": 5, "riskLevel": "MODERATE", "caution20": true, "allergen": false, "source": "TEST", "regulated": false}]
+                  }],
+                  "aiMetadata": null
+                }
+                """;
+        ShortformAnalysis analysis = new ShortformAnalysis(
+                member,
+                "legacyDetail",
+                "https://www.youtube.com/watch?v=legacyDetail",
+                "legacy-detail-fingerprint");
+        analysis.complete(
+                null, resultJson, "{}", "기존 분석", 1, 72,
+                "gpt-test", "3.0", 1, 1);
+        analysisRepository.saveAndFlush(analysis);
+        clearInvocations(
+                youtubeMetadataClient,
+                jobHandler,
+                openAiRoutineAnalysisClient,
+                openAiOptimizationReasonClient,
+                openAiCategoryClassifier);
+
+        mockMvc.perform(get("/api/shortform-analyses/{analysisId}", analysis.getId())
+                        .with(authentication(memberAuthentication(member.getId()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.result.steps[0].ingredientMarketOrVariant").value("100ml"))
+                .andExpect(jsonPath("$.data.result.steps[0].reasons[2].assessmentCategory").value("CAUTION"))
+                .andExpect(jsonPath("$.data.result.steps[0].reasons[2].tone").value("CAUTION"))
+                .andExpect(jsonPath("$.data.result.steps[0].reasons[2].description").value(
+                        org.hamcrest.Matchers.containsString("향료")));
+
+        mockMvc.perform(get(
+                        "/api/shortform-analyses/{analysisId}/results/{resultId}",
+                        analysis.getId(), 2)
+                        .with(authentication(memberAuthentication(member.getId()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.result.ingredientMarketOrVariant").value("100ml"))
+                .andExpect(jsonPath("$.data.result.reasons[2].assessmentCategory").value("CAUTION"));
+
+        verifyNoInteractions(
+                youtubeMetadataClient,
+                jobHandler,
+                openAiRoutineAnalysisClient,
+                openAiOptimizationReasonClient,
+                openAiCategoryClassifier);
+    }
+
+    @Test
     void refreshesLegacyOptimizationReasonsOnlyOnceAndKeepsNormalizedProducts() throws Exception {
         Member member = saveMember("optimization-member");
         String resultJson = """
