@@ -44,5 +44,7 @@ inventory:
   ai-cache-ttl: 30d
   connect-timeout: 1s
   read-timeout: 3s
+  gemini-connect-timeout: 5s
+  gemini-read-timeout: 8s
   openai-max-input-tokens: 600
   openai-max-output-tokens: 400

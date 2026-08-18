@@ -105,10 +105,13 @@ public class OpenAiPersonalizedAnalysisClient {
             throw e;
         } catch (RestClientException e) {
             log.warn("ChatGPT 맞춤 분석 실패: productName={}, message={}", productName, e.getMessage());
-            if (e instanceof RestClientResponseException responseException
-                    && responseException.getStatusCode().is4xxClientError()
-                    && responseException.getStatusCode().value() != 429) {
-                throw new AiProviderUnavailableException("OpenAI 맞춤 분석 요청이 거부되었습니다.", e);
+            if (e instanceof RestClientResponseException responseException) {
+                if (responseException.getStatusCode().value() == 429) {
+                    throw AiProviderUnavailableException.quota("OpenAI 맞춤 분석 호출에 실패했습니다.", e);
+                }
+                if (responseException.getStatusCode().is4xxClientError()) {
+                    throw new AiProviderUnavailableException("OpenAI 맞춤 분석 요청이 거부되었습니다.", e);
+                }
             }
             throw new AiProviderUnavailableException("OpenAI 맞춤 분석 호출에 실패했습니다.", e);
         } catch (RuntimeException e) {

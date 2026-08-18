@@ -135,10 +135,13 @@ public class OpenAiIngredientClient {
     }
 
     private AiProviderUnavailableException unavailable(RestClientException exception) {
-        if (exception instanceof RestClientResponseException responseException
-                && responseException.getStatusCode().is4xxClientError()
-                && responseException.getStatusCode().value() != 429) {
-            return new AiProviderUnavailableException("OpenAI 요청이 거부되었습니다.", exception);
+        if (exception instanceof RestClientResponseException responseException) {
+            if (responseException.getStatusCode().value() == 429) {
+                return AiProviderUnavailableException.quota("OpenAI 호출에 실패했습니다.", exception);
+            }
+            if (responseException.getStatusCode().is4xxClientError()) {
+                return new AiProviderUnavailableException("OpenAI 요청이 거부되었습니다.", exception);
+            }
         }
         return new AiProviderUnavailableException("OpenAI 호출에 실패했습니다.", exception);
     }
