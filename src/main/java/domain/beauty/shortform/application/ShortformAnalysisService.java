@@ -12,6 +12,7 @@ import domain.beauty.shortform.api.ShortformAnalysisResponses.Status;
 import domain.beauty.shortform.api.ShortformAnalysisResponses.VideoPreview;
 import domain.beauty.shortform.application.ShortformAnalysisStateService.AnalysisProfile;
 import domain.beauty.shortform.application.ShortformAnalysisStateService.CreateResult;
+import domain.beauty.shortform.application.ShortformAnalysisStateService.HighlightProfile;
 import domain.beauty.shortform.client.YouTubeMetadataClient;
 import domain.beauty.shortform.client.YouTubeVideoMetadata;
 import domain.beauty.shortform.domain.IngredientDataStatus;
@@ -115,12 +116,13 @@ public class ShortformAnalysisService {
     public Detail detail(Long memberId, Long analysisId) {
         ShortformAnalysis analysis = stateService.getOwned(memberId, analysisId);
         stateService.requireCompleted(analysis);
+        HighlightProfile profile = stateService.loadHighlightProfile(memberId);
         return new Detail(
                 analysis.getId(),
                 analysis.getStatus(),
                 analysis.getCreatedAt(),
                 analysis.getCompletedAt(),
-                readAnalysis(analysis)
+                readAnalysis(analysis, profile)
         );
     }
 
@@ -173,10 +175,13 @@ public class ShortformAnalysisService {
                 analysisId,
                 jsonMapper.write(normalized),
                 OptimizationReasonRefresher.CURRENT_VERSION);
+        HighlightProfile profile = stateService.loadHighlightProfile(memberId);
+        RoutineOptimizationSnapshot response = optimizationNormalizer.personalize(
+                profile.nickname(), profile.skinType(), analysisSnapshot, normalized);
         return new Optimization(
                 analysis.getId(),
                 analysis.getOptimizedAt(),
-                normalized
+                response
         );
     }
 
@@ -256,6 +261,16 @@ public class ShortformAnalysisService {
     private ShortformAnalysisSnapshot readAnalysis(ShortformAnalysis analysis) {
         return snapshotNormalizer.normalize(
                 jsonMapper.read(analysis.getResultJson(), ShortformAnalysisSnapshot.class));
+    }
+
+    private ShortformAnalysisSnapshot readAnalysis(
+            ShortformAnalysis analysis,
+            HighlightProfile profile
+    ) {
+        return snapshotNormalizer.normalize(
+                jsonMapper.read(analysis.getResultJson(), ShortformAnalysisSnapshot.class),
+                profile.nickname(),
+                profile.skinType());
     }
 
     private <T> List<T> safe(List<T> values) {

@@ -61,7 +61,8 @@ SHORTFORM_GEMINI_PRODUCT_MODELS=gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.
 - 같은 카테고리의 인벤토리 후보는 DB 성분과 제품 보강 캐시를 우선 사용하고, 근거가 없을 때만 제품 보강 API를 호출한다. 확인된 성분·효능만 개인화 입력과 대체 이유에 사용한다.
 - 최적화 응답은 `REPLACED`와 `VIDEO_PRODUCT`만 반환한다. 대체 시 `productName`은 인벤토리 제품명, `replaceName`은 영상 제품명이며, 대체품이 없으면 `replaceName`은 `null`이다.
 - 최적화 응답의 `overallScore`는 서버가 확정한 최종 제품 구성으로 다시 계산한다. 단계별 피부 타입 적합도 40점, 피부 고민·효능 적합도 35점, 성분 안전도 25점의 평균이며 원본 점수보다 낮아질 수도 있다.
-- 최적화 응답의 `highlights`는 AI가 입력 성분 중 실제 점수 근거로 선택한 성분명을 서버가 검증·중복 제거한 맞춤 성분 수와, 최종 제품들의 알레르기 유발 성분 수를 최대 두 문장으로 제공한다.
+- 분석 상세와 최적화 응답의 `highlights`는 AI가 입력 성분 중 실제 점수 근거로 선택한 성분명을 서버가 검증하고, 루틴 전체에서 고유 성분명 기준으로 중복 제거해 집계한다. 상세는 영상 원본 제품, 최적화는 최종 선택 제품을 기준으로 `장선우님 지성 맞춤 성분 8개 매칭`, `장선우님 피부 알레르기 유발 성분 5개` 형식의 두 문장을 반환한다. 닉네임은 AI 입력이나 저장 캐시에 포함하지 않고 공개 응답에서만 붙인다.
+- 효능 소개형 `highlights`가 저장된 기존 완료 분석은 추가 AI 호출이나 JSON 수정 없이 조회 시 보정한다. 저장된 BENEFICIAL 카드에 성분명이 명시된 경우만 맞춤 성분으로 인정하며, 확인된 `allergen=true` 성분만 알레르기 수에 포함한다.
 - 제품 상세 이유의 공식 4단계는 `assessmentCategory`의 `SAFE`, `BENEFICIAL`, `CAUTION`, `WARNING`이다. `tone`은 하위 호환용 표현 분류로 SAFE/BENEFICIAL은 `POSITIVE`, CAUTION은 `CAUTION`, WARNING은 `WARNING`으로 반환한다.
 - 단계 대표 판정이 CAUTION 또는 WARNING이면 상세 이유에도 같은 단계의 근거 카드가 반드시 포함된다. 기존 완료 분석도 조회 시 저장된 성분 통계와 성분 정보만으로 정규화하며 추가 AI 호출은 하지 않는다.
 - `ingredientMarketOrVariant`는 기존 필드명을 유지하지만 `100ml`, `50g`처럼 확인된 단일 용량만 반환한다. 국가·판매처 문구는 제거하며 용량이 없거나 서로 충돌하면 `null`이다.

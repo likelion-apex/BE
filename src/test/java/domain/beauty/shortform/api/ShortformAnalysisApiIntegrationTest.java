@@ -299,6 +299,10 @@ class ShortformAnalysisApiIntegrationTest {
         mockMvc.perform(get("/api/shortform-analyses/{analysisId}", analysis.getId())
                         .with(authentication(memberAuthentication(member.getId()))))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.result.highlights[0]")
+                        .value("테스터님 수부지 맞춤 성분 0개 매칭"))
+                .andExpect(jsonPath("$.data.result.highlights[1]")
+                        .value("테스터님 피부 알레르기 유발 성분 0개"))
                 .andExpect(jsonPath("$.data.result.steps[0].ingredientMarketOrVariant").value("100ml"))
                 .andExpect(jsonPath("$.data.result.steps[0].reasons[2].assessmentCategory").value("CAUTION"))
                 .andExpect(jsonPath("$.data.result.steps[0].reasons[2].tone").value("CAUTION"))
@@ -312,6 +316,9 @@ class ShortformAnalysisApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.result.ingredientMarketOrVariant").value("100ml"))
                 .andExpect(jsonPath("$.data.result.reasons[2].assessmentCategory").value("CAUTION"));
+
+        assertThat(analysisRepository.findById(analysis.getId()).orElseThrow().getResultJson())
+                .isEqualTo(resultJson);
 
         verifyNoInteractions(
                 youtubeMetadataClient,
@@ -517,8 +524,8 @@ class ShortformAnalysisApiIntegrationTest {
                 .andExpect(jsonPath("$.data.result.optimizationReasonVersion").doesNotExist())
                 .andExpect(jsonPath("$.data.result.compatibleCount").doesNotExist())
                 .andExpect(jsonPath("$.data.result.overallScore").value(76))
-                .andExpect(jsonPath("$.data.result.highlights[0]").value("수부지 맞춤 성분 0개 매칭"))
-                .andExpect(jsonPath("$.data.result.highlights[1]").value("알레르기 유발 성분 0개"))
+                .andExpect(jsonPath("$.data.result.highlights[0]").value("테스터님 수부지 맞춤 성분 0개 매칭"))
+                .andExpect(jsonPath("$.data.result.highlights[1]").value("테스터님 피부 알레르기 유발 성분 0개"))
                 .andExpect(jsonPath("$.data.result.replacedCount").value(1))
                 .andExpect(jsonPath("$.data.result.missingCount").value(1))
                 .andExpect(jsonPath("$.data.result.steps[0].status").value("REPLACED"))
@@ -627,7 +634,7 @@ class ShortformAnalysisApiIntegrationTest {
                         .with(authentication(memberAuthentication(member.getId()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.result.overallScore").value(80))
-                .andExpect(jsonPath("$.data.result.highlights[0]").value("수부지 맞춤 성분 1개 매칭"));
+                .andExpect(jsonPath("$.data.result.highlights[0]").value("테스터님 수부지 맞춤 성분 1개 매칭"));
 
         verifyNoInteractions(openAiOptimizationReasonClient);
     }

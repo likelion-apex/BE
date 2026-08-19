@@ -23,6 +23,14 @@ public class ShortformAnalysisSnapshotNormalizer {
     }
 
     public ShortformAnalysisSnapshot normalize(ShortformAnalysisSnapshot snapshot) {
+        return normalize(snapshot, null, null);
+    }
+
+    public ShortformAnalysisSnapshot normalize(
+            ShortformAnalysisSnapshot snapshot,
+            String nickname,
+            String skinType
+    ) {
         if (snapshot == null) {
             return null;
         }
@@ -36,7 +44,8 @@ public class ShortformAnalysisSnapshotNormalizer {
                 snapshot.title(),
                 snapshot.tag(),
                 snapshot.overallScore(),
-                snapshot.highlights(),
+                PersonalizedHighlights.personalizeAnalysis(
+                        nickname, skinType, snapshot),
                 snapshot.coreGoal(),
                 snapshot.synergyCombo(),
                 snapshot.summary(),

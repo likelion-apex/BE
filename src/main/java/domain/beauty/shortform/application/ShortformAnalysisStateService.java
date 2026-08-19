@@ -52,6 +52,15 @@ public class ShortformAnalysisStateService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public HighlightProfile loadHighlightProfile(Long memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
+        return new HighlightProfile(
+                member.getNickname(),
+                member.getSkinType() == null ? null : member.getSkinType().getLabel());
+    }
+
     @Transactional
     public CreateResult createOrReuse(
             Long memberId,
@@ -237,6 +246,9 @@ public class ShortformAnalysisStateService {
             List<String> skinConcerns,
             List<InventoryFact> inventory
     ) {
+    }
+
+    public record HighlightProfile(String nickname, String skinType) {
     }
 
     public record JobContext(

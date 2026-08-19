@@ -70,6 +70,23 @@ public class RoutineOptimizationNormalizer {
                 List.copyOf(normalizedSteps));
     }
 
+    public RoutineOptimizationSnapshot personalize(
+            String nickname,
+            String skinType,
+            ShortformAnalysisSnapshot analysis,
+            RoutineOptimizationSnapshot optimization
+    ) {
+        return new RoutineOptimizationSnapshot(
+                optimization.overallScore(),
+                PersonalizedHighlights.personalizeOptimization(
+                        nickname, skinType, analysis, optimization),
+                optimization.newProductCount(),
+                optimization.replacedCount(),
+                optimization.missingCount(),
+                optimization.summary(),
+                optimization.steps());
+    }
+
     private OptimizedStep replacementStep(OptimizedStep stored, StepResult source) {
         return new OptimizedStep(
                 stored.sourceResultId(),

@@ -181,6 +181,9 @@ public class ShortformAnalysisAssembler {
                 ? 0
                 : (int) Math.round(steps.stream().mapToInt(StepResult::matchScore).average().orElse(0));
         String coreGoal = userCopy(ai.coreGoal(), "피부 컨디션에 맞춘 단계별 관리");
+        Map<Integer, List<String>> matchedIngredientNames = new LinkedHashMap<>();
+        aiSteps.forEach((order, step) -> matchedIngredientNames.put(
+                order, safe(step.matchedIngredientNames())));
 
         ShortformAnalysisSnapshot snapshot = new ShortformAnalysisSnapshot(
                 "3.0",
@@ -189,11 +192,8 @@ public class ShortformAnalysisAssembler {
                 routineTitle(ai.title(), coreGoal, steps),
                 userCopy(ai.tag(), context.skinType() + " 맞춤"),
                 overallScore,
-                safe(ai.highlights()).stream()
-                        .map(value -> userCopy(value, "피부 상태에 맞춘 단계별 관리"))
-                        .distinct()
-                        .limit(2)
-                        .toList(),
+                PersonalizedHighlights.calculate(
+                        context.skinType(), steps, matchedIngredientNames),
                 coreGoal,
                 userCopy(ai.synergyCombo(), "영상 속 제품 조합"),
                 routineSummary(ai.summary(), steps),
