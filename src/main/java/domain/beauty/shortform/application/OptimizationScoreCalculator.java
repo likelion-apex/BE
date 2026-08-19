@@ -37,7 +37,7 @@ public class OptimizationScoreCalculator {
 
         List<Integer> scores = new ArrayList<>();
         Set<String> matchedIngredients = new LinkedHashSet<>();
-        int allergenCount = 0;
+        Set<String> allergenIngredients = new LinkedHashSet<>();
         for (OptimizedStep optimized : safe(optimization.steps())) {
             StepResult source = sourceByOrder.get(optimized.order());
             ScoreHint hint = hints.get(optimized.order());
@@ -51,25 +51,31 @@ public class OptimizationScoreCalculator {
                 matchedIngredients.addAll(validatedNames(
                         hint == null ? List.of() : hint.matchedIngredientNames(),
                         ingredients.stream().map(ProductEnrichmentResult.Ingredient::name).toList()));
-                allergenCount += (int) ingredients.stream().filter(ProductEnrichmentResult.Ingredient::allergen).count();
+                ingredients.stream()
+                        .filter(ProductEnrichmentResult.Ingredient::allergen)
+                        .map(ProductEnrichmentResult.Ingredient::name)
+                        .filter(name -> name != null && !name.isBlank())
+                        .map(this::key)
+                        .forEach(allergenIngredients::add);
             } else if (source != null) {
                 scores.add(clamp(source.matchScore(), 0, 100));
                 matchedIngredients.addAll(validatedNames(
                         hint == null ? List.of() : hint.matchedIngredientNames(),
                         safe(source.ingredients()).stream().map(IngredientDetail::name).toList()));
-                allergenCount += source.ingredientStats() == null
-                        ? (int) safe(source.ingredients()).stream().filter(IngredientDetail::allergen).count()
-                        : Math.max(0, source.ingredientStats().allergenCount());
+                safe(source.ingredients()).stream()
+                        .filter(IngredientDetail::allergen)
+                        .map(IngredientDetail::name)
+                        .filter(name -> name != null && !name.isBlank())
+                        .map(this::key)
+                        .forEach(allergenIngredients::add);
             }
         }
 
         int overallScore = scores.isEmpty()
                 ? 0
                 : (int) Math.round(scores.stream().mapToInt(Integer::intValue).average().orElse(0));
-        String profileLabel = skinType == null || skinType.isBlank() ? "피부" : skinType.trim();
-        List<String> highlights = List.of(
-                "%s 맞춤 성분 %d개 매칭".formatted(profileLabel, matchedIngredients.size()),
-                "알레르기 유발 성분 %d개".formatted(allergenCount));
+        List<String> highlights = PersonalizedHighlights.canonical(
+                skinType, matchedIngredients.size(), allergenIngredients.size());
         return new RoutineOptimizationSnapshot(
                 overallScore,
                 highlights,

@@ -116,6 +116,9 @@ class ShortformAnalysisAssemblerTest {
         assertThat(assembled.analysis().steps().get(1).estimatedIngredientCount()).isNull();
         assertThat(assembled.analysis().steps().get(0).ingredientStats().totalCount()).isEqualTo(1);
         assertThat(assembled.analysis().steps().get(0).ingredientMarketOrVariant()).isEqualTo("100ml");
+        assertThat(assembled.analysis().highlights()).containsExactly(
+                "수부지 맞춤 성분 0개 매칭",
+                "알레르기 유발 성분 0개");
         assertThat(assembled.optimization().steps().get(0).status()).isEqualTo(OptimizationStatus.REPLACED);
         assertThat(assembled.optimization().steps().get(1).status()).isEqualTo(OptimizationStatus.VIDEO_PRODUCT);
         assertThat(assembled.optimization().replacedCount()).isEqualTo(1);
