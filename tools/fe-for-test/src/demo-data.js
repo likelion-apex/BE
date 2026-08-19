@@ -94,8 +94,8 @@ export const demoDailyRoutine = {
 export const demoRoutineLibrary = {
   totalCount: 2,
   routines: [
-    { routineId: 71, name: '출근 전 수분 진정 루틴', routineType: 'DAY', stepCount: 3, createdAt: '2026-08-12T09:30:00' },
-    { routineId: 72, name: '민감성 장벽 회복 루틴', routineType: 'NIGHT', stepCount: 4, createdAt: '2026-07-28T22:10:00' },
+    { routineId: 71, name: '출근 전 수분 진정 루틴', routineType: 'DAY', stepCount: 3, createdAt: '2026-08-12T09:30:00', matchScore: 88 },
+    { routineId: 72, name: '민감성 장벽 회복 루틴', routineType: 'NIGHT', stepCount: 4, createdAt: '2026-07-28T22:10:00', matchScore: null },
   ],
 };
 
