@@ -88,7 +88,7 @@ class PersonalizedHighlightsTest {
                 "장선우", "지성", snapshot);
 
         assertThat(highlights).containsExactly(
-                "장선우님 지성 맞춤 성분 1개 매칭",
+                "지성 맞춤 성분 1개 매칭",
                 "장선우님 피부 알레르기 유발 성분 1개");
     }
 
@@ -105,7 +105,7 @@ class PersonalizedHighlightsTest {
 
         assertThat(PersonalizedHighlights.personalizeAnalysis("윤지님", "민감성", snapshot))
                 .containsExactly(
-                        "윤지님 수부지 맞춤 성분 8개 매칭",
+                        "수부지 맞춤 성분 8개 매칭",
                         "윤지님 피부 알레르기 유발 성분 5개");
     }
 
