@@ -1,7 +1,11 @@
 package domain.routine.service;
 
+import domain.beauty.shortform.application.ShortformAnalysisJsonMapper;
 import domain.beauty.shortform.application.ShortformRoutineTypeResolver;
+import domain.beauty.shortform.domain.RoutineOptimizationSnapshot;
 import domain.beauty.shortform.domain.RoutineSaveType;
+import domain.beauty.shortform.domain.ShortformAnalysis;
+import domain.beauty.shortform.domain.ShortformAnalysisRepository;
 import domain.ingredient.domain.InteractionType;
 import domain.ingredient.dto.request.ProductCompatibilityRequest;
 import domain.ingredient.dto.response.ProductCompatibilityResponse;
@@ -44,15 +48,21 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -67,6 +77,8 @@ public class RoutineService {
     private final InventoryRepository inventoryRepository;
     private final SkinAnalysisService skinAnalysisService;
     private final ProductCompatibilityService productCompatibilityService;
+    private final ShortformAnalysisRepository shortformAnalysisRepository;
+    private final ShortformAnalysisJsonMapper shortformAnalysisJsonMapper;
 
     @Transactional
     public DailyRoutineResponse getDailyRoutine(Long memberId) {
@@ -130,8 +142,8 @@ public class RoutineService {
     public ArchivedRoutineListResponse getArchivedRoutines(Long memberId, Integer year, String sort) {
         Sort sortOrder = switch (sort) {
             case "NAME" -> Sort.by(Sort.Order.asc("name"), Sort.Order.desc("createdAt"));
-            case "STEP_COUNT" -> Sort.unsorted(); // 자바에서 재정렬
-            default -> Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")); // LATEST, SCORE 폴백 (TODO: 선우 매칭점수 필드 추가되면 SCORE 케이스 분리해서 구현)
+            case "STEP_COUNT", "SCORE" -> Sort.unsorted(); // 자바에서 재정렬
+            default -> Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")); // LATEST
         };
 
         List<Routine> routines;
@@ -152,7 +164,62 @@ public class RoutineService {
                     .toList();
         }
 
-        return ArchivedRoutineListResponse.from(routines);
+        Map<Long, Integer> matchScoreByRoutineId = resolveMatchScores(routines);
+
+        if ("SCORE".equals(sort)) {
+            routines = routines.stream()
+                    .sorted(Comparator
+                            .comparing((Routine r) -> matchScoreByRoutineId.get(r.getId()),
+                                    Comparator.nullsLast(Comparator.reverseOrder()))
+                            .thenComparing(Routine::getCreatedAt, Comparator.reverseOrder()))
+                    .toList();
+        }
+
+        return ArchivedRoutineListResponse.from(routines, matchScoreByRoutineId);
+    }
+
+    /**
+     * 숏폼 분석에서 온 루틴(sourceAnalysis != null)만 optimizationJson을 파싱해
+     * 인벤토리 대체를 반영한 최종 매칭 점수(RoutineOptimizationSnapshot.overallScore)를 구한다.
+     * 원본 영상 분석 점수(ShortformAnalysis.resultOverallScore)는 사용하지 않는다.
+     */
+    private Map<Long, Integer> resolveMatchScores(List<Routine> routines) {
+        List<Long> analysisIds = routines.stream()
+                .map(Routine::getSourceAnalysis)
+                .filter(Objects::nonNull)
+                .map(ShortformAnalysis::getId)
+                .distinct()
+                .toList();
+        if (analysisIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, ShortformAnalysis> analysisById = shortformAnalysisRepository.findAllById(analysisIds).stream()
+                .collect(Collectors.toMap(ShortformAnalysis::getId, Function.identity()));
+
+        Map<Long, Integer> result = new HashMap<>();
+        for (Routine routine : routines) {
+            ShortformAnalysis source = routine.getSourceAnalysis();
+            if (source == null) {
+                continue;
+            }
+            ShortformAnalysis analysis = analysisById.get(source.getId());
+            String optimizationJson = analysis == null ? null : analysis.getOptimizationJson();
+            if (optimizationJson == null || optimizationJson.isBlank()) {
+                continue;
+            }
+            try {
+                Integer overallScore = shortformAnalysisJsonMapper
+                        .read(optimizationJson, RoutineOptimizationSnapshot.class)
+                        .overallScore();
+                if (overallScore != null) {
+                    result.put(routine.getId(), overallScore);
+                }
+            } catch (CustomException exception) {
+                log.warn("매칭점수 파싱 실패: routineId={}", routine.getId(), exception);
+            }
+        }
+        return result;
     }
 
     public RoutineDetailResponse getRoutineDetail(Long memberId, Long routineId) {
