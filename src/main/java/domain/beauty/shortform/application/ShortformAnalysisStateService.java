@@ -263,7 +263,7 @@ public class ShortformAnalysisStateService {
                     inventory.getProduct().getId(),
                     inventory.getProduct().getName(),
                     inventory.getProduct().getBrand(),
-                    inventory.getProduct().getCategory() == null ? "ETC" : inventory.getProduct().getCategory().name(),
+                    inventory.getProduct().getCategory() == null ? null : inventory.getProduct().getCategory().name(),
                     inventory.getProduct().getImageUrl()
             );
         }

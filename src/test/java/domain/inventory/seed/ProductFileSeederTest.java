@@ -66,7 +66,7 @@ class ProductFileSeederTest {
         Product existing = Product.builder()
                 .name("라운드랩 1025 독도 토너")
                 .brand("구브랜드")
-                .category(ProductCategory.ETC)
+                .category(ProductCategory.CREAM)
                 .imageUrl("https://img.example/old.jpg")
                 .build();
         ReflectionTestUtils.setField(existing, "id", 1L);

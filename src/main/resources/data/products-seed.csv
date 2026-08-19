@@ -1,21 +1,16 @@
 name,brand,category,imageUrl
-라운드랩 1025 독도 토너,라운드랩,SKIN_TONER,
-토리든 다이브인 저분자 히알루론산 토너,토리든,SKIN_TONER,
-아누아 어성초 77 수딩 토너,아누아,SKIN_TONER,
-코스알엑스 더 나이아신아마이드 15 세럼,코스알엑스,ESSENCE_SERUM,
-웰라쥬 리얼 히알루로닉 블루 100 앰플,웰라쥬,ESSENCE_SERUM,
-달바 화이트 트러플 퍼스트 스프레이 세럼,달바,ESSENCE_SERUM,
-라로슈포제 시카플라스트 밤 B5,라로슈포제,CREAM,
-닥터지 레드 블레미쉬 클리어 수딩 크림,닥터지,CREAM,
-에스트라 아토베리어365 크림,에스트라,CREAM,
-미샤 타임 레볼루션 더 퍼스트 트리트먼트 에센스,미샤,ESSENCE_SERUM,
-설화수 윤조에센스,설화수,ESSENCE_SERUM,
-일리윤 세라마이드 아토 로션,일리윤,LOTION,
-에스트라 아토베리어365 로션,에스트라,LOTION,
-닥터지 그린 마일드 업 선 플러스,닥터지,ETC,
-라운드랩 자작나무 수분 선크림,라운드랩,ETC,
-비플레인 녹두 약산성 클렌징폼,비플레인,ETC,
-라운드랩 1025 독도 클렌저,라운드랩,ETC,
-메디힐 마데카소사이드 흔적 패드,메디힐,SKIN_TONERPAD,
-라네즈 워터 슬리핑 마스크,라네즈,ETC,
-아벤느 오 떼르말 미스트,아벤느,MIST,
+라운드랩 1025 독도 토너,라운드랩,SKIN_TONER,/images/categories/skin_toner.png
+토리든 다이브인 저분자 히알루론산 토너,토리든,SKIN_TONER,/images/categories/skin_toner.png
+아누아 어성초 77 수딩 토너,아누아,SKIN_TONER,/images/categories/skin_toner.png
+코스알엑스 더 나이아신아마이드 15 세럼,코스알엑스,ESSENCE_SERUM,/images/categories/essence_serum.png
+웰라쥬 리얼 히알루로닉 블루 100 앰플,웰라쥬,ESSENCE_SERUM,/images/categories/essence_serum.png
+달바 화이트 트러플 퍼스트 스프레이 세럼,달바,ESSENCE_SERUM,/images/categories/essence_serum.png
+라로슈포제 시카플라스트 밤 B5,라로슈포제,BAM,/images/categories/bam.png
+닥터지 레드 블레미쉬 클리어 수딩 크림,닥터지,CREAM,/images/categories/cream.png
+에스트라 아토베리어365 크림,에스트라,CREAM,/images/categories/cream.png
+미샤 타임 레볼루션 더 퍼스트 트리트먼트 에센스,미샤,ESSENCE_SERUM,/images/categories/essence_serum.png
+설화수 윤조에센스,설화수,ESSENCE_SERUM,/images/categories/essence_serum.png
+일리윤 세라마이드 아토 로션,일리윤,LOTION,/images/categories/lotion.png
+에스트라 아토베리어365 로션,에스트라,LOTION,/images/categories/lotion.png
+메디힐 마데카소사이드 흔적 패드,메디힐,SKIN_TONERPAD,/images/categories/skin_tonerpad.png
+아벤느 오 떼르말 미스트,아벤느,MIST,/images/categories/mist.png

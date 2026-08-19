@@ -67,13 +67,13 @@ class V8__migrate_product_categories_v2Test {
         assertThat(categories()).containsExactly(
                 entry(1L, "ESSENCE_SERUM"),
                 entry(2L, "ESSENCE_SERUM"),
-                entry(3L, "ETC"),
-                entry(4L, "ETC"),
-                entry(5L, "ETC"),
+                entry(3L, null),
+                entry(4L, null),
+                entry(5L, null),
                 entry(6L, "SKIN_TONER"),
                 entry(7L, "LOTION"),
                 entry(8L, "CREAM"),
-                entry(9L, "ETC")
+                entry(9L, null)
         );
     }
 
