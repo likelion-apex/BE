@@ -10,20 +10,19 @@ import org.flywaydb.core.api.migration.BaseJavaMigration;
 import org.flywaydb.core.api.migration.Context;
 
 /**
- * Converts product category values from the previous 9-value enum to the new 10-value enum
- * before Hibernate applies the current {@code ProductCategory} definition.
- *
- * <p>{@code SERUM} and {@code ESSENCE} are merged into {@code ESSENCE_SERUM}. {@code SUNCREAM},
- * {@code CLEANSER}, and {@code MASK} no longer exist and fall back to {@code ETC}. The column is
- * temporarily widened to VARCHAR so the legacy native MySQL ENUM values can be converted, then the
- * ENUM definition is restored with the new value set.</p>
+ * Removes {@code ETC} from the product category set, locking the enum to the 9 real
+ * skincare-step categories. Any product left as {@code ETC} by {@code V8} (originally
+ * {@code SUNCREAM}, {@code CLEANSER}, or {@code MASK}) no longer has a home in the fixed 9
+ * categories, so it falls back to {@code NULL} (no category assigned) rather than a fabricated
+ * bucket. The column is temporarily widened to VARCHAR so the legacy native MySQL ENUM value can
+ * be converted, then the ENUM definition is restored with the new 9-value set.
  */
-public class V8__migrate_product_categories_v2 extends BaseJavaMigration {
+public class V9__remove_etc_product_category extends BaseJavaMigration {
 
     private static final String PRODUCTS = "products";
     private static final String CATEGORY = "category";
     private static final String MYSQL_PRODUCT_CATEGORY_ENUM = """
-            ENUM('BAM','CREAM','ESSENCE_SERUM','ETC','EYECARE','FACEOIL','LOTION','MIST','SKIN_TONER','SKIN_TONERPAD')
+            ENUM('BAM','CREAM','ESSENCE_SERUM','EYECARE','FACEOIL','LOTION','MIST','SKIN_TONER','SKIN_TONERPAD')
             """.trim();
 
     @Override
@@ -56,13 +55,8 @@ public class V8__migrate_product_categories_v2 extends BaseJavaMigration {
     private void migrateLegacyValues(Connection connection) throws SQLException {
         execute(connection, """
                 UPDATE `products`
-                SET `category` = 'ESSENCE_SERUM'
-                WHERE `category` IN ('SERUM', 'ESSENCE')
-                """);
-        execute(connection, """
-                UPDATE `products`
-                SET `category` = 'ETC'
-                WHERE `category` IN ('SUNCREAM', 'CLEANSER', 'MASK')
+                SET `category` = NULL
+                WHERE `category` = 'ETC'
                 """);
     }
 

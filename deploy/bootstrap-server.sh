@@ -37,6 +37,7 @@ cat >/etc/sudoers.d/mutsa-deploy <<'SUDOERS'
 mutsa-deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart mutsa.service
 mutsa-deploy ALL=(root) NOPASSWD: /usr/bin/systemctl stop mutsa.service
 mutsa-deploy ALL=(root) NOPASSWD: /usr/bin/systemctl status mutsa.service --no-pager
+mutsa-deploy ALL=(root) NOPASSWD: /usr/bin/journalctl -u mutsa.service *
 SUDOERS
 chmod 0440 /etc/sudoers.d/mutsa-deploy
 visudo --check --file=/etc/sudoers.d/mutsa-deploy
