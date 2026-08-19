@@ -166,8 +166,8 @@ final class PersonalizedHighlights {
         String owner = owner(nickname);
         String prefix = owner.isBlank() ? "" : owner + " ";
         return List.of(
-                "%s%s 맞춤 성분 %d개 매칭".formatted(
-                        prefix, profileLabel(skinType), Math.max(0, matchedCount)),
+                "%s 맞춤 성분 %d개 매칭".formatted(
+                        profileLabel(skinType), Math.max(0, matchedCount)),
                 "%s피부 알레르기 유발 성분 %d개".formatted(
                         prefix, Math.max(0, allergenCount)));
     }
