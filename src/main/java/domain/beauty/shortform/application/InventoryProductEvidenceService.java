@@ -44,7 +44,6 @@ public class InventoryProductEvidenceService {
     ) {
         Set<ProductCategory> allowed = videoCategories == null ? Set.of() : videoCategories.stream()
                 .filter(Objects::nonNull)
-                .filter(category -> category != ProductCategory.ETC)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         if (allowed.isEmpty()) {
             return Map.of();
@@ -67,7 +66,7 @@ public class InventoryProductEvidenceService {
         List<InventoryFact> candidates = safe(products).stream()
                 .filter(Objects::nonNull)
                 .filter(item -> item.productId() != null)
-                .filter(item -> categoryResolver.parseStored(item.category()) != ProductCategory.ETC)
+                .filter(item -> categoryResolver.parseStored(item.category()) != null)
                 .collect(java.util.stream.Collectors.toMap(
                         InventoryFact::productId,
                         item -> item,

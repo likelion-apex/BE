@@ -13,9 +13,9 @@ public class CategoryImageResolver {
 
     private static final String BASE_PATH = "/images/categories/";
 
-    /** ETC는 매칭되는 이미지 자산이 없어 null을 반환한다. */
+    /** 카테고리가 없는 상품(null)은 매칭되는 이미지 자산이 없어 null을 반환한다. */
     public String resolve(ProductCategory category) {
-        if (category == null || category == ProductCategory.ETC) {
+        if (category == null) {
             return null;
         }
         return BASE_PATH + category.name().toLowerCase(Locale.ROOT) + ".png";

@@ -37,7 +37,7 @@ public class RoutineOptimizationNormalizer {
             boolean replacement = stored.status() == OptimizationStatus.REPLACED
                     || stored.status() == OptimizationStatus.COMPATIBLE;
             ProductCategory sourceCategory = source == null
-                    ? ProductCategory.ETC
+                    ? null
                     : categoryResolver.resolve(source.category(), videoProductName(source));
             ProductCategory selectedCategory = categoryResolver.parseStored(stored.category());
             boolean alreadyNormalized = stored.status() == OptimizationStatus.REPLACED
@@ -46,7 +46,7 @@ public class RoutineOptimizationNormalizer {
             boolean validReplacement = replacement
                     && stored.inventoryId() != null
                     && (alreadyNormalized
-                            || (sourceCategory != ProductCategory.ETC && sourceCategory == selectedCategory));
+                            || (sourceCategory != null && sourceCategory == selectedCategory));
 
             normalizedSteps.add(validReplacement
                     ? replacementStep(stored, source)

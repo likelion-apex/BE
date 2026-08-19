@@ -31,7 +31,6 @@ import domain.beauty.shortform.domain.VideoRoutineExtraction;
 import domain.beauty.shortform.application.ShortformProductEnrichmentService.BatchResult;
 import domain.cosmetic.cache.RegulationInfoCache;
 import domain.cosmetic.client.RegulationInfo;
-import domain.inventory.ProductCategory;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -102,7 +101,7 @@ public class ShortformAnalysisAssembler {
                 matchedSteps.stream().map(step -> new RoutinePersonalizationInput.VideoStep(
                         step.source().order(),
                         step.source().category(),
-                        step.productCategory().name(),
+                        step.productCategory() == null ? null : step.productCategory().name(),
                         step.source().brand(),
                         step.source().productName(),
                         step.displayBrand(),
@@ -514,7 +513,7 @@ public class ShortformAnalysisAssembler {
             RoutinePersonalizationResult.InventoryRecommendation recommendation = recommendations.get(source.order());
             InventoryFact selected = recommendation == null ? null : inventoryById.get(recommendation.inventoryId());
             boolean categoryMatches = selected != null
-                    && matched.productCategory() != ProductCategory.ETC
+                    && matched.productCategory() != null
                     && matched.productCategory() == categoryResolver.parseStored(selected.category());
             if (!categoryMatches) {
                 selected = null;

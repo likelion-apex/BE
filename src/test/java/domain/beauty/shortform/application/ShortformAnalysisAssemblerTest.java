@@ -185,14 +185,14 @@ class ShortformAnalysisAssemblerTest {
     }
 
     @Test
-    void neverReplacesUnclassifiedEtcVideoProduct() {
+    void neverReplacesUnclassifiedNullCategoryVideoProduct() {
         JobContext context = new JobContext(
                 1L, "video", "https://www.youtube.com/watch?v=video", "수부지",
                 List.of(), List.of(new InventoryFact(
-                        100L, 20L, "보유 기타 제품", "테스트", "ETC", null)));
+                        100L, 20L, "보유 기타 제품", "테스트", null, null)));
         MatchedVideoStep unknown = new MatchedVideoStep(
                 step(1, IdentificationLevel.CATEGORY_ONLY, null),
-                null, ProductCategory.ETC, null, null, "확인되지 않은 제품",
+                null, null, null, null, "확인되지 않은 제품",
                 ProductResolutionStatus.UNRESOLVED, 0, IngredientDataStatus.NOT_ELIGIBLE,
                 ProductEnrichmentData.unresolved());
 

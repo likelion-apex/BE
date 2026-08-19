@@ -9,27 +9,27 @@ public class ShortformProductCategoryResolver {
 
     public ProductCategory resolve(String category, String productName) {
         ProductCategory resolved = resolveValue(category);
-        return resolved != ProductCategory.ETC ? resolved : resolveValue(productName);
+        return resolved != null ? resolved : resolveValue(productName);
     }
 
     public ProductCategory parseStored(String category) {
         if (category == null || category.isBlank()) {
-            return ProductCategory.ETC;
+            return null;
         }
         try {
             return ProductCategory.valueOf(category.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException ignored) {
-            return ProductCategory.ETC;
+            return null;
         }
     }
 
     private ProductCategory resolveValue(String value) {
         if (value == null || value.isBlank()) {
-            return ProductCategory.ETC;
+            return null;
         }
 
         ProductCategory stored = parseStored(value);
-        if (stored != ProductCategory.ETC || "ETC".equalsIgnoreCase(value.trim())) {
+        if (stored != null) {
             return stored;
         }
 
@@ -61,7 +61,7 @@ public class ShortformProductCategoryResolver {
         if (containsAny(normalized, "토너", "스킨", "toner")) {
             return ProductCategory.SKIN_TONER;
         }
-        return ProductCategory.ETC;
+        return null;
     }
 
     private boolean containsAny(String value, String... candidates) {

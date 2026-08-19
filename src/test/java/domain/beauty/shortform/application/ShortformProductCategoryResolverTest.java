@@ -18,8 +18,8 @@ class ShortformProductCategoryResolverTest {
     }
 
     @Test
-    void leavesUnknownCategoryAsEtc() {
-        assertThat(resolver.resolve("도포 제품", "확인되지 않은 제품")).isEqualTo(ProductCategory.ETC);
-        assertThat(resolver.parseStored("UNKNOWN")).isEqualTo(ProductCategory.ETC);
+    void leavesUnknownCategoryAsNull() {
+        assertThat(resolver.resolve("도포 제품", "확인되지 않은 제품")).isNull();
+        assertThat(resolver.parseStored("UNKNOWN")).isNull();
     }
 }

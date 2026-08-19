@@ -19,21 +19,21 @@ import java.util.Map;
  * 인벤토리에 신규 상품이 처음 등록될 때 한 번만 호출되며, 결과는 Product에 저장되어 이후 재사용된다.
  *
  * 1) AI 응답 성공 → AI가 제품명을 보고 9종 중 실제로 가장 가까운 것을 스스로 판단해서 반환
- * 2) API 장애/파싱 실패 등 응답 자체를 못 받은 경우 → 어떤 제품인지와 무관하게 고정값(DEFAULT_CATEGORY)을 그대로 반환
+ * 2) API 장애/파싱 실패 등 응답 자체를 못 받은 경우 → null(카테고리 미지정)을 반환
  */
 @Slf4j
 @Component
 public class OpenAiCategoryClassifier {
 
-    /** API 장애 등으로 분류 자체가 불가능할 때만 쓰는 고정 기본값. */
-    private static final ProductCategory DEFAULT_CATEGORY = ProductCategory.ETC;
+    /** API 장애 등으로 분류 자체가 불가능할 때만 쓰는 고정 기본값. 9종 중 어느 것도 강제하지 않고 null로 둔다. */
+    private static final ProductCategory DEFAULT_CATEGORY = null;
 
     private static final String SYSTEM_PROMPT = """
             당신은 화장품을 카테고리로 분류하는 어시스턴트입니다.
-            사용자가 알려준 화장품 제품명을 보고 다음 10개 카테고리 중 가장 가까운 것 하나로 반드시 분류하세요:
+            사용자가 알려준 화장품 제품명을 보고 다음 9개 카테고리 중 가장 가까운 것 하나로 반드시 분류하세요:
             SKIN_TONER(스킨/토너), LOTION(로션/에멀전), ESSENCE_SERUM(에센스/앰플/세럼), FACEOIL(페이스오일),
-            CREAM(크림), EYECARE(아이케어), MIST(미스트,젤), SKIN_TONERPAD(스킨/토너 패드), BAM(밤/멀티밤), ETC(기타)
-            확신이 없더라도 위 10개 중 가장 근접한 카테고리를 반드시 선택하세요. null이나 그 외 값은 절대 반환하지 마세요.
+            CREAM(크림), EYECARE(아이케어), MIST(미스트,젤), SKIN_TONERPAD(스킨/토너 패드), BAM(밤/멀티밤)
+            확신이 없더라도 위 9개 중 가장 근접한 카테고리를 반드시 선택하세요. null이나 그 외 값은 절대 반환하지 마세요.
             반드시 아래 JSON 형식으로만 답변하세요: {"category": "CREAM"}
             """;
 

@@ -10,20 +10,21 @@ import org.flywaydb.core.api.migration.BaseJavaMigration;
 import org.flywaydb.core.api.migration.Context;
 
 /**
- * Converts product category values from the previous 9-value enum to the new 10-value enum
+ * Converts product category values from the previous 9-value enum to the new 9-value enum
  * before Hibernate applies the current {@code ProductCategory} definition.
  *
  * <p>{@code SERUM} and {@code ESSENCE} are merged into {@code ESSENCE_SERUM}. {@code SUNCREAM},
- * {@code CLEANSER}, and {@code MASK} no longer exist and fall back to {@code ETC}. The column is
- * temporarily widened to VARCHAR so the legacy native MySQL ENUM values can be converted, then the
- * ENUM definition is restored with the new value set.</p>
+ * {@code CLEANSER}, {@code MASK}, and any legacy {@code ETC} value no longer exist and fall back
+ * to {@code NULL} (no category assigned). The column is temporarily widened to VARCHAR so the
+ * legacy native MySQL ENUM values can be converted, then the ENUM definition is restored with the
+ * new value set.</p>
  */
 public class V8__migrate_product_categories_v2 extends BaseJavaMigration {
 
     private static final String PRODUCTS = "products";
     private static final String CATEGORY = "category";
     private static final String MYSQL_PRODUCT_CATEGORY_ENUM = """
-            ENUM('BAM','CREAM','ESSENCE_SERUM','ETC','EYECARE','FACEOIL','LOTION','MIST','SKIN_TONER','SKIN_TONERPAD')
+            ENUM('BAM','CREAM','ESSENCE_SERUM','EYECARE','FACEOIL','LOTION','MIST','SKIN_TONER','SKIN_TONERPAD')
             """.trim();
 
     @Override
@@ -61,8 +62,8 @@ public class V8__migrate_product_categories_v2 extends BaseJavaMigration {
                 """);
         execute(connection, """
                 UPDATE `products`
-                SET `category` = 'ETC'
-                WHERE `category` IN ('SUNCREAM', 'CLEANSER', 'MASK')
+                SET `category` = NULL
+                WHERE `category` IN ('SUNCREAM', 'CLEANSER', 'MASK', 'ETC')
                 """);
     }
 

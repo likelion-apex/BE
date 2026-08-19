@@ -6,7 +6,6 @@ import domain.beauty.shortform.domain.IngredientDataStatus;
 import domain.beauty.shortform.domain.ProductResolutionStatus;
 import domain.cosmetic.client.KakaoImageClient;
 import domain.inventory.Product;
-import domain.inventory.ProductCategory;
 import domain.inventory.ProductRepository;
 import java.util.List;
 import java.util.Map;
@@ -73,7 +72,7 @@ public class ShortformProductMatcher {
             return new MatchedVideoStep(
                     step,
                     product.getId(),
-                    product.getCategory() == null ? ProductCategory.ETC : product.getCategory(),
+                    product.getCategory(),
                     product.getImageUrl(),
                     displayBrand,
                     displayProductName,
