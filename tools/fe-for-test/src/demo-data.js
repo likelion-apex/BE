@@ -179,7 +179,7 @@ export const demoAnalysisResult = {
   title: '속건조 타파 루틴',
   tag: '여름철 수부지 맞춤',
   overallScore: 88,
-  highlights: ['윤지님 수부지 맞춤 성분 12개 매칭', '윤지님 피부 알레르기 유발 성분 0개'],
+  highlights: ['수부지 맞춤 성분 12개 매칭', '윤지님 피부 알레르기 유발 성분 0개'],
   coreGoal: '속건조 해결 & 장벽 재생',
   synergyCombo: '히알루론산 + 고함량 판테놀',
   summary: '수분 공급과 장벽 회복을 함께 노린 루틴이에요. 자극 가능성이 있는 각질 제거 단계는 주 2~3회 사용을 권장합니다.',
@@ -233,7 +233,7 @@ export const demoAnalysisResult = {
 
 export const demoOptimization = {
   overallScore: 88,
-  highlights: ['윤지님 수부지 맞춤 성분 12개 매칭', '윤지님 피부 알레르기 유발 성분 0개'],
+  highlights: ['수부지 맞춤 성분 12개 매칭', '윤지님 피부 알레르기 유발 성분 0개'],
   newProductCount: 1,
   replacedCount: 3,
   missingCount: 1,
