@@ -73,7 +73,8 @@ function createRoutineState() {
     dailyLoaded: false,
     library: { totalCount: 0, routines: [] },
     libraryLoaded: false,
-    period: '3M',
+    year: null,
+    sort: 'LATEST',
     calendar: null,
     calendarLoaded: false,
     calendarYear: now.getFullYear(),
@@ -563,8 +564,15 @@ function renderRoutineLibrary() {
   return `
     <section class="page-section routine-library-head">
       <div><span class="eyebrow">나의 루틴 보관함</span><h1>다시 쓰고 싶은 루틴을<br>오늘 케어로 불러오세요</h1></div>
-      <div class="period-filter" aria-label="보관 기간">
-        ${[['3M', '3개월'], ['6M', '6개월'], ['ALL', '전체']].map(([period, label]) => `<button class="${state.routine.period === period ? 'active' : ''}" type="button" data-routine-period="${period}">${label}</button>`).join('')}
+      <div class="routine-filter-row">
+        <select data-routine-year-select aria-label="연도 선택">
+          <option value="" ${!state.routine.year ? 'selected' : ''}>전체(최근 3년)</option>
+          <option value="2026" ${state.routine.year === '2026' ? 'selected' : ''}>2026년</option>
+          <option value="2025" ${state.routine.year === '2025' ? 'selected' : ''}>2025년</option>
+        </select>
+        <div class="period-filter" aria-label="정렬">
+          ${[['LATEST', '최신순'], ['NAME', '가나다순'], ['STEP_COUNT', '단계순'], ['SCORE', 'AI 매칭점수순']].map(([sort, label]) => `<button class="${state.routine.sort === sort ? 'active' : ''}" type="button" data-routine-sort="${sort}">${label}</button>`).join('')}
+        </div>
       </div>
     </section>
     <section class="page-section routine-library-list">
@@ -572,7 +580,7 @@ function renderRoutineLibrary() {
       ${state.routine.libraryLoaded && !(library.routines || []).length ? '<div class="empty-card"><b>보관한 루틴이 없어요</b><p>숏폼 분석 결과나 AI 추천 루틴을 LIBRARY로 저장해 보세요.</p></div>' : ''}
       ${(library.routines || []).map((routine) => `<button class="library-routine-card" type="button" data-action="open-routine-detail" data-routine-id="${routine.routineId}">
         <span class="routine-type-badge ${String(routine.routineType).toLowerCase()}">${routine.routineType === 'DAY' ? 'DAY' : 'NIGHT'}</span>
-        <span><b>${escapeHtml(routine.name)}</b><small>${Number(routine.stepCount || 0)}단계 · ${formatDateTime(routine.createdAt)}</small></span><strong>›</strong>
+        <span><b>${escapeHtml(routine.name)}</b><small>${Number(routine.stepCount || 0)}단계 · ${formatDateTime(routine.createdAt)}${routine.matchScore != null ? ` · 매칭 ${routine.matchScore}점` : ''}</small></span><strong>›</strong>
       </button>`).join('')}
     </section>`;
 }
@@ -970,7 +978,7 @@ async function loadDailyRoutine(shouldRender = true) {
 async function loadRoutineLibrary(shouldRender = true) {
   state.routine.library = state.isDemo
     ? structuredClone(demoRoutineLibrary)
-    : await api.data(`/api/v1/routines?period=${encodeURIComponent(state.routine.period)}&sort=LATEST`);
+    : await api.data(`/api/v1/routines?status=ARCHIVED${state.routine.year ? `&year=${state.routine.year}` : ''}&sort=${encodeURIComponent(state.routine.sort)}`);
   state.routine.libraryLoaded = true;
   if (shouldRender) render();
 }
@@ -1644,9 +1652,9 @@ root.addEventListener('click', async (event) => {
     return;
   }
 
-  const routinePeriod = target.dataset.routinePeriod;
-  if (routinePeriod) {
-    state.routine.period = routinePeriod;
+  const routineSort = target.dataset.routineSort;
+  if (routineSort) {
+    state.routine.sort = routineSort;
     state.routine.libraryLoaded = false;
     render();
     loadRoutineLibrary().catch((error) => toast(`보관함을 불러오지 못했어요. ${error.message}`, 'error'));
@@ -1763,6 +1771,15 @@ root.addEventListener('click', async (event) => {
   if (target.dataset.resultId) showProductDetail({ resultId: target.dataset.resultId });
   else if (target.dataset.inventoryId && action !== 'toggle-favorite') showProductDetail({ inventoryId: target.dataset.inventoryId, productId: target.dataset.productId });
   else if (target.dataset.productId) showProductDetail({ productId: target.dataset.productId });
+});
+
+root.addEventListener('change', (event) => {
+  if (event.target.matches('[data-routine-year-select]')) {
+    state.routine.year = event.target.value || null;
+    state.routine.libraryLoaded = false;
+    render();
+    loadRoutineLibrary().catch((error) => toast(`보관함을 불러오지 못했어요. ${error.message}`, 'error'));
+  }
 });
 
 root.addEventListener('input', (event) => {
