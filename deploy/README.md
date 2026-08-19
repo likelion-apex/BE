@@ -13,7 +13,7 @@ The production service runs the executable JAR from `/srv/mutsa/current` with sy
 The server environment file must contain the two exact CORS origins without trailing slashes:
 
 ```text
-CORS_ALLOWED_ORIGINS=https://likelion-apex-fe.vercel.app,http://localhost:3000
+CORS_ALLOWED_ORIGINS=https://ssoak.my,http://localhost:3000
 ```
 
 Application secrets stay on the server and are not copied into GitHub Actions.
