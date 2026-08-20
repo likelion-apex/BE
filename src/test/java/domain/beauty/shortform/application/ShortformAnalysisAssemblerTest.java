@@ -36,15 +36,17 @@ class ShortformAnalysisAssemblerTest {
 
     private final RegulationInfoCache regulationInfoCache =
             new RegulationInfoCache(mock(CsmtcsReglMaterialClient.class));
+    private final KoreanUserCopyNormalizer koreanCopy = new KoreanUserCopyNormalizer();
     private final ShortformAnalysisAssembler assembler =
             new ShortformAnalysisAssembler(
                     regulationInfoCache,
                     new OpenAiRoutineProperties(),
                     new ShortformProductCategoryResolver(),
-                    new OptimizationReasonComposer(),
-                    new ReasonCardNormalizer(),
+                    new OptimizationReasonComposer(koreanCopy),
+                    new ReasonCardNormalizer(koreanCopy),
                     new ProductCapacityNormalizer(),
-                    new OptimizationScoreCalculator());
+                    new OptimizationScoreCalculator(),
+                    koreanCopy);
 
     @Test
     void forcesUnknownForCategoryOnlyStepAndIgnoresUnknownInventoryId() {

@@ -8,6 +8,9 @@ import org.springframework.stereotype.Component;
 public class ShortformProductCategoryResolver {
 
     public ProductCategory resolve(String category, String productName) {
+        if (isUnsupported(category) || isUnsupported(productName)) {
+            return null;
+        }
         ProductCategory resolved = resolveValue(category);
         return resolved != null ? resolved : resolveValue(productName);
     }
@@ -34,6 +37,14 @@ public class ShortformProductCategoryResolver {
         }
 
         String normalized = value.toLowerCase(Locale.ROOT).replaceAll("[\\s_/-]", "");
+        if (containsAny(normalized,
+                "클렌징", "클렌저", "세안", "페이스워시", "cleansing", "cleanser", "facewash")
+                || containsAny(normalized,
+                        "선크림", "선케어", "자외선차단", "sunscreen", "suncream")
+                || containsAny(normalized,
+                        "마스크팩", "시트마스크", "maskpack", "sheetmask")) {
+            return null;
+        }
         if (containsAny(normalized, "아이크림", "아이세럼", "아이케어", "eyecream", "eyeserum", "eyecare")) {
             return ProductCategory.EYECARE;
         }
@@ -71,5 +82,18 @@ public class ShortformProductCategoryResolver {
             }
         }
         return false;
+    }
+
+    private boolean isUnsupported(String value) {
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+        String normalized = value.toLowerCase(Locale.ROOT).replaceAll("[\\s_/-]", "");
+        return containsAny(normalized,
+                "클렌징", "클렌저", "세안", "페이스워시", "cleansing", "cleanser", "facewash")
+                || containsAny(normalized,
+                        "선크림", "선케어", "자외선차단", "sunscreen", "suncream")
+                || containsAny(normalized,
+                        "마스크팩", "시트마스크", "maskpack", "sheetmask");
     }
 }

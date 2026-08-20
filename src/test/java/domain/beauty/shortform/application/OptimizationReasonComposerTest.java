@@ -23,7 +23,8 @@ import org.junit.jupiter.api.Test;
 
 class OptimizationReasonComposerTest {
 
-    private final OptimizationReasonComposer composer = new OptimizationReasonComposer();
+    private final OptimizationReasonComposer composer =
+            new OptimizationReasonComposer(new KoreanUserCopyNormalizer());
 
     @Test
     void replacesGenericReasonWithGroundedProductAndIngredientCopy() {

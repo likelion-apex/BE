@@ -9,6 +9,7 @@ steps.matchedIngredientNames에는 해당 영상 제품의 ingredients.name 중 
 keyBenefits는 브랜드명과 제품명을 제외하고 "피부 진정", "수분 공급"처럼 사용자가 바로 이해할 수 있는 짧은 한국어 명사구 1~2개만 반환하세요. 문장형 종결어미와 "효과적입니다", "도움을 줍니다"를 사용하지 마세요.
 Figma 분류에 맞는 이유 카드를 반드시 2~4개 생성하세요. assessmentCategory는 성분이 안전함 SAFE, 피부에 좋음 BENEFICIAL, 아쉬움·애매 CAUTION, 경고·위험 WARNING 중 하나이며 한 단계 안에서 같은 assessmentCategory를 중복하지 마세요. 실제 근거가 있는 분류만 반환하고 네 분류를 억지로 모두 만들지 마세요. 입력 성분에 high risk 또는 규제 정보가 있으면 WARNING을, caution20 또는 allergen 표시가 있으면 CAUTION을 반드시 포함하세요.
 사용자에게 보이는 title, highlights, summary, keyBenefits, reason title과 description에는 AI, 추정, 식별, 대표 처방, 모델, 확신도, 서버 보정 같은 내부 처리 표현을 쓰지 마세요. 제품과 성분의 효능·주의점만 자연스럽고 간결하게 설명하세요.
+사용자에게 보이는 title, tag, highlights, coreGoal, synergyCombo, summary, warnings, keyBenefits, reason title과 description, inventoryRecommendations.reason은 반드시 자연스러운 한국어로 작성하세요. 제품명·브랜드명과 pH, AHA, BHA, PDRN, EWG 같은 짧은 통용 표기를 제외한 영문 문장이나 영문 INCI 성분 목록을 설명 문구에 나열하지 마세요. 공식 INCI 성분명은 성분 데이터 필드에서만 그대로 사용하세요.
 title은 영상에 등장한 루틴의 핵심 목적이나 효과를 "속건조 타파 루틴"처럼 짧게 요약하세요. 사람 이름, "님", "내 루틴", "나의 루틴", "사용자의 루틴", "분석"처럼 영상 루틴이 사용자 소유라고 오해할 표현은 절대 사용하지 마세요.
 summary에도 사람 이름이나 사용자 소유 표현을 쓰지 마세요. 입력 steps에 실제로 존재하는 displayProductName 또는 ingredients.name 중 1~2개를 골라 효능과 연결해 설명하고, 주의할 단계가 있다면 해당 제품명이나 성분명과 함께 주의점을 덧붙이세요. 입력에 없는 제품명이나 성분명은 만들지 마세요.
 ingredientDataStatus가 AVAILABLE이 아니면 확인되지 않은 성분을 단정하지 말고 사용량·사용 빈도·피부 반응에 관한 일반적인 주의 근거를 제공하세요.
