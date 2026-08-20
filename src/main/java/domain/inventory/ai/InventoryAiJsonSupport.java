@@ -38,7 +38,7 @@ public final class InventoryAiJsonSupport {
         return ingredients;
     }
 
-    public static Map<String, List<String>> parsePurposes(JsonNode payload) {
+    public static Map<String, IngredientAiDetail> parseIngredientDetails(JsonNode payload) {
         if (payload == null) {
             return Map.of();
         }
@@ -46,7 +46,7 @@ public final class InventoryAiJsonSupport {
         if (!ingredientsNode.isArray()) {
             return Map.of();
         }
-        Map<String, List<String>> result = new LinkedHashMap<>();
+        Map<String, IngredientAiDetail> result = new LinkedHashMap<>();
         ingredientsNode.forEach(node -> {
             String name = ingredientName(node);
             if (name == null) {
@@ -62,7 +62,8 @@ public final class InventoryAiJsonSupport {
                     }
                 });
             }
-            result.put(name, purposes);
+            String riskLevel = textOrNull(node.path("riskLevel"));
+            result.put(name, new IngredientAiDetail(purposes, riskLevel));
         });
         return result;
     }
