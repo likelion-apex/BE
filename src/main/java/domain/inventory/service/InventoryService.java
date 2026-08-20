@@ -24,6 +24,7 @@ import domain.inventory.dto.response.InventoryListResponse;
 import domain.inventory.dto.response.SkinEfficacyTag;
 import domain.member.Member;
 import domain.member.MemberRepository;
+import domain.member.SkinConcern;
 import global.exception.CustomException;
 import global.exception.ErrorCode;
 import global.util.PublicUrlResolver;
@@ -34,6 +35,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -51,6 +53,7 @@ public class InventoryService {
     private static final IngredientPurposeCategory DEFAULT_PURPOSE_CATEGORY =
             IngredientPurposeCategory.SKIN_CONDITIONING_AGENT;
     private static final int MAX_EFFICACY_TAGS = 2;
+    private static final int REQUIRED_KEYWORD_COUNT = 3;
     private static final int RISK_SCORE_WEIGHT_LOW = 100;
     private static final int RISK_SCORE_WEIGHT_MEDIUM = 60;
     private static final int RISK_SCORE_WEIGHT_HIGH = 20;
@@ -125,12 +128,17 @@ public class InventoryService {
             PersonalizedAnalysisResult result = personalizedAnalysisAiClient.analyze(
                     productName, ingredientNames, member.getSkinType(), member.getSkinConcerns());
             keywords = toKeywords(result);
-            // AI가 완전히 실패(result == null)했을 때는 캐시에 저장하지 않는다.
-            // 실패를 캐시하면 빈 keywords가 TTL 동안(기본 30일) 굳어져 AI가 복구된 뒤에도
-            // 계속 빈 배열만 반환하게 된다(재시도 불가).
-            if (result != null) {
+            // 완전한 keywords(REQUIRED_KEYWORD_COUNT개)만 캐시에 저장한다. 실패/불완전 결과를
+            // 캐시하면 부실한 keywords가 TTL 동안(기본 30일) 굳어져 AI가 복구된 뒤에도
+            // 계속 같은 결과만 반환하게 된다(재시도 불가).
+            if (keywords.size() == REQUIRED_KEYWORD_COUNT) {
                 saveCache(cacheKey, keywordsCachePayload(keywords));
             }
+        }
+        // 캐시/AI 모두 완전한 keywords를 주지 못하면, 실제 AI 근거와 섞이지 않도록
+        // 결정론적 기본 키워드 3개로 전체 교체한다(이 기본값은 캐시하지 않는다).
+        if (keywords.size() < REQUIRED_KEYWORD_COUNT) {
+            keywords = defaultKeywords(member, ingredients);
         }
 
         return new AiAnalysisResponse(
@@ -292,18 +300,40 @@ public class InventoryService {
     }
 
     /**
-     * 캐시된 판단 근거 키워드를 조회한다. 캐시 엔트리가 없으면 null(재조회 필요),
-     * 있으면 빈 배열이라도 그대로 반환한다(불필요한 재조회 방지).
+     * 캐시된 판단 근거 키워드를 조회한다. 캐시 엔트리가 없거나 완전하지 않으면(REQUIRED_KEYWORD_COUNT
+     * 미만) null(재조회 필요)을 반환하고, 완전한 경우에만 그대로 반환한다(불필요한 재조회 방지).
      */
     private List<AiAnalysisResponse.AnalysisKeyword> findCachedKeywords(String cacheKey) {
         try {
             return inventoryAiCacheService.find(cacheKey)
                     .map(this::keywordsFromCache)
+                    .filter(keywords -> keywords.size() == REQUIRED_KEYWORD_COUNT)
                     .orElse(null);
         } catch (RuntimeException e) {
             log.warn("맞춤 분석 캐시 조회를 건너뜁니다: cacheKey={}, message={}", cacheKey, e.getMessage());
             return null;
         }
+    }
+
+    /**
+     * 모든 AI provider가 실패하거나 응답이 불완전할 때 사용하는 결정론적 기본 키워드 3개.
+     * 실제 AI 근거와 섞이지 않도록 완전하지 않은 결과는 전부 이 기본값으로 교체하며, 캐시하지 않는다.
+     */
+    private List<AiAnalysisResponse.AnalysisKeyword> defaultKeywords(
+            Member member, List<IngredientAnalysisResponse.IngredientDetail> ingredients) {
+        String skinTypeLabel = member.getSkinType() != null ? member.getSkinType().getLabel() : "일반 피부";
+        String skinConcernLabel = (member.getSkinConcerns() == null || member.getSkinConcerns().isEmpty())
+                ? "특별한 피부고민이 없는 경우"
+                : member.getSkinConcerns().stream().map(SkinConcern::getLabel).collect(Collectors.joining(", "));
+        String ingredientReason = (ingredients == null || ingredients.isEmpty())
+                ? "전성분 정보를 확인할 수 없어 제품명을 기준으로 보수적으로 평가했습니다."
+                : "전성분 위험도 비율을 기준으로 적합 점수를 산출했습니다.";
+        return List.of(
+                new AiAnalysisResponse.AnalysisKeyword(
+                        "피부타입 적합도", skinTypeLabel + " 기준으로 성분을 보수적으로 평가했습니다."),
+                new AiAnalysisResponse.AnalysisKeyword("성분 안전성", ingredientReason),
+                new AiAnalysisResponse.AnalysisKeyword(
+                        "피부고민 맞춤", skinConcernLabel + "을 기준으로 적합도를 판단했습니다."));
     }
 
     private List<AiAnalysisResponse.AnalysisKeyword> keywordsFromCache(JsonNode payload) {

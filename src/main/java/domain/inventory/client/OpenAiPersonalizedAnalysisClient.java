@@ -33,9 +33,13 @@ public class OpenAiPersonalizedAnalysisClient {
             제품명, 전성분 목록, 사용자의 피부타입과 피부고민을 참고하여 이 제품이 사용자에게 얼마나 적합한지
             0에서 100 사이의 종합 점수와, 점수 판단 근거가 되는 키워드 3가지(각 키워드별 상세 이유 포함)를 제시하세요.
             전성분을 알 수 없으면 제품명과 일반적인 화장품 지식을 바탕으로 보수적으로 평가하세요.
+            keywords 배열은 반드시 정확히 3개여야 하며, 각 항목의 keyword와 reason은 모두 비어 있으면 안 됩니다.
+            빈 배열이나 3개 미만의 keywords는 절대 허용되지 않습니다.
             반드시 아래 JSON 형식으로만 답변하세요:
             {"score": 88, "keywords": [{"keyword": "...", "reason": "..."}, {"keyword": "...", "reason": "..."}, {"keyword": "...", "reason": "..."}]}
             """;
+
+    private static final int REQUIRED_KEYWORD_COUNT = 3;
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
@@ -128,6 +132,12 @@ public class OpenAiPersonalizedAnalysisClient {
                 """.formatted(productName, ingredients, skinTypeLabel, skinConcernLabels);
     }
 
+    /**
+     * keyword/reason이 모두 채워진 항목이 {@value #REQUIRED_KEYWORD_COUNT}개 미만이면 불완전한 응답으로 보고
+     * null을 반환한다. 호출부(OpenAI/Gemini/Groq)는 null을 AiProviderUnavailableException으로 전환해
+     * 다음 provider로 폴백하므로, 이 메서드만 강화하면 폴백·쿨다운 로직 전체가 자연스럽게 적용된다.
+     * 유효 항목이 기준치를 넘으면 앞에서부터 필요한 개수만 사용한다.
+     */
     public static PersonalizedAnalysisResult parseResult(JsonNode parsed) {
         if (parsed == null || !parsed.isObject()) {
             return null;
@@ -142,11 +152,15 @@ public class OpenAiPersonalizedAnalysisClient {
             keywordsNode.forEach(node -> {
                 String keyword = node.path("keyword").asText(null);
                 String reason = node.path("reason").asText(null);
-                if (keyword != null && !keyword.isBlank()) {
+                if (keyword != null && !keyword.isBlank() && reason != null && !reason.isBlank()) {
                     keywords.add(new PersonalizedAnalysisResult.Keyword(keyword, reason));
                 }
             });
         }
-        return new PersonalizedAnalysisResult(Math.min(score, 100), keywords);
+        if (keywords.size() < REQUIRED_KEYWORD_COUNT) {
+            return null;
+        }
+        return new PersonalizedAnalysisResult(
+                Math.min(score, 100), List.copyOf(keywords.subList(0, REQUIRED_KEYWORD_COUNT)));
     }
 }
