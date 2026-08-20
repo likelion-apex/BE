@@ -38,6 +38,13 @@ public final class InventoryAiJsonSupport {
         return ingredients;
     }
 
+    public static String parseBrand(JsonNode payload) {
+        if (payload == null) {
+            return null;
+        }
+        return textOrNull(payload.path("brand"));
+    }
+
     public static Map<String, IngredientAiDetail> parseIngredientDetails(JsonNode payload) {
         if (payload == null) {
             return Map.of();

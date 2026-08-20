@@ -21,8 +21,9 @@ import tools.jackson.databind.ObjectMapper;
 @RequiredArgsConstructor
 public class InventoryAiCacheService {
 
-    static final String INGREDIENT_VERSION = "v1";
+    static final String INGREDIENT_VERSION = "v2";
     static final String PERSONALIZED_VERSION = "v1";
+    static final String BRAND_VERSION = "v1";
     private static final int MAX_CACHE_KEY_LENGTH = 255;
 
     private final InventoryAiCacheRepository cacheRepository;
@@ -31,6 +32,10 @@ public class InventoryAiCacheService {
 
     public static String ingredientKey(String productName) {
         return "ing:" + ProductNameNormalizer.canonicalKey(productName) + ":" + INGREDIENT_VERSION;
+    }
+
+    public static String brandKey(String productName) {
+        return "brand:" + ProductNameNormalizer.canonicalKey(productName) + ":" + BRAND_VERSION;
     }
 
     public static String personalizedKey(String productName, SkinType skinType, Set<SkinConcern> skinConcerns) {

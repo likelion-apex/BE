@@ -80,4 +80,28 @@ public class IngredientAiClient {
         }
         return Map.of();
     }
+
+    public String inferBrand(String productName) {
+        if (productName == null || productName.isBlank()) {
+            return null;
+        }
+        String userPrompt = "제품명: " + productName;
+        for (AiProvider provider : ORDER) {
+            if (skipGate.shouldSkip(provider)) {
+                continue;
+            }
+            try {
+                return switch (provider) {
+                    case OPENAI -> openAiIngredientClient.fetchBrand(productName);
+                    case GEMINI -> InventoryAiJsonSupport.parseBrand(
+                            geminiJsonClient.generateJson(OpenAiIngredientClient.BRAND_SYSTEM_PROMPT, userPrompt));
+                    case GROQ -> groqIngredientClient.fetchBrand(productName);
+                };
+            } catch (AiProviderUnavailableException e) {
+                log.warn("브랜드 추론 {} 실패: productName={}, message={}", provider, productName, e.getMessage());
+                skipGate.markFrom(provider, e);
+            }
+        }
+        return null;
+    }
 }

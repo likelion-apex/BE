@@ -269,4 +269,54 @@ class IngredientAndPersonalizedAiClientTest {
 
         assertThat(personalizedClient().analyze("바닥 토너", List.of("정제수"), SkinType.DRY, Set.of())).isNull();
     }
+
+    // ---- inferBrand ----
+
+    @Test
+    void brand_openAiSucceeds_thenGeminiAndGroqAreNotCalled() {
+        when(skipGate.shouldSkip(AiProvider.OPENAI)).thenReturn(false);
+        when(openAiIngredientClient.fetchBrand("바닥 토너")).thenReturn("이니스프리");
+
+        String result = ingredientClient().inferBrand("바닥 토너");
+
+        assertThat(result).isEqualTo("이니스프리");
+        verify(geminiJsonClient, never()).generateJson(any(), any());
+        verify(groqIngredientClient, never()).fetchBrand(any());
+    }
+
+    @Test
+    void brand_openAiFails_thenGeminiFallbackSucceeds() {
+        when(skipGate.shouldSkip(AiProvider.OPENAI)).thenReturn(false);
+        when(skipGate.shouldSkip(AiProvider.GEMINI)).thenReturn(false);
+        when(openAiIngredientClient.fetchBrand(any()))
+                .thenThrow(new AiProviderUnavailableException("openai down"));
+        ObjectNode payload = new ObjectMapper().createObjectNode();
+        payload.put("brand", "이니스프리");
+        when(geminiJsonClient.generateJson(eq(OpenAiIngredientClient.BRAND_SYSTEM_PROMPT), anyString()))
+                .thenReturn(payload);
+
+        String result = ingredientClient().inferBrand("바닥 토너");
+
+        assertThat(result).isEqualTo("이니스프리");
+        verify(skipGate).markFrom(eq(AiProvider.OPENAI), any());
+        verify(groqIngredientClient, never()).fetchBrand(any());
+    }
+
+    @Test
+    void brand_openAiAndGeminiFail_thenGroqFallbackSucceeds() {
+        when(skipGate.shouldSkip(AiProvider.OPENAI)).thenReturn(false);
+        when(skipGate.shouldSkip(AiProvider.GEMINI)).thenReturn(false);
+        when(skipGate.shouldSkip(AiProvider.GROQ)).thenReturn(false);
+        when(openAiIngredientClient.fetchBrand(any()))
+                .thenThrow(new AiProviderUnavailableException("openai down"));
+        when(geminiJsonClient.generateJson(any(), any()))
+                .thenThrow(new AiProviderUnavailableException("gemini down"));
+        when(groqIngredientClient.fetchBrand("바닥 토너")).thenReturn("이니스프리");
+
+        String result = ingredientClient().inferBrand("바닥 토너");
+
+        assertThat(result).isEqualTo("이니스프리");
+        verify(skipGate).markFrom(eq(AiProvider.OPENAI), any());
+        verify(skipGate).markFrom(eq(AiProvider.GEMINI), any());
+    }
 }

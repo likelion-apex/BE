@@ -30,7 +30,6 @@ public class OpenAiIngredientClient {
             당신은 화장품 전성분 정보를 알려주는 어시스턴트입니다.
             사용자가 알려준 화장품 제품명에 대해 실제 제품 라벨에 기재되는 전성분(포함된 모든 성분)을
             한국어 표준 성분명으로, 배합량이 많은 순서대로 나열하세요.
-            제품을 확실히 알 수 없으면 빈 배열을 반환하세요.
             반드시 아래 JSON 형식으로만 답변하세요: {"ingredients": ["성분1", "성분2"]}
             """;
 
@@ -39,12 +38,20 @@ public class OpenAiIngredientClient {
             사용자가 알려준 성분 목록 각각에 대해 다음을 판단하세요:
             1. 화장품 원료로서의 배합목적을 1~3개씩 한국어로 나열하세요
                (예: "피부 보습", "피부 컨디셔닝", "기제(용매)", "피부 진정").
-               배합목적을 확실히 알 수 없으면 해당 성분은 빈 배열로 응답하세요.
+               완전히 확신할 수 없어도 화장품 성분 지식을 바탕으로 가장 가능성 높은 배합목적을
+               최소 1개는 추정해서 반드시 채우세요. 
             2. 피부 자극/알레르기 유발 가능성 등을 고려한 일반적인 위험도를 "LOW"(낮음, 안전),
                "MEDIUM"(중간, 주의 필요), "HIGH"(높음, 자극/위험 가능성 높음) 중 하나로 판단하세요.
                확신이 없으면 "MEDIUM"으로 응답하세요.
             반드시 아래 JSON 형식으로만, 요청받은 성분 개수와 이름을 그대로 유지하여 답변하세요:
             {"ingredients": [{"name": "성분1", "purposes": ["용도1", "용도2"], "riskLevel": "LOW"}]}
+            """;
+
+    public static final String BRAND_SYSTEM_PROMPT = """
+            당신은 화장품 제품명에서 브랜드명을 판별하는 어시스턴트입니다.
+            사용자가 알려준 제품명을 보고 실제로 존재하는 화장품 브랜드 중 가장 가능성 높은 브랜드명을
+            한국에서 통용되는 표시명으로 답하세요. 브랜드를 전혀 특정할 수 없으면 null을 반환하세요.
+            반드시 아래 JSON 형식으로만 답변하세요: {"brand": "브랜드명"}
             """;
 
     private final RestClient restClient;
@@ -87,6 +94,14 @@ public class OpenAiIngredientClient {
                 "배합목적/위험도 조회",
                 String.join(",", ingredientNames));
         return InventoryAiJsonSupport.parseIngredientDetails(payload);
+    }
+
+    public String fetchBrand(String productName) {
+        if (productName == null || productName.isBlank()) {
+            return null;
+        }
+        JsonNode payload = completeJson(BRAND_SYSTEM_PROMPT, "제품명: " + productName, "브랜드 조회", productName);
+        return InventoryAiJsonSupport.parseBrand(payload);
     }
 
     private JsonNode completeJson(String systemPrompt, String userPrompt, String action, String context) {
