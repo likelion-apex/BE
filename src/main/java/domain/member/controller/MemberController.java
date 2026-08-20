@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -75,5 +76,17 @@ public class MemberController {
             @Valid @RequestBody ProfileUpdateRequest request
     ) {
         return ApiResponse.success("프로필이 수정되었습니다.", memberService.updateProfile(memberId, request));
+    }
+
+    @Operation(
+            summary = "온보딩 완료",
+            description = "닉네임, 피부 타입, 피부 고민과 인벤토리 제품 등록 여부를 확인한 뒤 온보딩을 완료 처리합니다."
+    )
+    @PostMapping("/me/onboarding/complete")
+    public ApiResponse<MemberResponse> completeOnboarding(@AuthenticationPrincipal Long memberId) {
+        return ApiResponse.success(
+                "온보딩이 완료되었습니다.",
+                memberService.completeOnboarding(memberId)
+        );
     }
 }

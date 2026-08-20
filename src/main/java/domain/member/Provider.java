@@ -1,5 +1,6 @@
 package domain.member;
 
 public enum Provider {
-    KAKAO
+    KAKAO,
+    LOCAL
 }

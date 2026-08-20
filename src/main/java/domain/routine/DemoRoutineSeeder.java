@@ -2,7 +2,9 @@ package domain.routine;
 
 import domain.beauty.shortform.domain.RoutineSaveType;
 import domain.member.Member;
+import domain.member.DemoMemberSeeder;
 import domain.member.MemberRepository;
+import domain.member.Provider;
 import domain.routine.domain.Routine;
 import domain.routine.domain.RoutineStatus;
 import domain.routine.domain.RoutineStep;
@@ -40,7 +42,8 @@ public class DemoRoutineSeeder implements ApplicationRunner {
             return;
         }
 
-        memberRepository.findAll().stream().findFirst().ifPresent(member -> {
+        memberRepository.findByProviderAndProviderId(Provider.KAKAO, DemoMemberSeeder.DEMO_PROVIDER_ID)
+                .ifPresent(member -> {
             seedRoutine(member, RoutineType.DAY, "아침 스킨케어 루틴");
             seedRoutine(member, RoutineType.NIGHT, "저녁 스킨케어 루틴");
             log.info("루틴 데모 데이터 시딩 완료: memberId={}", member.getId());

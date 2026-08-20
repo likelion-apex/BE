@@ -1,6 +1,7 @@
 package domain.auth.controller;
 
 import domain.auth.dto.request.KakaoLoginRequest;
+import domain.auth.dto.request.LocalLoginRequest;
 import domain.auth.dto.request.ReissueTokenRequest;
 import domain.auth.dto.response.TokenResponse;
 import domain.auth.service.AuthService;
@@ -20,7 +21,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "Auth", description = "카카오 소셜 로그인 및 토큰 관리 API")
+@Tag(name = "Auth", description = "카카오·심사용 ID/PW 로그인 및 토큰 관리 API")
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -64,6 +65,31 @@ public class AuthController {
         return ApiResponse.success(
                 "카카오 로그인이 완료되었습니다.",
                 authService.loginWithKakao(request.code(), request.redirectUri()));
+    }
+
+    @Operation(
+            summary = "심사용 ID/PW 로그인",
+            description = "사전 발급된 심사용 또는 팀 테스트 계정으로 로그인하고 기존과 동일한 JWT를 발급합니다."
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "로그인 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401",
+                    description = "아이디 또는 비밀번호 불일치",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404",
+                    description = "ID/PW 로그인 기능 비활성화",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
+            )
+    })
+    @PostMapping("/local/login")
+    public ApiResponse<TokenResponse> localLogin(@Valid @RequestBody LocalLoginRequest request) {
+        return ApiResponse.success(
+                "ID/PW 로그인이 완료되었습니다.",
+                authService.loginWithLocal(request.loginId(), request.password())
+        );
     }
 
     @Operation(summary = "Access/Refresh 토큰 재발급", description = "전달받은 refresh token으로 access/refresh 토큰을 재발급합니다.")
