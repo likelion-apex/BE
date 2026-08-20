@@ -178,8 +178,14 @@ public class InventoryService {
         List<IngredientAnalysisResponse.IngredientDetail> ingredients = ingredientNames.stream()
                 .map(name -> toIngredientDetail(name, detailsByName.get(name)))
                 .toList();
-        if (!ingredients.isEmpty()) {
+        // 모든 성분에 대해 상세(배합목적/위험도)를 확보했을 때만 캐시한다. 일부만 채워진
+        // 결과를 캐시하면 30일 동안 나머지 성분이 기본값으로 고정되어 버린다.
+        boolean complete = !ingredients.isEmpty() && ingredientNames.stream().allMatch(detailsByName::containsKey);
+        if (complete) {
             saveCache(cacheKey, ingredientCachePayload(ingredients));
+        } else if (!ingredients.isEmpty()) {
+            log.warn("성분 상세가 불완전해 캐시하지 않습니다: productName={}, requested={}, resolved={}",
+                    productName, ingredientNames.size(), detailsByName.size());
         }
         return ingredients;
     }
@@ -220,7 +226,8 @@ public class InventoryService {
             product.updateBrand(inferred);
             return inferred;
         }
-        saveCache(cacheKey, Map.of("brand", ""));
+        // 빈 브랜드는 캐시하지 않는다. AI 호출이 일시적으로 실패했거나 응답이 비어 있던 것일 뿐일
+        // 수 있으므로, 캐시해버리면 30일 동안 브랜드를 영영 알아낼 수 없게 된다.
         return null;
     }
 

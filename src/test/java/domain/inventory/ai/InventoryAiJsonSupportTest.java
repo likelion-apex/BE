@@ -3,6 +3,7 @@ package domain.inventory.ai;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -84,6 +85,33 @@ class InventoryAiJsonSupportTest {
 
         assertThat(result.isQuotaExceeded()).isTrue();
         assertThat(result.getMessage()).isEqualTo("OpenAI 호출에 실패했습니다.");
+        assertThat(result.getRetryAfter()).isNull();
+    }
+
+    @Test
+    void mapToUnavailable_tooManyRequests_parsesRetryAfterHeader() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(HttpHeaders.RETRY_AFTER, "30");
+        HttpClientErrorException exception = HttpClientErrorException.create(
+                HttpStatus.TOO_MANY_REQUESTS, "Too Many Requests", headers, new byte[0], StandardCharsets.UTF_8);
+
+        AiProviderUnavailableException result = InventoryAiJsonSupport.mapToUnavailable("OpenAI", exception);
+
+        assertThat(result.isQuotaExceeded()).isTrue();
+        assertThat(result.getRetryAfter()).isEqualTo(Duration.ofSeconds(30));
+    }
+
+    @Test
+    void mapToUnavailable_tooManyRequests_parsesGeminiRetryDelayBody() {
+        String body = "{\"error\":{\"code\":429,\"message\":\"quota\",\"details\":[{\"retryDelay\":\"12s\"}]}}";
+        HttpClientErrorException exception = HttpClientErrorException.create(
+                HttpStatus.TOO_MANY_REQUESTS, "Too Many Requests", new HttpHeaders(),
+                body.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
+
+        AiProviderUnavailableException result = InventoryAiJsonSupport.mapToUnavailable("Gemini", exception);
+
+        assertThat(result.isQuotaExceeded()).isTrue();
+        assertThat(result.getRetryAfter()).isEqualTo(Duration.ofSeconds(12));
     }
 
     @Test

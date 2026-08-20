@@ -230,6 +230,55 @@ class IngredientAndPersonalizedAiClientTest {
         verify(skipGate, never()).markFrom(eq(AiProvider.OPENAI), any());
     }
 
+    @Test
+    void details_moreThanEightIngredients_splitsIntoBatchesAndMergesResults() {
+        List<String> tenIngredients = List.of(
+                "성분1", "성분2", "성분3", "성분4", "성분5", "성분6", "성분7", "성분8", "성분9", "성분10");
+        List<String> firstBatch = tenIngredients.subList(0, 8);
+        List<String> secondBatch = tenIngredients.subList(8, 10);
+
+        when(skipGate.shouldSkip(AiProvider.OPENAI)).thenReturn(false);
+        when(skipGate.shouldSkip(AiProvider.GEMINI)).thenReturn(false);
+        Map<String, IngredientAiDetail> firstBatchResult = firstBatch.stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        name -> name, name -> new IngredientAiDetail(List.of("용제"), List.of(), "LOW")));
+        when(openAiIngredientClient.fetchIngredientDetails(firstBatch)).thenReturn(firstBatchResult);
+        when(openAiIngredientClient.fetchIngredientDetails(secondBatch))
+                .thenThrow(new AiProviderUnavailableException("openai down"));
+        ObjectNode secondBatchPayload = new ObjectMapper().createObjectNode();
+        var ingredientsArray = secondBatchPayload.putArray("ingredients");
+        ingredientsArray.addObject().put("name", "성분9").putArray("purposes").add("보습제");
+        ingredientsArray.addObject().put("name", "성분10").putArray("purposes").add("보습제");
+        when(geminiJsonClient.generateJson(eq(OpenAiIngredientClient.DETAIL_SYSTEM_PROMPT), anyString()))
+                .thenReturn(secondBatchPayload);
+
+        Map<String, IngredientAiDetail> result = ingredientClient().fetchIngredientDetails(tenIngredients);
+
+        assertThat(result).hasSize(10);
+        assertThat(result.get("성분1").purposes()).containsExactly("용제");
+        assertThat(result.get("성분9").purposes()).containsExactly("보습제");
+        assertThat(result.get("성분10").purposes()).containsExactly("보습제");
+        verify(openAiIngredientClient).fetchIngredientDetails(firstBatch);
+        verify(openAiIngredientClient).fetchIngredientDetails(secondBatch);
+        verify(skipGate).markFrom(eq(AiProvider.OPENAI), any());
+    }
+
+    @Test
+    void details_exactlyEightIngredients_doesNotSplitIntoBatches() {
+        List<String> eightIngredients = List.of(
+                "성분1", "성분2", "성분3", "성분4", "성분5", "성분6", "성분7", "성분8");
+        when(skipGate.shouldSkip(AiProvider.OPENAI)).thenReturn(false);
+        Map<String, IngredientAiDetail> result = eightIngredients.stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        name -> name, name -> new IngredientAiDetail(List.of("용제"), List.of(), "LOW")));
+        when(openAiIngredientClient.fetchIngredientDetails(eightIngredients)).thenReturn(result);
+
+        Map<String, IngredientAiDetail> actual = ingredientClient().fetchIngredientDetails(eightIngredients);
+
+        assertThat(actual).hasSize(8);
+        verify(openAiIngredientClient, org.mockito.Mockito.times(1)).fetchIngredientDetails(any());
+    }
+
     // ---- PersonalizedAnalysisAiClient.analyze ----
 
     @Test
