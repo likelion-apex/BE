@@ -63,6 +63,15 @@ public class GroqIngredientClient {
         return InventoryAiJsonSupport.parseIngredientDetails(payload);
     }
 
+    public String fetchBrand(String productName) {
+        if (productName == null || productName.isBlank()) {
+            return null;
+        }
+        JsonNode payload = completeJson(
+                OpenAiIngredientClient.BRAND_SYSTEM_PROMPT, "제품명: " + productName, "브랜드 조회", productName);
+        return InventoryAiJsonSupport.parseBrand(payload);
+    }
+
     private JsonNode completeJson(String systemPrompt, String userPrompt, String action, String context) {
         String apiKey = groqProperties.getApiKey();
         if (apiKey == null || apiKey.isBlank()) {

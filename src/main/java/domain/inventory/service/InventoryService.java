@@ -8,6 +8,7 @@ import domain.inventory.ai.CautionIngredientCatalog;
 import domain.inventory.ai.IngredientAiClient;
 import domain.inventory.ai.IngredientAiDetail;
 import domain.inventory.ai.InventoryAiCacheService;
+import domain.inventory.ai.InventoryAiJsonSupport;
 import domain.inventory.ai.PersonalizedAnalysisAiClient;
 import domain.inventory.client.OpenAiPersonalizedAnalysisClient;
 import domain.inventory.client.PersonalizedAnalysisResult;
@@ -44,6 +45,7 @@ import tools.jackson.databind.JsonNode;
 public class InventoryService {
 
     private static final int DEFAULT_FAVORITE_LIMIT = 4;
+    private static final String DEFAULT_PURPOSE = "배합목적 확인 필요";
 
     private final InventoryRepository inventoryRepository;
     private final MemberRepository memberRepository;
@@ -120,7 +122,7 @@ public class InventoryService {
         Inventory inventory = findOwnedInventory(memberId, inventoryId);
         Product product = inventory.getProduct();
         String productName = product.getName();
-        String brand = product.getBrand();
+        String brand = resolveBrand(product);
         String capacity = productCapacityNormalizer.normalize(productName);
 
         String cacheKey = InventoryAiCacheService.ingredientKey(productName);
@@ -142,10 +144,47 @@ public class InventoryService {
         return buildIngredientAnalysisResponse(inventory.getId(), productName, brand, capacity, ingredients);
     }
 
+    private String resolveBrand(Product product) {
+        String existing = product.getBrand();
+        if (existing != null && !existing.isBlank()) {
+            return existing;
+        }
+        String productName = product.getName();
+        String cacheKey = InventoryAiCacheService.brandKey(productName);
+        JsonNode cached = findCachedBrand(cacheKey);
+        if (cached != null) {
+            return InventoryAiJsonSupport.parseBrand(cached);
+        }
+
+        String inferred = ingredientAiClient.inferBrand(productName);
+        if (inferred != null && !inferred.isBlank()) {
+            product.updateBrand(inferred);
+            return inferred;
+        }
+        saveCache(cacheKey, Map.of("brand", ""));
+        return null;
+    }
+
+    private JsonNode findCachedBrand(String cacheKey) {
+        try {
+            return inventoryAiCacheService.find(cacheKey).orElse(null);
+        } catch (RuntimeException e) {
+            log.warn("브랜드 캐시 조회를 건너뜁니다: cacheKey={}, message={}", cacheKey, e.getMessage());
+            return null;
+        }
+    }
+
     private IngredientAnalysisResponse.IngredientDetail toIngredientDetail(String name, IngredientAiDetail detail) {
-        List<String> purposes = detail == null || detail.purposes() == null ? List.of() : detail.purposes();
+        List<String> purposes = purposesOrFallback(detail == null ? null : detail.purposes());
         IngredientRiskLevel riskLevel = IngredientRiskLevel.fromRaw(detail == null ? null : detail.riskLevel());
         return new IngredientAnalysisResponse.IngredientDetail(name, purposes, riskLevel);
+    }
+
+    private List<String> purposesOrFallback(List<String> purposes) {
+        if (purposes == null || purposes.isEmpty()) {
+            return List.of(DEFAULT_PURPOSE);
+        }
+        return purposes;
     }
 
     private IngredientAnalysisResponse buildIngredientAnalysisResponse(
@@ -278,7 +317,7 @@ public class InventoryService {
                 });
             }
             IngredientRiskLevel riskLevel = IngredientRiskLevel.fromRaw(node.path("riskLevel").asText(null));
-            ingredients.add(new IngredientAnalysisResponse.IngredientDetail(name, purposes, riskLevel));
+            ingredients.add(new IngredientAnalysisResponse.IngredientDetail(name, purposesOrFallback(purposes), riskLevel));
         });
         return ingredients.isEmpty() ? null : ingredients;
     }

@@ -86,6 +86,7 @@ class InventoryAnalysisCacheTest {
         ReflectionTestUtils.setField(member, "skinType", SkinType.DRY);
         Product product = Product.builder()
                 .name("바닥 토너")
+                .brand("바닥 브랜드")
                 .category(ProductCategory.SKIN_TONER)
                 .build();
         ReflectionTestUtils.setField(product, "id", 3L);
@@ -110,6 +111,7 @@ class InventoryAnalysisCacheTest {
                         "정제수", List.of("기제(용매)"), IngredientRiskLevel.MEDIUM));
         verify(ingredientAiClient, never()).fetchIngredientNames(any());
         verify(ingredientAiClient, never()).fetchIngredientDetails(any());
+        verify(ingredientAiClient, never()).inferBrand(any());
     }
 
     @Test
@@ -241,5 +243,91 @@ class InventoryAnalysisCacheTest {
                 .isInstanceOf(CustomException.class)
                 .extracting(exception -> ((CustomException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.AI_ANALYSIS_FAILED);
+    }
+
+    @Test
+    void infersBrandWhenMissingAndPersistsOnProduct() {
+        Product product = Product.builder()
+                .name("바닥 토너")
+                .category(ProductCategory.SKIN_TONER)
+                .build();
+        ReflectionTestUtils.setField(product, "id", 3L);
+        Inventory noBrandInventory = Inventory.builder().member(member).product(product).build();
+        ReflectionTestUtils.setField(noBrandInventory, "id", 11L);
+
+        when(inventoryRepository.findByIdAndMemberId(11L, 9L)).thenReturn(Optional.of(noBrandInventory));
+        when(inventoryAiCacheService.find(any())).thenReturn(Optional.empty());
+        when(ingredientAiClient.inferBrand("바닥 토너")).thenReturn("이니스프리");
+        when(ingredientAiClient.fetchIngredientNames("바닥 토너")).thenReturn(List.of("정제수"));
+        when(ingredientAiClient.fetchIngredientDetails(List.of("정제수")))
+                .thenReturn(Map.of("정제수", new IngredientAiDetail(List.of("기제(용매)"), "LOW")));
+
+        IngredientAnalysisResponse response = inventoryService.getIngredientAnalysis(9L, 11L);
+
+        assertThat(response.brand()).isEqualTo("이니스프리");
+        assertThat(product.getBrand()).isEqualTo("이니스프리");
+        verify(ingredientAiClient).inferBrand("바닥 토너");
+    }
+
+    @Test
+    void cachesUnknownBrandAndDoesNotInferAgain() {
+        Product product = Product.builder()
+                .name("바닥 토너")
+                .category(ProductCategory.SKIN_TONER)
+                .build();
+        ReflectionTestUtils.setField(product, "id", 3L);
+        Inventory noBrandInventory = Inventory.builder().member(member).product(product).build();
+        ReflectionTestUtils.setField(noBrandInventory, "id", 11L);
+
+        ObjectNode unknownBrand = new ObjectMapper().createObjectNode().put("brand", "");
+        when(inventoryRepository.findByIdAndMemberId(11L, 9L)).thenReturn(Optional.of(noBrandInventory));
+        when(inventoryAiCacheService.find(InventoryAiCacheService.brandKey("바닥 토너")))
+                .thenReturn(Optional.of(unknownBrand));
+        when(inventoryAiCacheService.find(InventoryAiCacheService.ingredientKey("바닥 토너")))
+                .thenReturn(Optional.empty());
+        when(ingredientAiClient.fetchIngredientNames("바닥 토너")).thenReturn(List.of());
+
+        IngredientAnalysisResponse response = inventoryService.getIngredientAnalysis(9L, 11L);
+
+        assertThat(response.brand()).isNull();
+        verify(ingredientAiClient, never()).inferBrand(any());
+    }
+
+    @Test
+    void savesUnknownBrandMarkerWhenInferenceFails() {
+        Product product = Product.builder()
+                .name("바닥 토너")
+                .category(ProductCategory.SKIN_TONER)
+                .build();
+        ReflectionTestUtils.setField(product, "id", 3L);
+        Inventory noBrandInventory = Inventory.builder().member(member).product(product).build();
+        ReflectionTestUtils.setField(noBrandInventory, "id", 11L);
+
+        when(inventoryRepository.findByIdAndMemberId(11L, 9L)).thenReturn(Optional.of(noBrandInventory));
+        when(inventoryAiCacheService.find(any())).thenReturn(Optional.empty());
+        when(ingredientAiClient.inferBrand("바닥 토너")).thenReturn(null);
+        when(ingredientAiClient.fetchIngredientNames("바닥 토너")).thenReturn(List.of());
+
+        IngredientAnalysisResponse response = inventoryService.getIngredientAnalysis(9L, 11L);
+
+        assertThat(response.brand()).isNull();
+        verify(inventoryAiCacheService).save(eq(InventoryAiCacheService.brandKey("바닥 토너")), eq(Map.of("brand", "")));
+        verify(inventoryAiCacheService, never()).save(eq(InventoryAiCacheService.ingredientKey("바닥 토너")), any());
+    }
+
+    @Test
+    void fillsDefaultPurposeWhenAiReturnsEmptyList() {
+        when(inventoryRepository.findByIdAndMemberId(11L, 9L)).thenReturn(Optional.of(inventory));
+        when(inventoryAiCacheService.find(any())).thenReturn(Optional.empty());
+        when(ingredientAiClient.fetchIngredientNames("바닥 토너")).thenReturn(List.of("정제수"));
+        when(ingredientAiClient.fetchIngredientDetails(List.of("정제수")))
+                .thenReturn(Map.of("정제수", new IngredientAiDetail(List.of(), "LOW")));
+
+        IngredientAnalysisResponse response = inventoryService.getIngredientAnalysis(9L, 11L);
+
+        assertThat(response.ingredients()).containsExactly(
+                new IngredientAnalysisResponse.IngredientDetail(
+                        "정제수", List.of("배합목적 확인 필요"), IngredientRiskLevel.LOW));
+        verify(ingredientAiClient, never()).inferBrand(any());
     }
 }

@@ -72,4 +72,9 @@ public class Product {
         this.category = category;
         this.imageUrl = imageUrl;
     }
+
+    /** AI 추론 등으로 brand만 갱신할 때 사용 (category/imageUrl은 그대로 유지). */
+    public void updateBrand(String brand) {
+        this.brand = brand;
+    }
 }
