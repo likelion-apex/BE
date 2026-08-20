@@ -234,10 +234,9 @@ public class RoutineService {
     public RoutineDetailResponse getRoutineDetail(Long memberId, Long routineId) {
         Routine routine = routineRepository.findByIdAndMemberId(routineId, memberId)
                 .orElseThrow(() -> new CustomException(ErrorCode.ROUTINE_NOT_FOUND));
-        return RoutineDetailResponse.from(routine, publicUrlResolver);
         AiBriefing aiBriefing = resolveAiBriefing(routine);
         Map<Integer, String> safetyEvaluationByOrder = resolveSafetyEvaluations(memberId, routine.getSteps());
-        return RoutineDetailResponse.from(routine, aiBriefing, safetyEvaluationByOrder);
+        return RoutineDetailResponse.from(routine, aiBriefing, safetyEvaluationByOrder, publicUrlResolver);
     }
 
     /**

@@ -21,15 +21,13 @@ public record RoutineDetailResponse(
         AiBriefing aiBriefing
 ) {
 
-    public static RoutineDetailResponse from(Routine routine, PublicUrlResolver publicUrlResolver) {
-        List<RoutineDetailStepResponse> steps = routine.getSteps().stream()
-                .sorted(Comparator.comparingInt(RoutineStep::getOrder))
-                .map(step -> RoutineDetailStepResponse.from(step, publicUrlResolver))
     public static RoutineDetailResponse from(
-            Routine routine, AiBriefing aiBriefing, Map<Integer, String> safetyEvaluationByOrder) {
+            Routine routine, AiBriefing aiBriefing, Map<Integer, String> safetyEvaluationByOrder,
+            PublicUrlResolver publicUrlResolver) {
         List<RoutineDetailStepResponse> steps = routine.getSteps().stream()
                 .sorted(Comparator.comparingInt(RoutineStep::getOrder))
-                .map(step -> RoutineDetailStepResponse.from(step, safetyEvaluationByOrder.get(step.getOrder())))
+                .map(step -> RoutineDetailStepResponse.from(
+                        step, safetyEvaluationByOrder.get(step.getOrder()), publicUrlResolver))
                 .toList();
         return new RoutineDetailResponse(
                 routine.getId(), routine.getName(), routine.getRoutineType(), routine.getStatus(),
@@ -61,8 +59,8 @@ public record RoutineDetailResponse(
             String safetyEvaluation
     ) {
 
-        static RoutineDetailStepResponse from(RoutineStep step, PublicUrlResolver publicUrlResolver) {
-        static RoutineDetailStepResponse from(RoutineStep step, String safetyEvaluation) {
+        static RoutineDetailStepResponse from(
+                RoutineStep step, String safetyEvaluation, PublicUrlResolver publicUrlResolver) {
             return new RoutineDetailStepResponse(
                     step.getOrder(),
                     step.getProduct() != null ? step.getProduct().getId() : null,
@@ -71,8 +69,6 @@ public record RoutineDetailResponse(
                     step.getBrand(),
                     step.getCategory(),
                     publicUrlResolver.resolve(step.getImageUrl()),
-                    step.getAiReason()
-                    step.getImageUrl(),
                     step.getAiReason(),
                     safetyEvaluation
             );
