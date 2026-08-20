@@ -134,7 +134,10 @@ class InventoryAnalysisCacheTest {
                 .thenReturn(Optional.of(ingredientPayload));
 
         ObjectNode keywordPayload = mapper.createObjectNode();
-        keywordPayload.putArray("keywords").addObject().put("keyword", "보습").put("reason", "건성");
+        var keywordsArray = keywordPayload.putArray("keywords");
+        keywordsArray.addObject().put("keyword", "보습").put("reason", "건성");
+        keywordsArray.addObject().put("keyword", "저자극").put("reason", "민감성 성분 없음");
+        keywordsArray.addObject().put("keyword", "저알러지").put("reason", "알레르기 유발 성분 없음");
         when(inventoryAiCacheService.find(InventoryAiCacheService.personalizedKey(
                 "바닥 토너", SkinType.DRY, Set.of())))
                 .thenReturn(Optional.of(keywordPayload));
@@ -142,9 +145,37 @@ class InventoryAnalysisCacheTest {
         AiAnalysisResponse response = inventoryService.getAiAnalysis(9L, 11L);
 
         assertThat(response.score()).isEqualTo(87);
-        assertThat(response.keywords()).containsExactly(new AiAnalysisResponse.AnalysisKeyword("보습", "건성"));
+        assertThat(response.keywords()).containsExactly(
+                new AiAnalysisResponse.AnalysisKeyword("보습", "건성"),
+                new AiAnalysisResponse.AnalysisKeyword("저자극", "민감성 성분 없음"),
+                new AiAnalysisResponse.AnalysisKeyword("저알러지", "알레르기 유발 성분 없음"));
         verify(personalizedAnalysisAiClient, never()).analyze(any(), any(), any(), any());
         verify(ingredientAiClient, never()).fetchIngredientNames(any());
+    }
+
+    @Test
+    void personalizedAnalysisTreatsIncompleteCachedKeywordsAsMissAndRetriesAi() {
+        when(inventoryRepository.findByIdAndMemberId(11L, 9L)).thenReturn(Optional.of(inventory));
+        when(memberRepository.findById(9L)).thenReturn(Optional.of(member));
+        when(inventoryAiCacheService.find(InventoryAiCacheService.ingredientKey("바닥 토너")))
+                .thenReturn(Optional.empty());
+        when(ingredientAiClient.fetchIngredientNames("바닥 토너")).thenReturn(List.of());
+
+        ObjectNode incompleteKeywordPayload = new ObjectMapper().createObjectNode();
+        incompleteKeywordPayload.putArray("keywords").addObject().put("keyword", "보습").put("reason", "건성");
+        when(inventoryAiCacheService.find(InventoryAiCacheService.personalizedKey(
+                "바닥 토너", SkinType.DRY, Set.of())))
+                .thenReturn(Optional.of(incompleteKeywordPayload));
+        when(personalizedAnalysisAiClient.analyze("바닥 토너", List.of(), SkinType.DRY, Set.of()))
+                .thenReturn(new PersonalizedAnalysisResult(80, List.of(
+                        new PersonalizedAnalysisResult.Keyword("보습", "건성"),
+                        new PersonalizedAnalysisResult.Keyword("저자극", "민감성 성분 없음"),
+                        new PersonalizedAnalysisResult.Keyword("저알러지", "알레르기 유발 성분 없음"))));
+
+        AiAnalysisResponse response = inventoryService.getAiAnalysis(9L, 11L);
+
+        assertThat(response.keywords()).hasSize(3);
+        verify(personalizedAnalysisAiClient).analyze("바닥 토너", List.of(), SkinType.DRY, Set.of());
     }
 
     @Test
@@ -306,6 +337,11 @@ class InventoryAnalysisCacheTest {
                         "정제수", List.of(IngredientPurposeCategory.SOLVENT), List.of(), IngredientRiskLevel.LOW));
     }
 
+    /**
+     * AI가 1~2개짜리 불완전한 keywords를 반환하면(정상 흐름에서는 provider 단계의 parseResult에서
+     * 이미 걸러지지만, 방어 로직으로) InventoryService는 실제 AI 근거와 기본 문구가 섞이지 않도록
+     * 전체를 기본 키워드 3개로 교체한다.
+     */
     @Test
     void personalizedAnalysisStillReturnsWhenCacheFails() {
         when(inventoryRepository.findByIdAndMemberId(11L, 9L)).thenReturn(Optional.of(inventory));
@@ -322,11 +358,14 @@ class InventoryAnalysisCacheTest {
         AiAnalysisResponse response = inventoryService.getAiAnalysis(9L, 11L);
 
         assertThat(response.score()).isEqualTo(100);
-        assertThat(response.keywords()).containsExactly(new AiAnalysisResponse.AnalysisKeyword("보습", "건성"));
+        assertThat(response.keywords()).containsExactly(
+                new AiAnalysisResponse.AnalysisKeyword("피부타입 적합도", "건성 기준으로 성분을 보수적으로 평가했습니다."),
+                new AiAnalysisResponse.AnalysisKeyword("성분 안전성", "전성분 위험도 비율을 기준으로 적합 점수를 산출했습니다."),
+                new AiAnalysisResponse.AnalysisKeyword("피부고민 맞춤", "특별한 피부고민이 없는 경우을 기준으로 적합도를 판단했습니다."));
     }
 
     @Test
-    void personalizedAnalysisReturnsDefaultScoreWithEmptyKeywordsWhenAiReturnsNull() {
+    void personalizedAnalysisReturnsDefaultScoreAndDefaultKeywordsWhenAiReturnsNull() {
         when(inventoryRepository.findByIdAndMemberId(11L, 9L)).thenReturn(Optional.of(inventory));
         when(memberRepository.findById(9L)).thenReturn(Optional.of(member));
         when(inventoryAiCacheService.find(any())).thenReturn(Optional.empty());
@@ -337,13 +376,17 @@ class InventoryAnalysisCacheTest {
         AiAnalysisResponse response = inventoryService.getAiAnalysis(9L, 11L);
 
         assertThat(response.score()).isEqualTo(70);
-        assertThat(response.keywords()).isEmpty();
+        assertThat(response.keywords()).containsExactly(
+                new AiAnalysisResponse.AnalysisKeyword("피부타입 적합도", "건성 기준으로 성분을 보수적으로 평가했습니다."),
+                new AiAnalysisResponse.AnalysisKeyword(
+                        "성분 안전성", "전성분 정보를 확인할 수 없어 제품명을 기준으로 보수적으로 평가했습니다."),
+                new AiAnalysisResponse.AnalysisKeyword("피부고민 맞춤", "특별한 피부고민이 없는 경우을 기준으로 적합도를 판단했습니다."));
     }
 
     /**
-     * AI가 완전히 실패(null)했을 때 빈 keywords를 캐시에 저장하면, 이후 AI가 복구되어도
-     * TTL 동안 계속 빈 배열만 반환하는 문제가 있었다. 실패는 캐시하지 않아야 하며, 매 호출마다
-     * AI를 다시 시도해서 복구 즉시 키워드가 채워져야 한다.
+     * AI가 완전히 실패(null)했을 때 빈/불완전 keywords를 캐시에 저장하면, 이후 AI가 복구되어도
+     * TTL 동안 계속 부실한 결과만 반환하는 문제가 있었다. 실패·불완전은 캐시하지 않아야 하며,
+     * 매 호출마다 AI를 다시 시도해서 복구 즉시 완전한 키워드가 채워지고 캐시되어야 한다.
      */
     @Test
     void doesNotCacheKeywordsWhenAiFailsAndRetriesOnNextCall() {
@@ -353,19 +396,46 @@ class InventoryAnalysisCacheTest {
         when(ingredientAiClient.fetchIngredientNames("바닥 토너")).thenReturn(List.of());
         when(personalizedAnalysisAiClient.analyze("바닥 토너", List.of(), SkinType.DRY, Set.of()))
                 .thenReturn(null)
-                .thenReturn(new PersonalizedAnalysisResult(
-                        80, List.of(new PersonalizedAnalysisResult.Keyword("보습", "건성"))));
+                .thenReturn(new PersonalizedAnalysisResult(80, List.of(
+                        new PersonalizedAnalysisResult.Keyword("보습", "건성"),
+                        new PersonalizedAnalysisResult.Keyword("저자극", "민감성 성분 없음"),
+                        new PersonalizedAnalysisResult.Keyword("저알러지", "알레르기 유발 성분 없음"))));
 
         AiAnalysisResponse firstResponse = inventoryService.getAiAnalysis(9L, 11L);
         AiAnalysisResponse secondResponse = inventoryService.getAiAnalysis(9L, 11L);
 
-        assertThat(firstResponse.keywords()).isEmpty();
-        assertThat(secondResponse.keywords())
-                .containsExactly(new AiAnalysisResponse.AnalysisKeyword("보습", "건성"));
+        assertThat(firstResponse.keywords()).hasSize(3);
+        assertThat(secondResponse.keywords()).containsExactly(
+                new AiAnalysisResponse.AnalysisKeyword("보습", "건성"),
+                new AiAnalysisResponse.AnalysisKeyword("저자극", "민감성 성분 없음"),
+                new AiAnalysisResponse.AnalysisKeyword("저알러지", "알레르기 유발 성분 없음"));
         verify(personalizedAnalysisAiClient, times(2)).analyze(any(), any(), any(), any());
         verify(inventoryAiCacheService, never()).save(
                 eq(InventoryAiCacheService.personalizedKey("바닥 토너", SkinType.DRY, Set.of())),
-                argThat(payload -> ((Map<?, ?>) payload).get("keywords") instanceof List<?> list && list.isEmpty()));
+                argThat(payload -> ((Map<?, ?>) payload).get("keywords") instanceof List<?> list
+                        && list.size() != 3));
+        verify(inventoryAiCacheService).save(
+                eq(InventoryAiCacheService.personalizedKey("바닥 토너", SkinType.DRY, Set.of())),
+                argThat(payload -> ((Map<?, ?>) payload).get("keywords") instanceof List<?> list
+                        && list.size() == 3));
+    }
+
+    @Test
+    void doesNotCacheIncompleteKeywordsWhenAiReturnsFewerThanThree() {
+        when(inventoryRepository.findByIdAndMemberId(11L, 9L)).thenReturn(Optional.of(inventory));
+        when(memberRepository.findById(9L)).thenReturn(Optional.of(member));
+        when(inventoryAiCacheService.find(any())).thenReturn(Optional.empty());
+        when(ingredientAiClient.fetchIngredientNames("바닥 토너")).thenReturn(List.of());
+        when(personalizedAnalysisAiClient.analyze("바닥 토너", List.of(), SkinType.DRY, Set.of()))
+                .thenReturn(new PersonalizedAnalysisResult(80, List.of(
+                        new PersonalizedAnalysisResult.Keyword("보습", "건성"),
+                        new PersonalizedAnalysisResult.Keyword("저자극", "민감성 성분 없음"))));
+
+        AiAnalysisResponse response = inventoryService.getAiAnalysis(9L, 11L);
+
+        assertThat(response.keywords()).hasSize(3);
+        verify(inventoryAiCacheService, never()).save(
+                eq(InventoryAiCacheService.personalizedKey("바닥 토너", SkinType.DRY, Set.of())), any());
     }
 
     @Test

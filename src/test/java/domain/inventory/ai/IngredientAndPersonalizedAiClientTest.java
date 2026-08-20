@@ -204,7 +204,10 @@ class IngredientAndPersonalizedAiClientTest {
                 .thenThrow(new AiProviderUnavailableException("openai down"));
         ObjectNode payload = new ObjectMapper().createObjectNode();
         payload.put("score", 65);
-        payload.putArray("keywords").addObject().put("keyword", "보습").put("reason", "건성에 맞음");
+        var keywordsArray = payload.putArray("keywords");
+        keywordsArray.addObject().put("keyword", "보습").put("reason", "건성에 맞음");
+        keywordsArray.addObject().put("keyword", "저자극").put("reason", "민감성 성분 없음");
+        keywordsArray.addObject().put("keyword", "veganCertified").put("reason", "비건 인증 성분");
         when(geminiJsonClient.generateJson(eq(OpenAiPersonalizedAnalysisClient.SYSTEM_PROMPT), anyString()))
                 .thenReturn(payload);
 
@@ -212,8 +215,33 @@ class IngredientAndPersonalizedAiClientTest {
                 personalizedClient().analyze("바닥 토너", List.of("정제수"), SkinType.DRY, Set.of());
 
         assertThat(result.score()).isEqualTo(65);
+        assertThat(result.keywords()).hasSize(3);
         verify(skipGate).markFrom(eq(AiProvider.OPENAI), any());
         verify(groqPersonalizedAnalysisClient, never()).analyze(any(), any(), any(), any());
+    }
+
+    @Test
+    void analyze_geminiReturnsIncompleteKeywords_thenGroqFallbackSucceeds() {
+        when(skipGate.shouldSkip(AiProvider.OPENAI)).thenReturn(false);
+        when(skipGate.shouldSkip(AiProvider.GEMINI)).thenReturn(false);
+        when(skipGate.shouldSkip(AiProvider.GROQ)).thenReturn(false);
+        when(openAiPersonalizedAnalysisClient.analyze(any(), any(), any(), any()))
+                .thenThrow(new AiProviderUnavailableException("openai down"));
+        ObjectNode incompletePayload = new ObjectMapper().createObjectNode();
+        incompletePayload.put("score", 65);
+        incompletePayload.putArray("keywords").addObject().put("keyword", "보습").put("reason", "건성에 맞음");
+        when(geminiJsonClient.generateJson(eq(OpenAiPersonalizedAnalysisClient.SYSTEM_PROMPT), anyString()))
+                .thenReturn(incompletePayload);
+        PersonalizedAnalysisResult groqResult = new PersonalizedAnalysisResult(58, List.of());
+        when(groqPersonalizedAnalysisClient.analyze(eq("바닥 토너"), any(), any(), any()))
+                .thenReturn(groqResult);
+
+        PersonalizedAnalysisResult result =
+                personalizedClient().analyze("바닥 토너", List.of("정제수"), SkinType.DRY, Set.of());
+
+        assertThat(result.score()).isEqualTo(58);
+        verify(skipGate).markFrom(eq(AiProvider.OPENAI), any());
+        verify(skipGate).markFrom(eq(AiProvider.GEMINI), any());
     }
 
     @Test
