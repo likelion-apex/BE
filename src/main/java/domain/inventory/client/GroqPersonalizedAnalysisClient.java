@@ -77,11 +77,9 @@ public class GroqPersonalizedAnalysisClient {
                     ? null
                     : response.path("choices").path(0).path("message").path("content").asText(null);
             JsonNode parsed = InventoryAiJsonSupport.readObject(objectMapper, content);
-            PersonalizedAnalysisResult result = OpenAiPersonalizedAnalysisClient.parseResult(parsed);
-            if (result == null) {
-                throw new AiProviderUnavailableException("Groq 맞춤 분석 응답이 비어 있습니다.");
-            }
-            return result;
+            // null(완전히 빈 응답)은 예외로 바꾸지 않고 그대로 반환한다 - 콘텐츠 품질 문제이지
+            // provider 장애가 아니므로 호출부가 쿨다운 없이 다음 provider로 넘어가도록 한다.
+            return OpenAiPersonalizedAnalysisClient.parseResult(parsed);
         } catch (AiProviderUnavailableException e) {
             throw e;
         } catch (RestClientException e) {

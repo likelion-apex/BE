@@ -43,17 +43,27 @@ public class IngredientAiClient {
                 continue;
             }
             try {
-                return switch (provider) {
+                List<String> ingredients = switch (provider) {
                     case OPENAI -> openAiIngredientClient.fetchIngredientNames(productName);
                     case GEMINI -> InventoryAiJsonSupport.parseIngredientNames(
                             geminiJsonClient.generateJson(OpenAiIngredientClient.SYSTEM_PROMPT, userPrompt));
                     case GROQ -> groqIngredientClient.fetchIngredientNames(productName);
                 };
+                // 화장품은 항상 전성분이 있어야 하므로, 예외 없이 빈 배열이 와도 정상 성공으로
+                // 받아들이지 않고 다음 provider로 넘어간다. 콘텐츠 품질 문제이지 provider
+                // 장애가 아니므로 쿨다운은 걸지 않는다(이 요청 안에서만 다음 provider 시도).
+                if (!ingredients.isEmpty()) {
+                    log.info("전성분 조회 성공: provider={}, productName={}, count={}",
+                            provider, productName, ingredients.size());
+                    return ingredients;
+                }
+                log.warn("전성분 {} 응답이 비어 있어 다음 provider로 넘어갑니다: productName={}", provider, productName);
             } catch (AiProviderUnavailableException e) {
                 log.warn("전성분 {} 실패: productName={}, message={}", provider, productName, e.getMessage());
                 skipGate.markFrom(provider, e);
             }
         }
+        log.warn("전성분 조회가 모든 provider에서 비어 있거나 실패했습니다: productName={}", productName);
         return List.of();
     }
 
@@ -67,17 +77,23 @@ public class IngredientAiClient {
                 continue;
             }
             try {
-                return switch (provider) {
+                Map<String, IngredientAiDetail> details = switch (provider) {
                     case OPENAI -> openAiIngredientClient.fetchIngredientDetails(ingredientNames);
                     case GEMINI -> InventoryAiJsonSupport.parseIngredientDetails(geminiJsonClient.generateJson(
                             OpenAiIngredientClient.DETAIL_SYSTEM_PROMPT, userPrompt));
                     case GROQ -> groqIngredientClient.fetchIngredientDetails(ingredientNames);
                 };
+                if (!details.isEmpty()) {
+                    log.info("배합목적/위험도 조회 성공: provider={}, count={}", provider, details.size());
+                    return details;
+                }
+                log.warn("배합목적/위험도 {} 응답이 비어 있어 다음 provider로 넘어갑니다", provider);
             } catch (AiProviderUnavailableException e) {
                 log.warn("배합목적/위험도 {} 실패: message={}", provider, e.getMessage());
                 skipGate.markFrom(provider, e);
             }
         }
+        log.warn("배합목적/위험도 조회가 모든 provider에서 비어 있거나 실패했습니다");
         return Map.of();
     }
 

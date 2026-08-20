@@ -124,7 +124,9 @@ public class InventoryService {
         String cacheKey = InventoryAiCacheService.personalizedKey(
                 productName, member.getSkinType(), member.getSkinConcerns());
         List<AiAnalysisResponse.AnalysisKeyword> keywords = findCachedKeywords(cacheKey);
-        if (keywords == null) {
+        if (keywords != null) {
+            log.info("맞춤 분석 캐시 히트: cacheKey={}", cacheKey);
+        } else {
             PersonalizedAnalysisResult result = personalizedAnalysisAiClient.analyze(
                     productName, ingredientNames, member.getSkinType(), member.getSkinConcerns());
             keywords = toKeywords(result);
@@ -138,6 +140,8 @@ public class InventoryService {
         // 캐시/AI 모두 완전한 keywords를 주지 못하면, 실제 AI 근거와 섞이지 않도록
         // 결정론적 기본 키워드 3개로 전체 교체한다(이 기본값은 캐시하지 않는다).
         if (keywords.size() < REQUIRED_KEYWORD_COUNT) {
+            log.warn("맞춤 분석 keywords가 불완전({}개)해 기본 키워드로 대체합니다: inventoryId={}, productName={}",
+                    keywords.size(), inventoryId, productName);
             keywords = defaultKeywords(member, ingredients);
         }
 
