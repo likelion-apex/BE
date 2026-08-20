@@ -30,11 +30,12 @@ public record DailyRoutineResponse(
             Routine routine, RoutineLog routineLog, AiBriefing aiBriefing, PublicUrlResolver publicUrlResolver) {
         Map<Long, RoutineStep> stepById = routine.getSteps().stream()
                 .collect(Collectors.toMap(RoutineStep::getId, Function.identity()));
+        boolean hasSourceAnalysis = routine.getSourceAnalysis() != null;
 
         List<DailyRoutineStepResponse> steps = routineLog.getSteps().stream()
                 .sorted(Comparator.comparingInt(RoutineLogStep::getOrder))
                 .map(logStep -> DailyRoutineStepResponse.from(
-                        logStep, stepById.get(logStep.getRoutineStepId()), publicUrlResolver))
+                        logStep, stepById.get(logStep.getRoutineStepId()), publicUrlResolver, hasSourceAnalysis))
                 .toList();
 
         long completedCount = steps.stream().filter(DailyRoutineStepResponse::completed).count();
@@ -62,7 +63,8 @@ public record DailyRoutineResponse(
     ) {
 
         public static DailyRoutineStepResponse from(
-                RoutineLogStep logStep, RoutineStep step, PublicUrlResolver publicUrlResolver) {
+                RoutineLogStep logStep, RoutineStep step, PublicUrlResolver publicUrlResolver,
+                boolean hasSourceAnalysis) {
             return new DailyRoutineStepResponse(
                     logStep.getId(),
                     logStep.getOrder(),
@@ -73,7 +75,9 @@ public record DailyRoutineResponse(
                     step != null ? step.getCategory() : null,
                     step != null ? publicUrlResolver.resolve(step.getImageUrl()) : null,
                     logStep.isCompleted(),
-                    step != null ? (step.getInventory() != null ? "REPLACED" : "VIDEO_PRODUCT") : null
+                    step != null && hasSourceAnalysis
+                            ? (step.getInventory() != null ? "REPLACED" : "VIDEO_PRODUCT")
+                            : null
             );
         }
     }
