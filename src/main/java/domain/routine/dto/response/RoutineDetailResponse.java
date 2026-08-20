@@ -24,10 +24,11 @@ public record RoutineDetailResponse(
     public static RoutineDetailResponse from(
             Routine routine, AiBriefing aiBriefing, Map<Integer, String> safetyEvaluationByOrder,
             PublicUrlResolver publicUrlResolver) {
+        boolean hasSourceAnalysis = routine.getSourceAnalysis() != null;
         List<RoutineDetailStepResponse> steps = routine.getSteps().stream()
                 .sorted(Comparator.comparingInt(RoutineStep::getOrder))
                 .map(step -> RoutineDetailStepResponse.from(
-                        step, safetyEvaluationByOrder.get(step.getOrder()), publicUrlResolver))
+                        step, safetyEvaluationByOrder.get(step.getOrder()), publicUrlResolver, hasSourceAnalysis))
                 .toList();
         return new RoutineDetailResponse(
                 routine.getId(), routine.getName(), routine.getRoutineType(), routine.getStatus(),
@@ -67,7 +68,8 @@ public record RoutineDetailResponse(
     ) {
 
         static RoutineDetailStepResponse from(
-                RoutineStep step, String safetyEvaluation, PublicUrlResolver publicUrlResolver) {
+                RoutineStep step, String safetyEvaluation, PublicUrlResolver publicUrlResolver,
+                boolean hasSourceAnalysis) {
             return new RoutineDetailStepResponse(
                     step.getOrder(),
                     step.getProduct() != null ? step.getProduct().getId() : null,
@@ -78,7 +80,7 @@ public record RoutineDetailResponse(
                     publicUrlResolver.resolve(step.getImageUrl()),
                     step.getAiReason(),
                     safetyEvaluation,
-                    step.getInventory() != null ? "REPLACED" : "VIDEO_PRODUCT"
+                    hasSourceAnalysis ? (step.getInventory() != null ? "REPLACED" : "VIDEO_PRODUCT") : null
             );
         }
     }
