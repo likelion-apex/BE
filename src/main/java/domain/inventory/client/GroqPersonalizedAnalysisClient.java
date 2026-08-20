@@ -16,7 +16,6 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -87,15 +86,7 @@ public class GroqPersonalizedAnalysisClient {
             throw e;
         } catch (RestClientException e) {
             log.warn("Groq 맞춤 분석 실패: productName={}, message={}", productName, e.getMessage());
-            if (e instanceof RestClientResponseException responseException) {
-                if (responseException.getStatusCode().value() == 429) {
-                    throw AiProviderUnavailableException.quota("Groq 맞춤 분석 호출에 실패했습니다.", e);
-                }
-                if (responseException.getStatusCode().is4xxClientError()) {
-                    throw new AiProviderUnavailableException("Groq 맞춤 분석 요청이 거부되었습니다.", e);
-                }
-            }
-            throw new AiProviderUnavailableException("Groq 맞춤 분석 호출에 실패했습니다.", e);
+            throw InventoryAiJsonSupport.mapToUnavailable("Groq 맞춤 분석", e);
         } catch (RuntimeException e) {
             log.warn("Groq 맞춤 분석 응답 파싱 실패: productName={}", productName);
             throw new AiProviderUnavailableException("Groq 맞춤 분석 응답을 해석할 수 없습니다.", e);

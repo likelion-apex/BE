@@ -14,7 +14,6 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -141,7 +140,7 @@ public class OpenAiIngredientClient {
             throw e;
         } catch (RestClientException e) {
             log.warn("ChatGPT {} 실패: context={}, message={}", action, context, e.getMessage());
-            throw unavailable(e);
+            throw InventoryAiJsonSupport.mapToUnavailable("OpenAI", e);
         } catch (RuntimeException e) {
             log.warn("ChatGPT {} 파싱 실패: context={}", action, context);
             throw new AiProviderUnavailableException("OpenAI " + action + " 응답을 해석할 수 없습니다.", e);
@@ -152,17 +151,5 @@ public class OpenAiIngredientClient {
         if (apiKey == null || apiKey.isBlank()) {
             throw new AiProviderUnavailableException("OPENAI_API_KEY가 없습니다.");
         }
-    }
-
-    private AiProviderUnavailableException unavailable(RestClientException exception) {
-        if (exception instanceof RestClientResponseException responseException) {
-            if (responseException.getStatusCode().value() == 429) {
-                return AiProviderUnavailableException.quota("OpenAI 호출에 실패했습니다.", exception);
-            }
-            if (responseException.getStatusCode().is4xxClientError()) {
-                return new AiProviderUnavailableException("OpenAI 요청이 거부되었습니다.", exception);
-            }
-        }
-        return new AiProviderUnavailableException("OpenAI 호출에 실패했습니다.", exception);
     }
 }
