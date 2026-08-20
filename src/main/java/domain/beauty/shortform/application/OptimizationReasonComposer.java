@@ -29,6 +29,12 @@ public class OptimizationReasonComposer {
             "서버 보정"
     );
 
+    private final KoreanUserCopyNormalizer koreanCopy;
+
+    public OptimizationReasonComposer(KoreanUserCopyNormalizer koreanCopy) {
+        this.koreanCopy = koreanCopy;
+    }
+
     public String forNewAnalysis(
             JobContext profile,
             MatchedVideoStep source,
@@ -97,7 +103,7 @@ public class OptimizationReasonComposer {
             String skinType,
             List<String> skinConcerns
     ) {
-        if (reason == null || reason.contains("님")
+        if (reason == null || !koreanCopy.isAcceptable(reason) || reason.contains("님")
                 || GENERIC_OR_INTERNAL.stream().anyMatch(reason::contains)) {
             return false;
         }
@@ -156,6 +162,7 @@ public class OptimizationReasonComposer {
     ) {
         String sharedIngredient = video.ingredients().stream()
                 .map(IngredientFact::name)
+                .filter(koreanCopy::isAcceptable)
                 .filter(name -> name != null && owned.ingredients().stream()
                         .map(IngredientFact::name)
                         .anyMatch(name::equalsIgnoreCase))
@@ -163,8 +170,8 @@ public class OptimizationReasonComposer {
                 .orElse(null);
         String benefit = firstText(
                 commonFact(video.ingredients(), owned.ingredients()),
-                first(video.benefits()),
-                video.purpose(),
+                firstKorean(video.benefits()),
+                koreanCopy.isAcceptable(video.purpose()) ? video.purpose() : null,
                 "같은 단계의 피부 관리"
         );
         String profile = profilePhrase(skinType, concerns);
@@ -177,14 +184,24 @@ public class OptimizationReasonComposer {
     }
 
     private String missingReason(ProductFacts video, String skinType, List<String> concerns) {
-        IngredientFact ingredient = video.ingredients().stream().findFirst().orElse(null);
+        IngredientFact ingredient = video.ingredients().stream()
+                .filter(item -> koreanCopy.isAcceptable(item.name()))
+                .findFirst()
+                .orElse(null);
         String profile = profilePhrase(skinType, concerns);
         if (ingredient != null) {
-            String benefit = firstText(first(ingredient.benefits()), first(ingredient.purposes()), video.purpose(), "피부 관리");
+            String benefit = firstText(
+                    firstKorean(ingredient.benefits()),
+                    firstKorean(ingredient.purposes()),
+                    koreanCopy.isAcceptable(video.purpose()) ? video.purpose() : null,
+                    "피부 관리");
             return limit("영상 속 %s의 %s은 %s 역할을 해요. %s이 역할을 대신할 확인된 보유 제품이 없어 영상 속 제품을 사용해 주세요."
                     .formatted(video.name(), ingredient.name(), benefit, profile));
         }
-        String purpose = firstText(first(video.benefits()), video.purpose(), "해당 단계의 피부 관리");
+        String purpose = firstText(
+                firstKorean(video.benefits()),
+                koreanCopy.isAcceptable(video.purpose()) ? video.purpose() : null,
+                "해당 단계의 피부 관리");
         return limit("영상 속 %s은 %s을 위한 제품이에요. %s같은 역할을 맡길 확인된 보유 제품이 없어 영상 속 제품을 사용해 주세요."
                 .formatted(video.name(), purpose, profile));
     }
@@ -244,6 +261,7 @@ public class OptimizationReasonComposer {
         });
         return left.stream()
                 .flatMap(item -> Stream.concat(item.benefits().stream(), item.purposes().stream()))
+                .filter(koreanCopy::isAcceptable)
                 .filter(rightFacts::contains)
                 .findFirst()
                 .orElse(null);
@@ -290,6 +308,13 @@ public class OptimizationReasonComposer {
         return values == null ? null : values.stream()
                 .filter(value -> value != null && !value.isBlank())
                 .findFirst().orElse(null);
+    }
+
+    private String firstKorean(List<String> values) {
+        return safe(values).stream()
+                .filter(koreanCopy::isAcceptable)
+                .findFirst()
+                .orElse(null);
     }
 
     private <T> List<T> safe(List<T> values) {

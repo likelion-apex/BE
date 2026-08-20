@@ -16,9 +16,17 @@ import org.springframework.stereotype.Component;
 public class RoutineOptimizationNormalizer {
 
     private final ShortformProductCategoryResolver categoryResolver;
+    private final ShortformProductImageResolver imageResolver;
+    private final KoreanUserCopyNormalizer koreanCopy;
 
-    public RoutineOptimizationNormalizer(ShortformProductCategoryResolver categoryResolver) {
+    public RoutineOptimizationNormalizer(
+            ShortformProductCategoryResolver categoryResolver,
+            ShortformProductImageResolver imageResolver,
+            KoreanUserCopyNormalizer koreanCopy
+    ) {
         this.categoryResolver = categoryResolver;
+        this.imageResolver = imageResolver;
+        this.koreanCopy = koreanCopy;
     }
 
     public RoutineOptimizationSnapshot normalize(
@@ -88,6 +96,7 @@ public class RoutineOptimizationNormalizer {
     }
 
     private OptimizedStep replacementStep(OptimizedStep stored, StepResult source) {
+        ProductCategory category = categoryResolver.parseStored(stored.category());
         return new OptimizedStep(
                 stored.sourceResultId(),
                 stored.order(),
@@ -98,12 +107,16 @@ public class RoutineOptimizationNormalizer {
                 stored.productName(),
                 textOr(stored.replaceName(), videoProductName(source)),
                 stored.brand(),
-                stored.imageUrl(),
-                textOr(stored.reason(), "같은 카테고리에서 사용할 수 있는 보유 제품입니다.")
+                imageResolver.resolve(category, stored.imageUrl()),
+                koreanCopy.normalizeOptimizationReason(
+                        stored.reason(), koreanCopy.optimizationFallback(category, true))
         );
     }
 
     private OptimizedStep videoProductStep(OptimizedStep stored, StepResult source, boolean rejectedReplacement) {
+        ProductCategory category = source == null
+                ? categoryResolver.resolve(stored.category(), stored.productName())
+                : categoryResolver.resolve(source.category(), videoProductName(source));
         return new OptimizedStep(
                 source == null ? stored.sourceResultId() : source.resultId(),
                 stored.order(),
@@ -114,10 +127,10 @@ public class RoutineOptimizationNormalizer {
                 source == null ? stored.productName() : videoProductName(source),
                 null,
                 source == null ? stored.brand() : source.displayBrand(),
-                source == null ? stored.imageUrl() : source.imageUrl(),
-                rejectedReplacement
-                        ? "추천된 인벤토리 제품의 카테고리가 달라 영상 속 제품을 유지합니다."
-                        : textOr(stored.reason(), "인벤토리에서 같은 카테고리의 대체 제품을 찾지 못했습니다.")
+                imageResolver.resolve(category, source == null ? stored.imageUrl() : source.imageUrl()),
+                koreanCopy.normalizeOptimizationReason(
+                        rejectedReplacement ? null : stored.reason(),
+                        koreanCopy.optimizationFallback(category, false))
         );
     }
 

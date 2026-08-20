@@ -15,6 +15,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class ReasonCardNormalizer {
 
+    private final KoreanUserCopyNormalizer koreanCopy;
+
+    public ReasonCardNormalizer(KoreanUserCopyNormalizer koreanCopy) {
+        this.koreanCopy = koreanCopy;
+    }
+
     public List<ReasonCard> normalize(
             List<ReasonCard> reasons,
             AssessmentCategory primaryCategory,
@@ -27,6 +33,7 @@ public class ReasonCardNormalizer {
         safe(reasons).stream()
                 .filter(Objects::nonNull)
                 .map(reason -> normalizeReason(reason, resolvedPrimary))
+                .filter(Objects::nonNull)
                 .forEach(reason -> byCategory.putIfAbsent(reason.assessmentCategory(), reason));
 
         byCategory.computeIfAbsent(
@@ -56,11 +63,14 @@ public class ReasonCardNormalizer {
         AssessmentCategory category = reason.assessmentCategory() == null
                 ? primaryCategory
                 : reason.assessmentCategory();
+        if (!koreanCopy.isAcceptable(reason.description())) {
+            return null;
+        }
         return new ReasonCard(
                 toneOf(category),
                 category,
-                textOr(reason.title(), fallbackTitle(category)),
-                textOr(reason.description(), fallbackDescription(category, null)),
+                koreanCopy.normalize(reason.title(), fallbackTitle(category)),
+                koreanCopy.normalize(reason.description(), fallbackDescription(category, null)),
                 textOr(reason.evidenceSource(), "PERSONALIZED_ANALYSIS")
         );
     }
@@ -125,10 +135,11 @@ public class ReasonCardNormalizer {
             String safetySummary
     ) {
         IngredientDetail evidence = evidenceIngredient(category, ingredients);
+        IngredientDetail localizedEvidence = localizedEvidence(evidence);
         return new ReasonCard(
                 toneOf(category),
                 category,
-                fallbackTitle(category, evidence),
+                fallbackTitle(category, localizedEvidence),
                 fallbackDescription(category, evidence, stats, safetySummary),
                 "SERVER_EVIDENCE_FALLBACK"
         );
@@ -195,15 +206,31 @@ public class ReasonCardNormalizer {
     ) {
         if (evidence != null) {
             return switch (category) {
-                case SAFE -> evidence.name() + "은 확인된 정보에서 낮은 위험도로 분류되어 비교적 부담이 적어요.";
-                case BENEFICIAL -> evidence.name() + "은 "
-                        + String.join(" 및 ", evidence.skinBenefits().stream().limit(2).toList())
-                        + "에 도움을 줄 수 있어요.";
-                case CAUTION -> cautionDescription(evidence);
-                case WARNING -> warningDescription(evidence);
+                case SAFE -> koreanCopy.isAcceptable(evidence.name())
+                        ? evidence.name() + "은 확인된 정보에서 낮은 위험도로 분류되어 비교적 부담이 적어요."
+                        : fallbackDescription(category, stats);
+                case BENEFICIAL -> {
+                    List<String> benefits = safe(evidence.skinBenefits()).stream()
+                            .filter(koreanCopy::isAcceptable)
+                            .limit(2)
+                            .toList();
+                    yield benefits.isEmpty()
+                            ? "확인된 제품 효능을 현재 피부 고민에 맞춰 활용할 수 있어요."
+                            : koreanCopy.isAcceptable(evidence.name())
+                                    ? evidence.name() + "은 " + String.join(" 및 ", benefits)
+                                            + "에 도움을 줄 수 있어요."
+                                    : String.join(" 및 ", benefits)
+                                            + " 효능이 확인되어 피부 고민 관리에 활용할 수 있어요.";
+                }
+                case CAUTION -> koreanCopy.isAcceptable(evidence.name())
+                        ? cautionDescription(evidence)
+                        : fallbackDescription(category, stats);
+                case WARNING -> koreanCopy.isAcceptable(evidence.name())
+                        ? warningDescription(evidence)
+                        : fallbackDescription(category, stats);
             };
         }
-        if (safetySummary != null && !safetySummary.isBlank()) {
+        if (koreanCopy.isAcceptable(safetySummary)) {
             return safetySummary.trim();
         }
         return fallbackDescription(category, stats);
@@ -215,8 +242,14 @@ public class ReasonCardNormalizer {
                     ? "확인된 성분에서 고위험 및 알레르기 주의 표시가 확인되지 않았어요."
                     : "실제 제품 라벨을 확인하고 피부 반응을 살피며 사용해 주세요.";
             case BENEFICIAL -> "확인된 제품 효능을 현재 피부 고민에 맞춰 활용할 수 있어요.";
-            case CAUTION -> "피부 반응을 살피며 적은 양부터 천천히 사용해 주세요.";
-            case WARNING -> "자극 가능성을 줄이기 위해 사용 빈도와 피부 반응을 확인해 주세요.";
+            case CAUTION -> stats != null && stats.allergenCount() > 0
+                    ? "알레르기 주의 표시가 확인된 성분이 있어 적은 양부터 피부 반응을 확인해 주세요."
+                    : stats != null && stats.caution20Count() > 0
+                            ? "주의 성분이 확인되어 사용량과 사용 빈도를 조절해 주세요."
+                            : "피부 반응을 살피며 적은 양부터 천천히 사용해 주세요.";
+            case WARNING -> stats != null && stats.highRiskCount() > 0
+                    ? "고위험으로 분류된 성분이 있어 사용 전 제품 라벨과 피부 반응을 확인해 주세요."
+                    : "자극 가능성을 줄이기 위해 사용 빈도와 피부 반응을 확인해 주세요.";
         };
     }
 
@@ -235,6 +268,10 @@ public class ReasonCardNormalizer {
             return ingredient.name() + "은 규제 정보가 확인된 성분이므로 실제 제품 라벨과 사용 조건을 확인해 주세요.";
         }
         return ingredient.name() + "은 높은 위험도로 분류되어 적은 양부터 사용하고 피부 반응을 확인해 주세요.";
+    }
+
+    private IngredientDetail localizedEvidence(IngredientDetail ingredient) {
+        return ingredient != null && koreanCopy.isAcceptable(ingredient.name()) ? ingredient : null;
     }
 
     private String textOr(String value, String fallback) {

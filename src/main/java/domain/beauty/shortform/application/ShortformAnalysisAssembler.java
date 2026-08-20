@@ -60,6 +60,7 @@ public class ShortformAnalysisAssembler {
     private final ReasonCardNormalizer reasonCardNormalizer;
     private final ProductCapacityNormalizer capacityNormalizer;
     private final OptimizationScoreCalculator optimizationScoreCalculator;
+    private final KoreanUserCopyNormalizer koreanCopy;
 
     public ShortformAnalysisAssembler(
             RegulationInfoCache regulationInfoCache,
@@ -68,7 +69,8 @@ public class ShortformAnalysisAssembler {
             OptimizationReasonComposer reasonComposer,
             ReasonCardNormalizer reasonCardNormalizer,
             ProductCapacityNormalizer capacityNormalizer,
-            OptimizationScoreCalculator optimizationScoreCalculator
+            OptimizationScoreCalculator optimizationScoreCalculator,
+            KoreanUserCopyNormalizer koreanCopy
     ) {
         this.regulationInfoCache = regulationInfoCache;
         this.openAiProperties = openAiProperties;
@@ -77,6 +79,7 @@ public class ShortformAnalysisAssembler {
         this.reasonCardNormalizer = reasonCardNormalizer;
         this.capacityNormalizer = capacityNormalizer;
         this.optimizationScoreCalculator = optimizationScoreCalculator;
+        this.koreanCopy = koreanCopy;
     }
 
     public RoutinePersonalizationInput toInput(
@@ -319,6 +322,7 @@ public class ShortformAnalysisAssembler {
                 .map(String::trim)
                 .filter(value -> !value.isBlank() && value.length() <= 18)
                 .filter(value -> isUserCopy(value))
+                .filter(koreanCopy::isAcceptable)
                 .filter(value -> !containsIgnoreCase(value, source.productName()))
                 .filter(value -> !containsIgnoreCase(value, source.brand()))
                 .filter(value -> !containsIgnoreCase(value, matched.displayProductName()))
@@ -331,8 +335,9 @@ public class ShortformAnalysisAssembler {
         if (!normalized.isEmpty()) {
             return normalized;
         }
-        String purpose = toBenefitPhrase(userCopy(source.purpose(), "피부 컨디션 관리"));
-        return List.of(purpose.isBlank() ? "피부 컨디션 관리" : purpose);
+        return koreanCopy.normalizeBenefits(
+                List.of(toBenefitPhrase(userCopy(source.purpose(), "피부 컨디션 관리"))),
+                source.category(), matched.displayProductName(), categoryResolver);
     }
 
     private String toBenefitPhrase(String value) {

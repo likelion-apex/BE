@@ -5,6 +5,7 @@ import domain.beauty.shortform.domain.SafetyLevel;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.ReasonCard;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.StepResult;
+import domain.inventory.ProductCategory;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
@@ -13,13 +14,22 @@ public class ShortformAnalysisSnapshotNormalizer {
 
     private final ReasonCardNormalizer reasonCardNormalizer;
     private final ProductCapacityNormalizer capacityNormalizer;
+    private final ShortformProductCategoryResolver categoryResolver;
+    private final ShortformProductImageResolver imageResolver;
+    private final KoreanUserCopyNormalizer koreanCopy;
 
     public ShortformAnalysisSnapshotNormalizer(
             ReasonCardNormalizer reasonCardNormalizer,
-            ProductCapacityNormalizer capacityNormalizer
+            ProductCapacityNormalizer capacityNormalizer,
+            ShortformProductCategoryResolver categoryResolver,
+            ShortformProductImageResolver imageResolver,
+            KoreanUserCopyNormalizer koreanCopy
     ) {
         this.reasonCardNormalizer = reasonCardNormalizer;
         this.capacityNormalizer = capacityNormalizer;
+        this.categoryResolver = categoryResolver;
+        this.imageResolver = imageResolver;
+        this.koreanCopy = koreanCopy;
     }
 
     public ShortformAnalysisSnapshot normalize(ShortformAnalysisSnapshot snapshot) {
@@ -69,6 +79,14 @@ public class ShortformAnalysisSnapshotNormalizer {
                 step.ingredientMarketOrVariant(),
                 step.displayProductName(),
                 step.productName());
+        String productName = textOr(step.displayProductName(), step.productName());
+        ProductCategory productCategory = categoryResolver.resolve(step.category(), productName);
+        List<String> keyBenefits = koreanCopy.normalizeBenefits(
+                step.keyBenefits(), step.category(), productName, categoryResolver);
+        ReasonCard primaryReason = reasons.stream()
+                .filter(reason -> reason.assessmentCategory() == primaryCategory)
+                .findFirst()
+                .orElseGet(reasons::getFirst);
 
         return new StepResult(
                 step.resultId(),
@@ -82,18 +100,18 @@ public class ShortformAnalysisSnapshotNormalizer {
                 step.displayProductName(),
                 step.productResolutionStatus(),
                 step.productResolutionConfidence(),
-                step.imageUrl(),
+                imageResolver.resolve(productCategory, step.imageUrl()),
                 step.productId(),
                 step.identificationConfidence(),
                 step.evidenceSummary(),
                 step.matchScore(),
-                step.matchSummary(),
-                step.keyBenefits(),
+                String.join(" 및 ", keyBenefits),
+                keyBenefits,
                 step.scoreBreakdown(),
                 safetyLevel(primaryCategory),
                 primaryCategory,
-                textOr(step.safetyTitle(), categoryTitle(primaryCategory)),
-                step.safetySummary(),
+                categoryTitle(primaryCategory),
+                primaryReason.description(),
                 reasons,
                 step.ingredientDataStatus(),
                 step.ingredientVerificationStatus(),
