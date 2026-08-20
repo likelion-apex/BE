@@ -2,6 +2,7 @@ package domain.cosmetic.client;
 
 import domain.inventory.ai.AiProviderUnavailableException;
 import domain.inventory.ai.GroqProperties;
+import domain.inventory.ai.IngredientAiDetail;
 import domain.inventory.ai.InventoryAiJsonSupport;
 import domain.inventory.ai.InventoryAiProperties;
 import java.util.List;
@@ -50,16 +51,16 @@ public class GroqIngredientClient {
         return InventoryAiJsonSupport.parseIngredientNames(payload);
     }
 
-    public Map<String, List<String>> fetchIngredientPurposes(List<String> ingredientNames) {
+    public Map<String, IngredientAiDetail> fetchIngredientDetails(List<String> ingredientNames) {
         if (ingredientNames == null || ingredientNames.isEmpty()) {
             return Map.of();
         }
         JsonNode payload = completeJson(
-                OpenAiIngredientClient.PURPOSE_SYSTEM_PROMPT,
+                OpenAiIngredientClient.DETAIL_SYSTEM_PROMPT,
                 "성분 목록: " + String.join(", ", ingredientNames),
-                "배합목적 조회",
+                "배합목적/위험도 조회",
                 String.join(",", ingredientNames));
-        return InventoryAiJsonSupport.parsePurposes(payload);
+        return InventoryAiJsonSupport.parseIngredientDetails(payload);
     }
 
     private JsonNode completeJson(String systemPrompt, String userPrompt, String action, String context) {

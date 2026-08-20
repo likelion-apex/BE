@@ -144,36 +144,38 @@ class IngredientAndPersonalizedAiClientTest {
         verify(groqIngredientClient, never()).fetchIngredientNames(any());
     }
 
-    // ---- fetchIngredientPurposes ----
+    // ---- fetchIngredientDetails ----
 
     @Test
-    void purposes_openAiSucceeds_thenGeminiAndGroqAreNotCalled() {
+    void details_openAiSucceeds_thenGeminiAndGroqAreNotCalled() {
         when(skipGate.shouldSkip(AiProvider.OPENAI)).thenReturn(false);
-        when(openAiIngredientClient.fetchIngredientPurposes(List.of("정제수")))
-                .thenReturn(Map.of("정제수", List.of("기제(용매)")));
+        when(openAiIngredientClient.fetchIngredientDetails(List.of("정제수")))
+                .thenReturn(Map.of("정제수", new IngredientAiDetail(List.of("기제(용매)"), "LOW")));
 
-        Map<String, List<String>> result = ingredientClient().fetchIngredientPurposes(List.of("정제수"));
+        Map<String, IngredientAiDetail> result = ingredientClient().fetchIngredientDetails(List.of("정제수"));
 
-        assertThat(result.get("정제수")).containsExactly("기제(용매)");
+        assertThat(result.get("정제수").purposes()).containsExactly("기제(용매)");
+        assertThat(result.get("정제수").riskLevel()).isEqualTo("LOW");
         verify(geminiJsonClient, never()).generateJson(any(), any());
-        verify(groqIngredientClient, never()).fetchIngredientPurposes(any());
+        verify(groqIngredientClient, never()).fetchIngredientDetails(any());
     }
 
     @Test
-    void purposes_openAiFails_thenGroqUsedAfterGeminiAlsoFails() {
+    void details_openAiFails_thenGroqUsedAfterGeminiAlsoFails() {
         when(skipGate.shouldSkip(AiProvider.OPENAI)).thenReturn(false);
         when(skipGate.shouldSkip(AiProvider.GEMINI)).thenReturn(false);
         when(skipGate.shouldSkip(AiProvider.GROQ)).thenReturn(false);
-        when(openAiIngredientClient.fetchIngredientPurposes(any()))
+        when(openAiIngredientClient.fetchIngredientDetails(any()))
                 .thenThrow(new AiProviderUnavailableException("openai down"));
-        when(geminiJsonClient.generateJson(eq(OpenAiIngredientClient.PURPOSE_SYSTEM_PROMPT), anyString()))
+        when(geminiJsonClient.generateJson(eq(OpenAiIngredientClient.DETAIL_SYSTEM_PROMPT), anyString()))
                 .thenThrow(new AiProviderUnavailableException("gemini down"));
-        when(groqIngredientClient.fetchIngredientPurposes(List.of("정제수")))
-                .thenReturn(Map.of("정제수", List.of("보습")));
+        when(groqIngredientClient.fetchIngredientDetails(List.of("정제수")))
+                .thenReturn(Map.of("정제수", new IngredientAiDetail(List.of("보습"), "MEDIUM")));
 
-        Map<String, List<String>> result = ingredientClient().fetchIngredientPurposes(List.of("정제수"));
+        Map<String, IngredientAiDetail> result = ingredientClient().fetchIngredientDetails(List.of("정제수"));
 
-        assertThat(result.get("정제수")).containsExactly("보습");
+        assertThat(result.get("정제수").purposes()).containsExactly("보습");
+        assertThat(result.get("정제수").riskLevel()).isEqualTo("MEDIUM");
     }
 
     // ---- PersonalizedAnalysisAiClient.analyze ----
