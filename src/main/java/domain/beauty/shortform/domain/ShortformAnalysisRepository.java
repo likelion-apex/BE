@@ -34,9 +34,14 @@ public interface ShortformAnalysisRepository extends JpaRepository<ShortformAnal
                    analysis.createdAt as createdAt
             from ShortformAnalysis analysis
             where analysis.member.id = :memberId
+              and analysis.status not in :excludedStatuses
             order by analysis.createdAt desc
             """)
-    List<HistorySummary> findRecentSummaries(@Param("memberId") Long memberId, Pageable pageable);
+    List<HistorySummary> findRecentSummaries(
+            @Param("memberId") Long memberId,
+            @Param("excludedStatuses") List<ShortformAnalysisStatus> excludedStatuses,
+            Pageable pageable
+    );
 
     interface HistorySummary {
         Long getAnalysisId();

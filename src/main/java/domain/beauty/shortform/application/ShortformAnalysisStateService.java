@@ -19,6 +19,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ShortformAnalysisStateService {
 
+    private static final List<ShortformAnalysisStatus> HIDDEN_HISTORY_STATUSES = List.of(
+            ShortformAnalysisStatus.FAILED,
+            ShortformAnalysisStatus.CANCELLED
+    );
+
     private final ShortformAnalysisRepository analysisRepository;
     private final MemberRepository memberRepository;
     private final InventoryRepository inventoryRepository;
@@ -215,7 +220,11 @@ public class ShortformAnalysisStateService {
 
     @Transactional(readOnly = true)
     public List<ShortformAnalysisRepository.HistorySummary> recent(Long memberId) {
-        return analysisRepository.findRecentSummaries(memberId, PageRequest.of(0, 10));
+        return analysisRepository.findRecentSummaries(
+                memberId,
+                HIDDEN_HISTORY_STATUSES,
+                PageRequest.of(0, 10)
+        );
     }
 
     public void requireCompleted(ShortformAnalysis analysis) {
