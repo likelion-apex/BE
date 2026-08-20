@@ -3,6 +3,15 @@ import { ApiClient } from './api.js';
 import { optimizationPresentation, optimizationScorePresentation } from './optimization.js';
 import { needsIngredientReanalysis, reasonPresentation } from './product-detail.js';
 import {
+  conditionOptions,
+  conditionPresentation,
+  formatRoutineRecordDate,
+  routineCompletion,
+  routineRecordView,
+  routineTypeLabel,
+  sortedRoutineSteps,
+} from './routine-date-detail.js';
+import {
   buildGeneratedRoutineCreatePayload,
   buildKakaoAuthorizeUrl,
   buildRoutineApplyPayload,
@@ -45,13 +54,6 @@ const skinTypes = [
 ];
 
 const concerns = ['속건조', '여드름', '민감성', '미백·잡티', '다크서클', '색소·블랙헤드', '홍조', '아토피'];
-const conditionOptions = [
-  { value: '트러블있고예민해요', short: '트러블이 있고\n예민해요', icon: 'condition-troubled.svg' },
-  { value: '건조하고푸석해요', short: '건조하고\n푸석해요', icon: 'condition-dry.svg' },
-  { value: '평범하고무난해요', short: '평범하고\n무난해요', icon: 'condition-normal.svg' },
-  { value: '촉촉하고편안해요', short: '촉촉하고\n편안해요', icon: 'condition-moist.svg' },
-  { value: '컨디션최고예요', short: '컨디션\n최고예요', icon: 'condition-best.svg' },
-];
 
 const categoryLabels = {
   CLEANSER: '클렌저',
@@ -608,17 +610,75 @@ function renderRoutineCalendar() {
       <div class="calendar-weekdays">${['일', '월', '화', '수', '목', '금', '토'].map((day) => `<span>${day}</span>`).join('')}</div>
       <div class="calendar-grid">${cells.join('')}</div>
     </section>
-    ${!state.routine.calendarLoaded ? '<section class="page-section routine-loading"><span></span>캘린더를 불러오고 있어요</section>' : ''}
-    ${state.routine.selectedDateDetail ? renderRoutineDateDetail(state.routine.selectedDateDetail) : '<section class="page-section calendar-guide"><b>날짜별 피부 컨디션과 루틴 기록</b><p>확인하고 싶은 날짜를 눌러 주세요.</p></section>'}`;
+    ${!state.routine.calendarLoaded ? '<section class="page-section routine-loading"><span></span>캘린더를 불러오고 있어요</section>' : ''}`;
 }
 
-function renderRoutineDateDetail(detail) {
-  return `<section class="page-section calendar-detail">
-    <span class="eyebrow">${escapeHtml(detail.date)} 기록</span>
-    <h2>${escapeHtml(detail.condition || '컨디션 기록 없음')}</h2>
-    <p>${escapeHtml(detail.memo || '작성한 메모가 없어요.')}</p>
-    <div class="calendar-log-list">${(detail.routineLogs || []).map((log) => `<article><span class="routine-type-badge ${String(log.routineType).toLowerCase()}">${log.routineType}</span><div><b>${escapeHtml(log.name)}</b><small>${Number(log.completionRate || 0)}% 완료 · ${log.steps?.length || 0}단계</small></div><strong>${log.completed ? '완료' : '진행 중'}</strong></article>`).join('') || '<div class="empty-inline">이날의 루틴 기록이 없어요.</div>'}</div>
+function renderRoutineRecordCondition(detail) {
+  const condition = conditionPresentation(detail.condition);
+  const memo = detail.memo || '작성한 메모가 없어요.';
+  const conditionCard = condition
+    ? `<div class="routine-record-condition-card">
+        <span>${icon(condition.icon, condition.value)}</span>
+        <b>${escapeHtml(condition.short).replaceAll('\n', '<br>')}</b>
+      </div>`
+    : '<div class="routine-record-condition-card empty"><span>—</span><b>컨디션 기록<br>없음</b></div>';
+  return `<section class="routine-record-condition">
+    <h3>피부 컨디션</h3>
+    <div>${conditionCard}<p>${escapeHtml(memo)}</p></div>
   </section>`;
+}
+
+function renderRoutineRecordSelection(logs) {
+  return `<section class="routine-record-picker">
+    <div class="routine-record-section-heading"><h3>진행한 루틴</h3><span>확인할 루틴을 선택해 주세요</span></div>
+    <div class="routine-record-picker-list">${logs.map((routine) => {
+      const completion = routineCompletion(routine);
+      const type = String(routine.routineType || '').toLowerCase();
+      return `<button type="button" data-action="open-routine-record" data-routine-id="${escapeHtml(routine.routineId)}">
+        <span class="routine-type-badge ${type}">${escapeHtml(routine.routineType || 'ROUTINE')}</span>
+        <span><b>${escapeHtml(routine.name || '이름 없는 루틴')}</b><small>${completion.rate}% 완료 · ${completion.totalCount}단계</small></span>
+        <strong>›</strong>
+      </button>`;
+    }).join('')}</div>
+  </section>`;
+}
+
+function renderRoutineRecordDetail(routine, hasMultipleRoutines) {
+  const completion = routineCompletion(routine);
+  const steps = sortedRoutineSteps(routine);
+  return `<section class="routine-record-detail">
+    ${hasMultipleRoutines ? '<button class="routine-record-back" type="button" data-action="show-routine-record-list">‹ 다른 루틴 보기</button>' : ''}
+    <div class="routine-record-progress-head">
+      <h3>${escapeHtml(routineTypeLabel(routine.routineType))} 케어 실천도</h3>
+      <strong>${completion.rate}%(${completion.completedCount}/${completion.totalCount})</strong>
+    </div>
+    <div class="routine-record-progress" role="progressbar" aria-label="${escapeHtml(routineTypeLabel(routine.routineType))} 케어 실천도" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${completion.rate}"><span style="width:${completion.rate}%"></span></div>
+    <div class="routine-record-steps">
+      <h3>진행한 루틴</h3>
+      ${steps.length ? `<ol>${steps.map((step, index) => `<li class="${step.completed ? 'completed' : ''}">
+        <i aria-label="${step.completed ? '완료' : '미완료'}">${step.completed ? '✓' : ''}</i>
+        <img src="${safeImageUrl(step.imageUrl, '/assets/product-jar.png')}" alt="">
+        <span><em>${Number(step.order || index + 1)}단계</em><b>${escapeHtml(step.productName || '제품 정보 없음')}</b></span>
+      </li>`).join('')}</ol>` : '<div class="routine-record-empty">기록된 루틴 단계가 없어요.</div>'}
+    </div>
+  </section>`;
+}
+
+function showRoutineDateDialog(detail, selectedRoutineId = null) {
+  const view = routineRecordView(detail.routineLogs, selectedRoutineId);
+  let routineContent;
+  if (view.mode === 'empty') {
+    routineContent = '<div class="routine-record-empty">이날의 루틴 기록이 없어요.</div>';
+  } else if (view.mode === 'selection') {
+    routineContent = renderRoutineRecordSelection(view.logs);
+  } else {
+    routineContent = renderRoutineRecordDetail(view.routine, view.logs.length > 1);
+  }
+
+  openDialog(dialogFrame(
+    formatRoutineRecordDate(detail.date),
+    `${renderRoutineRecordCondition(detail)}${routineContent}`,
+  ), 'bottom-sheet routine-record-dialog');
 }
 
 function renderRoutineGenerator() {
@@ -1001,6 +1061,7 @@ async function loadRoutineDate(date) {
       : await api.data(buildRoutineLogsPath({ date }));
     state.debug = state.routine.selectedDateDetail;
     render();
+    showRoutineDateDialog(state.routine.selectedDateDetail);
   } catch (error) {
     toast(`날짜별 루틴 기록을 불러오지 못했어요. ${error.message}`, 'error');
   } finally {
@@ -1823,6 +1884,14 @@ dialog.addEventListener('click', (event) => {
   if (applyRoutineButton) applyArchivedRoutine(applyRoutineButton.dataset.routineId);
   const deleteRoutineButton = event.target.closest('[data-action="delete-routine"]');
   if (deleteRoutineButton) deleteArchivedRoutine(deleteRoutineButton.dataset.routineId);
+  const routineRecordButton = event.target.closest('[data-action="open-routine-record"]');
+  if (routineRecordButton && state.routine.selectedDateDetail) {
+    showRoutineDateDialog(state.routine.selectedDateDetail, routineRecordButton.dataset.routineId);
+  }
+  const routineRecordBackButton = event.target.closest('[data-action="show-routine-record-list"]');
+  if (routineRecordBackButton && state.routine.selectedDateDetail) {
+    showRoutineDateDialog(state.routine.selectedDateDetail);
+  }
   const reanalysisButton = event.target.closest('[data-action="reanalyze-ingredients"]');
   if (reanalysisButton) reanalyzeIngredients(reanalysisButton.dataset.analysisId);
 });

@@ -314,17 +314,6 @@ body.is-busy::after { position: fixed; z-index: 999; top: 18px; left: 50%; width
 .calendar-day.recorded { background: var(--blue-05); color: var(--blue-dark); font-weight: 700; }
 .calendar-day.completed i { background: var(--green); }
 .calendar-day.selected { border-color: var(--blue); background: #fff; box-shadow: 0 5px 14px rgba(3,193,251,.2); }
-.calendar-guide, .calendar-detail { margin-top: 22px !important; padding: 18px; border-radius: 15px; background: var(--gray-05); }
-.calendar-guide b { font-size: 13px; }
-.calendar-guide p { margin-top: 6px; color: var(--gray-60); font-size: 11px; }
-.calendar-detail h2 { margin-top: 8px; font-size: 17px; }
-.calendar-detail > p { margin-top: 6px; color: var(--gray-60); font-size: 11px; }
-.calendar-log-list { display: grid; margin-top: 16px; gap: 8px; }
-.calendar-log-list article { display: grid; padding: 10px; align-items: center; grid-template-columns: auto 1fr auto; gap: 9px; border-radius: 11px; background: #fff; }
-.calendar-log-list article > div { display: grid; gap: 4px; }
-.calendar-log-list b { font-size: 11px; }
-.calendar-log-list small { color: var(--gray-60); font-size: 9px; }
-.calendar-log-list article > strong { color: var(--green); font-size: 9px; }
 .routine-generator-hero { display: flex; margin-top: 24px; padding: 24px 18px; align-items: center; flex-direction: column; border-radius: 20px; background: linear-gradient(160deg, var(--blue-05), #fff); box-shadow: var(--shadow); text-align: center; }
 .routine-generator-hero > img { width: 64px; height: 64px; margin-bottom: 14px; border-radius: 50%; box-shadow: 0 15px 38px rgba(3,193,251,.3); }
 .routine-generator-hero h1 { margin-top: 8px; font-size: 20px; line-height: 29px; }
@@ -441,6 +430,46 @@ body.is-busy::after { position: fixed; z-index: 999; top: 18px; left: 50%; width
 .dialog-frame > header button { width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; background: var(--gray-05); color: var(--gray-60); font-size: 22px; }
 .dialog-body { padding: 20px; }
 .dialog-frame > footer { padding: 0 20px 20px; }
+.routine-record-dialog .dialog-frame { max-height: calc(100dvh - 18px); }
+.routine-record-dialog .dialog-frame > header { height: 72px; padding: 18px 20px 4px; border-bottom: 0; }
+.routine-record-dialog .dialog-frame > header h2 { font-size: 20px; line-height: 28px; }
+.routine-record-dialog .dialog-frame > header button { width: 28px; height: 28px; background: var(--gray-10); font-size: 20px; line-height: 28px; }
+.routine-record-dialog .dialog-body { padding: 12px 20px 30px; }
+.routine-record-condition { padding-bottom: 24px; border-bottom: 1px solid var(--gray-20); }
+.routine-record-condition h3, .routine-record-section-heading h3, .routine-record-progress-head h3, .routine-record-steps h3 { color: var(--gray-60); font-size: 14px; line-height: 18px; }
+.routine-record-condition > div { display: grid; margin-top: 12px; align-items: center; grid-template-columns: 66px minmax(0, 1fr); gap: 16px; }
+.routine-record-condition-card { display: flex; width: 66px; min-height: 94px; padding: 8px 4px; align-items: center; flex-direction: column; gap: 8px; border: 1px solid var(--blue); border-radius: 8px; }
+.routine-record-condition-card > span { display: grid; width: 40px; height: 40px; border-radius: 50%; place-items: center; background: var(--blue); color: #fff; font-size: 17px; font-weight: 700; }
+.routine-record-condition-card > span .ui-icon { width: 28px; height: 28px; }
+.routine-record-condition-card > b { font-size: 10px; line-height: 14px; text-align: center; }
+.routine-record-condition-card.empty { border-color: var(--gray-20); color: var(--gray-60); }
+.routine-record-condition-card.empty > span { background: var(--gray-20); }
+.routine-record-condition > div > p { display: flex; min-height: 94px; padding-left: 16px; align-items: center; border-left: 1px solid var(--blue); font-size: 14px; line-height: 20px; }
+.routine-record-picker, .routine-record-detail { margin-top: 24px; }
+.routine-record-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.routine-record-section-heading > span { color: var(--gray-60); font-size: 10px; }
+.routine-record-picker-list { display: grid; margin-top: 16px; gap: 10px; }
+.routine-record-picker-list > button { display: grid; width: 100%; padding: 14px 12px; align-items: center; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; border: 1px solid var(--gray-10); border-radius: 12px; background: #fff; text-align: left; }
+.routine-record-picker-list > button > span:nth-child(2) { display: grid; min-width: 0; gap: 4px; }
+.routine-record-picker-list b { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.routine-record-picker-list small { color: var(--gray-60); font-size: 10px; }
+.routine-record-picker-list strong { color: var(--gray-30); font-size: 22px; font-weight: 400; }
+.routine-record-back { margin-bottom: 18px; padding: 0; border: 0; background: none; color: var(--blue-dark); font-size: 12px; font-weight: 700; }
+.routine-record-progress-head { display: flex; align-items: center; justify-content: space-between; }
+.routine-record-progress-head strong { color: var(--blue); font-size: 14px; }
+.routine-record-progress { height: 6px; margin-top: 16px; overflow: hidden; border-radius: 6px; background: var(--gray-10); }
+.routine-record-progress > span { display: block; height: 100%; border-radius: inherit; background: var(--blue); }
+.routine-record-steps { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--gray-20); }
+.routine-record-steps ol { position: relative; display: grid; margin: 20px 0 0; padding: 0; gap: 16px; list-style: none; }
+.routine-record-steps ol::before { position: absolute; z-index: 0; top: 8px; bottom: 8px; left: 7px; width: 1px; background: #81e0fd; content: ""; }
+.routine-record-steps li { position: relative; z-index: 1; display: grid; min-width: 0; align-items: center; grid-template-columns: 16px 24px minmax(0, 1fr); gap: 12px; }
+.routine-record-steps li > i { display: grid; width: 16px; height: 16px; border: 1px solid var(--gray-20); border-radius: 50%; place-items: center; background: #fff; color: #fff; font-size: 10px; font-style: normal; font-weight: 800; }
+.routine-record-steps li.completed > i { border-color: var(--blue); background: var(--blue); }
+.routine-record-steps li > img { width: 24px; height: 24px; border: 1px solid var(--gray-10); border-radius: 8px; object-fit: cover; background: var(--gray-05); }
+.routine-record-steps li > span { display: grid; min-width: 0; align-items: center; grid-template-columns: auto minmax(0, 1fr); gap: 8px; }
+.routine-record-steps em { color: var(--blue); font-size: 12px; font-style: normal; font-weight: 700; white-space: nowrap; }
+.routine-record-steps b { overflow: hidden; font-size: 14px; line-height: 20px; text-overflow: ellipsis; white-space: nowrap; }
+.routine-record-empty { margin-top: 24px; padding: 28px 14px; border-radius: 12px; background: var(--gray-05); color: var(--gray-60); font-size: 12px; text-align: center; }
 .stack-form { display: grid; gap: 16px; }
 .stack-form > label, .token-field { display: grid; gap: 7px; color: var(--gray-60); font-size: 11px; font-weight: 700; }
 .stack-form input, .stack-form textarea, .stack-form select, .token-field textarea { width: 100%; padding: 11px 12px; border: 1px solid var(--gray-20); border-radius: 10px; outline: 0; background: var(--gray-05); color: #171a1f; resize: vertical; }
