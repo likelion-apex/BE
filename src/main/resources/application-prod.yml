@@ -18,6 +18,9 @@ spring:
     baseline-version: "0"
     clean-disabled: true
 
+app:
+  public-base-url: ${APP_PUBLIC_BASE_URL:https://mutsa.dev.me.kr}
+
 kakao:
   client-id: ${KAKAO_CLIENT_ID}
   client-secret: ${KAKAO_CLIENT_SECRET}

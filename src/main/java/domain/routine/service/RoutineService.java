@@ -47,6 +47,7 @@ import domain.routine.repository.RoutineLogStepRepository;
 import domain.routine.repository.RoutineRepository;
 import global.exception.CustomException;
 import global.exception.ErrorCode;
+import global.util.PublicUrlResolver;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -85,6 +86,7 @@ public class RoutineService {
     private final ProductCompatibilityService productCompatibilityService;
     private final ShortformAnalysisRepository shortformAnalysisRepository;
     private final ShortformAnalysisJsonMapper shortformAnalysisJsonMapper;
+    private final PublicUrlResolver publicUrlResolver;
     private final ShortformAnalysisSnapshotNormalizer shortformAnalysisSnapshotNormalizer;
 
     @Transactional
@@ -102,7 +104,7 @@ public class RoutineService {
                 .findByMemberIdAndLogDateAndRoutineId(memberId, today, routine.getId())
                 .orElseGet(() -> createTodayLog(routine, today));
 
-        return DailyRoutineResponse.from(routine, routineLog);
+        return DailyRoutineResponse.from(routine, routineLog, publicUrlResolver);
     }
 
     @Transactional
@@ -112,7 +114,7 @@ public class RoutineService {
         step.updateCompleted(completed);
 
         RoutineLog routineLog = step.getRoutineLog();
-        return DailyRoutineResponse.from(routineLog.getRoutine(), routineLog);
+        return DailyRoutineResponse.from(routineLog.getRoutine(), routineLog, publicUrlResolver);
     }
 
     @Transactional
@@ -123,14 +125,14 @@ public class RoutineService {
             throw new CustomException(ErrorCode.ROUTINE_LOG_STEPS_INCOMPLETE);
         }
         routineLog.complete();
-        return DailyRoutineResponse.from(routineLog.getRoutine(), routineLog);
+        return DailyRoutineResponse.from(routineLog.getRoutine(), routineLog, publicUrlResolver);
     }
 
     @Transactional
     public DailyRoutineResponse completeAllSteps(Long memberId) {
         RoutineLog routineLog = findTodayRoutineLog(memberId);
         routineLog.getSteps().forEach(step -> step.updateCompleted(true));
-        return DailyRoutineResponse.from(routineLog.getRoutine(), routineLog);
+        return DailyRoutineResponse.from(routineLog.getRoutine(), routineLog, publicUrlResolver);
     }
 
     public CalendarMonthResponse getCalendarMonth(Long memberId, int year, int month) {
@@ -143,7 +145,7 @@ public class RoutineService {
     public DailyLogDetailResponse getDailyLogDetail(Long memberId, LocalDate date) {
         DailyCondition dailyCondition = dailyConditionRepository.findByMemberIdAndLogDate(memberId, date).orElse(null);
         List<RoutineLog> logs = routineLogRepository.findByMemberIdAndLogDate(memberId, date);
-        return DailyLogDetailResponse.from(date, dailyCondition, logs);
+        return DailyLogDetailResponse.from(date, dailyCondition, logs, publicUrlResolver);
     }
 
     public ArchivedRoutineListResponse getArchivedRoutines(Long memberId, Integer year, String sort) {
@@ -232,6 +234,7 @@ public class RoutineService {
     public RoutineDetailResponse getRoutineDetail(Long memberId, Long routineId) {
         Routine routine = routineRepository.findByIdAndMemberId(routineId, memberId)
                 .orElseThrow(() -> new CustomException(ErrorCode.ROUTINE_NOT_FOUND));
+        return RoutineDetailResponse.from(routine, publicUrlResolver);
         AiBriefing aiBriefing = resolveAiBriefing(routine);
         Map<Integer, String> safetyEvaluationByOrder = resolveSafetyEvaluations(memberId, routine.getSteps());
         return RoutineDetailResponse.from(routine, aiBriefing, safetyEvaluationByOrder);
@@ -333,7 +336,7 @@ public class RoutineService {
                 .orElseThrow(() -> new CustomException(ErrorCode.ROUTINE_NOT_FOUND));
 
         RoutineLog routineLog = applyAsTodayActive(memberId, routine);
-        return DailyRoutineResponse.from(routine, routineLog);
+        return DailyRoutineResponse.from(routine, routineLog, publicUrlResolver);
     }
 
     public RoutineGenerationResponse generateRoutine(Long memberId, RoutineType routineType) {

@@ -2,6 +2,7 @@ package domain.inventory.dto.response;
 
 import domain.inventory.Inventory;
 import domain.inventory.ProductCategory;
+import global.util.PublicUrlResolver;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -12,10 +13,10 @@ public record InventoryListResponse(
         @Schema(description = "인벤토리 목록") List<InventoryListItem> items
 ) {
 
-    public static InventoryListResponse from(List<Inventory> inventories) {
+    public static InventoryListResponse from(List<Inventory> inventories, PublicUrlResolver publicUrlResolver) {
         return new InventoryListResponse(
                 inventories.size(),
-                inventories.stream().map(InventoryListItem::from).toList()
+                inventories.stream().map(inventory -> InventoryListItem.from(inventory, publicUrlResolver)).toList()
         );
     }
 
@@ -31,14 +32,14 @@ public record InventoryListResponse(
             @Schema(description = "등록 일시") LocalDateTime createdAt
     ) {
 
-        public static InventoryListItem from(Inventory inventory) {
+        public static InventoryListItem from(Inventory inventory, PublicUrlResolver publicUrlResolver) {
             return new InventoryListItem(
                     inventory.getId(),
                     inventory.getProduct().getId(),
                     inventory.getProduct().getName(),
                     inventory.getProduct().getBrand(),
                     inventory.getProduct().getCategory(),
-                    inventory.getProduct().getImageUrl(),
+                    publicUrlResolver.resolve(inventory.getProduct().getImageUrl()),
                     inventory.isFavorite(),
                     inventory.getCreatedAt()
             );

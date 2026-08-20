@@ -20,6 +20,7 @@ import domain.member.Member;
 import domain.member.MemberRepository;
 import global.exception.CustomException;
 import global.exception.ErrorCode;
+import global.util.PublicUrlResolver;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -46,6 +47,7 @@ public class InventoryService {
     private final IngredientAiClient ingredientAiClient;
     private final PersonalizedAnalysisAiClient personalizedAnalysisAiClient;
     private final InventoryAiCacheService inventoryAiCacheService;
+    private final PublicUrlResolver publicUrlResolver;
 
     @Transactional(readOnly = true)
     public FavoriteInventoryResponse getFavorites(Long memberId, Integer limit) {
@@ -53,12 +55,13 @@ public class InventoryService {
         long totalFavoriteCount = inventoryRepository.countByMemberIdAndFavoriteTrue(memberId);
         List<Inventory> favorites = inventoryRepository
                 .findAllByMemberIdAndFavoriteTrueOrderByCreatedAtDesc(memberId, PageRequest.of(0, size));
-        return FavoriteInventoryResponse.of(totalFavoriteCount, favorites);
+        return FavoriteInventoryResponse.of(totalFavoriteCount, favorites, publicUrlResolver);
     }
 
     @Transactional(readOnly = true)
     public InventoryListResponse getAll(Long memberId) {
-        return InventoryListResponse.from(inventoryRepository.findAllByMemberIdOrderByCreatedAtDesc(memberId));
+        return InventoryListResponse.from(
+                inventoryRepository.findAllByMemberIdOrderByCreatedAtDesc(memberId), publicUrlResolver);
     }
 
     public InventoryCreateResponse create(Long memberId, InventoryCreateRequest request) {

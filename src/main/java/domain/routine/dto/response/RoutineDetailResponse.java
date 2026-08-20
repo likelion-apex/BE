@@ -4,6 +4,7 @@ import domain.routine.domain.Routine;
 import domain.routine.domain.RoutineStatus;
 import domain.routine.domain.RoutineStep;
 import domain.routine.domain.RoutineType;
+import global.util.PublicUrlResolver;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Comparator;
 import java.util.List;
@@ -20,6 +21,10 @@ public record RoutineDetailResponse(
         AiBriefing aiBriefing
 ) {
 
+    public static RoutineDetailResponse from(Routine routine, PublicUrlResolver publicUrlResolver) {
+        List<RoutineDetailStepResponse> steps = routine.getSteps().stream()
+                .sorted(Comparator.comparingInt(RoutineStep::getOrder))
+                .map(step -> RoutineDetailStepResponse.from(step, publicUrlResolver))
     public static RoutineDetailResponse from(
             Routine routine, AiBriefing aiBriefing, Map<Integer, String> safetyEvaluationByOrder) {
         List<RoutineDetailStepResponse> steps = routine.getSteps().stream()
@@ -56,6 +61,7 @@ public record RoutineDetailResponse(
             String safetyEvaluation
     ) {
 
+        static RoutineDetailStepResponse from(RoutineStep step, PublicUrlResolver publicUrlResolver) {
         static RoutineDetailStepResponse from(RoutineStep step, String safetyEvaluation) {
             return new RoutineDetailStepResponse(
                     step.getOrder(),
@@ -64,6 +70,8 @@ public record RoutineDetailResponse(
                     step.getProductName(),
                     step.getBrand(),
                     step.getCategory(),
+                    publicUrlResolver.resolve(step.getImageUrl()),
+                    step.getAiReason()
                     step.getImageUrl(),
                     step.getAiReason(),
                     safetyEvaluation

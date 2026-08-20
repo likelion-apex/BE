@@ -12,6 +12,7 @@ import domain.inventory.ProductCategory;
 import domain.inventory.ProductRepository;
 import domain.inventory.cache.PopularProductCache;
 import domain.inventory.client.OpenAiCategoryClassifier;
+import global.util.PublicUrlResolver;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,7 +37,8 @@ class ProductServiceFindOrCreateTest {
     @BeforeEach
     void setUp() {
         productService = new ProductService(
-                productRepository, categoryImageResolver, categoryClassifier, popularProductCache);
+                productRepository, categoryImageResolver, categoryClassifier, popularProductCache,
+                new PublicUrlResolver(""));
     }
 
     @Test

@@ -5,6 +5,7 @@ import domain.routine.domain.RoutineLog;
 import domain.routine.domain.RoutineLogStep;
 import domain.routine.domain.RoutineStep;
 import domain.routine.domain.RoutineType;
+import global.util.PublicUrlResolver;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Comparator;
 import java.util.List;
@@ -22,13 +23,14 @@ public record DailyRoutineResponse(
         @Schema(description = "루틴 단계 목록 (순서대로)") List<DailyRoutineStepResponse> steps
 ) {
 
-    public static DailyRoutineResponse from(Routine routine, RoutineLog routineLog) {
+    public static DailyRoutineResponse from(Routine routine, RoutineLog routineLog, PublicUrlResolver publicUrlResolver) {
         Map<Long, RoutineStep> stepById = routine.getSteps().stream()
                 .collect(Collectors.toMap(RoutineStep::getId, Function.identity()));
 
         List<DailyRoutineStepResponse> steps = routineLog.getSteps().stream()
                 .sorted(Comparator.comparingInt(RoutineLogStep::getOrder))
-                .map(logStep -> DailyRoutineStepResponse.from(logStep, stepById.get(logStep.getRoutineStepId())))
+                .map(logStep -> DailyRoutineStepResponse.from(
+                        logStep, stepById.get(logStep.getRoutineStepId()), publicUrlResolver))
                 .toList();
 
         long completedCount = steps.stream().filter(DailyRoutineStepResponse::completed).count();
@@ -53,7 +55,8 @@ public record DailyRoutineResponse(
             @Schema(description = "완료 여부") boolean completed
     ) {
 
-        public static DailyRoutineStepResponse from(RoutineLogStep logStep, RoutineStep step) {
+        public static DailyRoutineStepResponse from(
+                RoutineLogStep logStep, RoutineStep step, PublicUrlResolver publicUrlResolver) {
             return new DailyRoutineStepResponse(
                     logStep.getId(),
                     logStep.getOrder(),
@@ -62,7 +65,7 @@ public record DailyRoutineResponse(
                     step != null ? step.getProductName() : null,
                     step != null ? step.getBrand() : null,
                     step != null ? step.getCategory() : null,
-                    step != null ? step.getImageUrl() : null,
+                    step != null ? publicUrlResolver.resolve(step.getImageUrl()) : null,
                     logStep.isCompleted()
             );
         }
