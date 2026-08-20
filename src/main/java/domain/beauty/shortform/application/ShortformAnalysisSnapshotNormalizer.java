@@ -100,7 +100,7 @@ public class ShortformAnalysisSnapshotNormalizer {
                 step.displayProductName(),
                 step.productResolutionStatus(),
                 step.productResolutionConfidence(),
-                imageResolver.resolve(productCategory, step.imageUrl()),
+                imageResolver.resolve(productCategory),
                 step.productId(),
                 step.identificationConfidence(),
                 step.evidenceSummary(),

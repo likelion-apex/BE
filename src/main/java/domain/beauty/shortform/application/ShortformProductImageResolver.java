@@ -3,11 +3,12 @@ package domain.beauty.shortform.application;
 import domain.inventory.CategoryImageResolver;
 import domain.inventory.ProductCategory;
 import global.util.PublicUrlResolver;
-import java.net.URI;
 import org.springframework.stereotype.Component;
 
 @Component
 public class ShortformProductImageResolver {
+
+    private static final String ETC_IMAGE_PATH = "/images/categories/etc.png";
 
     private final CategoryImageResolver categoryImageResolver;
     private final PublicUrlResolver publicUrlResolver;
@@ -20,25 +21,8 @@ public class ShortformProductImageResolver {
         this.publicUrlResolver = publicUrlResolver;
     }
 
-    public String resolve(ProductCategory category, String externalImageUrl) {
+    public String resolve(ProductCategory category) {
         String categoryImage = categoryImageResolver.resolve(category);
-        if (categoryImage != null) {
-            return publicUrlResolver.resolve(categoryImage);
-        }
-        return secureHttpsUrl(externalImageUrl);
-    }
-
-    String secureHttpsUrl(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        try {
-            URI uri = URI.create(value.trim());
-            return "https".equalsIgnoreCase(uri.getScheme()) && uri.getHost() != null
-                    ? uri.toString()
-                    : null;
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
+        return publicUrlResolver.resolve(categoryImage == null ? ETC_IMAGE_PATH : categoryImage);
     }
 }

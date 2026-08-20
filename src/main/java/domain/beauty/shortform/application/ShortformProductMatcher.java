@@ -4,7 +4,6 @@ import domain.beauty.domain.BeautyRoutineAnalysis.IdentificationLevel;
 import domain.beauty.domain.BeautyRoutineAnalysis.Step;
 import domain.beauty.shortform.domain.IngredientDataStatus;
 import domain.beauty.shortform.domain.ProductResolutionStatus;
-import domain.cosmetic.client.KakaoImageClient;
 import domain.inventory.Product;
 import domain.inventory.ProductCategory;
 import domain.inventory.ProductRepository;
@@ -16,18 +15,15 @@ import org.springframework.stereotype.Component;
 public class ShortformProductMatcher {
 
     private final ProductRepository productRepository;
-    private final KakaoImageClient imageClient;
     private final ShortformProductCategoryResolver categoryResolver;
     private final ShortformProductImageResolver imageResolver;
 
     public ShortformProductMatcher(
             ProductRepository productRepository,
-            KakaoImageClient imageClient,
             ShortformProductCategoryResolver categoryResolver,
             ShortformProductImageResolver imageResolver
     ) {
         this.productRepository = productRepository;
-        this.imageClient = imageClient;
         this.categoryResolver = categoryResolver;
         this.imageResolver = imageResolver;
     }
@@ -49,7 +45,7 @@ public class ShortformProductMatcher {
         if (!videoHasExactProduct && !aiResolvedProduct) {
             ProductCategory category = categoryResolver.resolve(step.category(), step.productName());
             return new MatchedVideoStep(
-                    step, null, category, imageResolver.resolve(category, null),
+                    step, null, category, imageResolver.resolve(category),
                     step.brand(), step.category(), ProductResolutionStatus.UNRESOLVED,
                     0, IngredientDataStatus.NOT_ELIGIBLE, ProductEnrichmentData.unresolved());
         }
@@ -74,14 +70,17 @@ public class ShortformProductMatcher {
                         : IngredientDataStatus.UNAVAILABLE;
 
         if (product != null) {
-            ProductCategory productCategory = product.getCategory() == null
-                    ? categoryResolver.resolve(step.category(), displayProductName)
-                    : product.getCategory();
+            boolean unsupported = categoryResolver.isUnsupported(step.category(), displayProductName);
+            ProductCategory productCategory = unsupported
+                    ? null
+                    : product.getCategory() == null
+                            ? categoryResolver.resolve(step.category(), displayProductName)
+                            : product.getCategory();
             return new MatchedVideoStep(
                     step,
                     product.getId(),
                     productCategory,
-                    imageResolver.resolve(productCategory, product.getImageUrl()),
+                    imageResolver.resolve(productCategory),
                     displayBrand,
                     displayProductName,
                     resolutionStatus,
@@ -90,16 +89,12 @@ public class ShortformProductMatcher {
                     enrichment
             );
         }
-        String query = displayBrand == null ? displayProductName : displayBrand + " " + displayProductName;
         ProductCategory resolvedCategory = categoryResolver.resolve(step.category(), displayProductName);
-        String imageUrl = resolvedCategory == null
-                ? imageResolver.resolve(null, imageClient.searchImageUrl(query))
-                : imageResolver.resolve(resolvedCategory, null);
         return new MatchedVideoStep(
                 step,
                 null,
                 resolvedCategory,
-                imageUrl,
+                imageResolver.resolve(resolvedCategory),
                 displayBrand,
                 displayProductName,
                 resolutionStatus,

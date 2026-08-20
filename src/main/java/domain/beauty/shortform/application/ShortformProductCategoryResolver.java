@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 public class ShortformProductCategoryResolver {
 
     public ProductCategory resolve(String category, String productName) {
-        if (isUnsupported(category) || isUnsupported(productName)) {
+        if (isUnsupported(category, productName)) {
             return null;
         }
         ProductCategory resolved = resolveValue(category);
@@ -24,6 +24,10 @@ public class ShortformProductCategoryResolver {
         } catch (IllegalArgumentException ignored) {
             return null;
         }
+    }
+
+    public boolean isUnsupported(String category, String productName) {
+        return isUnsupportedValue(category) || isUnsupportedValue(productName);
     }
 
     private ProductCategory resolveValue(String value) {
@@ -84,7 +88,7 @@ public class ShortformProductCategoryResolver {
         return false;
     }
 
-    private boolean isUnsupported(String value) {
+    private boolean isUnsupportedValue(String value) {
         if (value == null || value.isBlank()) {
             return false;
         }

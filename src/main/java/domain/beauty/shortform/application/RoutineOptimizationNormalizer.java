@@ -107,7 +107,7 @@ public class RoutineOptimizationNormalizer {
                 stored.productName(),
                 textOr(stored.replaceName(), videoProductName(source)),
                 stored.brand(),
-                imageResolver.resolve(category, stored.imageUrl()),
+                imageResolver.resolve(category),
                 koreanCopy.normalizeOptimizationReason(
                         stored.reason(), koreanCopy.optimizationFallback(category, true))
         );
@@ -127,7 +127,7 @@ public class RoutineOptimizationNormalizer {
                 source == null ? stored.productName() : videoProductName(source),
                 null,
                 source == null ? stored.brand() : source.displayBrand(),
-                imageResolver.resolve(category, source == null ? stored.imageUrl() : source.imageUrl()),
+                imageResolver.resolve(category),
                 koreanCopy.normalizeOptimizationReason(
                         rejectedReplacement ? null : stored.reason(),
                         koreanCopy.optimizationFallback(category, false))

@@ -3,7 +3,6 @@ package domain.beauty.shortform.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import domain.beauty.domain.BeautyRoutineAnalysis.EvidenceSource;
@@ -15,7 +14,7 @@ import domain.beauty.shortform.domain.IngredientDataStatus;
 import domain.beauty.shortform.domain.IngredientSourceType;
 import domain.beauty.shortform.domain.IngredientVerificationStatus;
 import domain.beauty.shortform.domain.ProductResolutionStatus;
-import domain.cosmetic.client.KakaoImageClient;
+import domain.inventory.Product;
 import domain.inventory.ProductRepository;
 import domain.inventory.ProductCategory;
 import domain.inventory.CategoryImageResolver;
@@ -30,13 +29,11 @@ class ShortformProductMatcherTest {
     @Test
     void exposesEstimatedIngredientsEvenWhenVideoStepWasCategoryOnly() {
         ProductRepository repository = mock(ProductRepository.class);
-        KakaoImageClient imageClient = mock(KakaoImageClient.class);
         when(repository.findFirstByNameIgnoreCase(anyString())).thenReturn(Optional.empty());
         when(repository.findFirstByNameIgnoreCaseAndBrandIgnoreCase(anyString(), anyString()))
                 .thenReturn(Optional.empty());
-        when(imageClient.searchImageUrl(anyString())).thenReturn(null);
         ShortformProductMatcher matcher = new ShortformProductMatcher(
-                repository, imageClient, new ShortformProductCategoryResolver(),
+                repository, new ShortformProductCategoryResolver(),
                 new ShortformProductImageResolver(
                         new CategoryImageResolver(), new PublicUrlResolver("https://mutsa.dev.me.kr")));
         ProductEnrichmentData estimated = new ProductEnrichmentData(
@@ -59,7 +56,31 @@ class ShortformProductMatcherTest {
         assertThat(matched.productCategory()).isEqualTo(ProductCategory.CREAM);
         assertThat(matched.imageUrl())
                 .isEqualTo("https://mutsa.dev.me.kr/images/categories/cream.png");
-        verifyNoInteractions(imageClient);
+    }
+
+    @Test
+    void unsupportedVideoProductOverridesStaleCatalogCategoryWithEtcImage() {
+        ProductRepository repository = mock(ProductRepository.class);
+        Product staleCatalogProduct = Product.builder()
+                .name("퓨어 클렌징 오일")
+                .brand("테스트")
+                .category(ProductCategory.FACEOIL)
+                .imageUrl("https://external.example/old.jpg")
+                .build();
+        when(repository.findFirstByNameIgnoreCaseAndBrandIgnoreCase(
+                "퓨어 클렌징 오일", "테스트"))
+                .thenReturn(Optional.of(staleCatalogProduct));
+        ShortformProductMatcher matcher = new ShortformProductMatcher(
+                repository, new ShortformProductCategoryResolver(),
+                new ShortformProductImageResolver(
+                        new CategoryImageResolver(), new PublicUrlResolver("https://mutsa.dev.me.kr")));
+
+        MatchedVideoStep matched = matcher.match(
+                List.of(exactCleansingOilStep()), Map.of()).getFirst();
+
+        assertThat(matched.productCategory()).isNull();
+        assertThat(matched.imageUrl())
+                .isEqualTo("https://mutsa.dev.me.kr/images/categories/etc.png");
     }
 
     private Step categoryStep() {
@@ -68,5 +89,13 @@ class ShortformProductMatcherTest {
                 PurposeBasis.GENERAL_INFERENCE, null, IdentificationLevel.CATEGORY_ONLY,
                 "수딩 크림", null, null, null, null, null,
                 List.of(EvidenceSource.VISUAL_USAGE), "파란 용기의 수딩 크림", 0.70);
+    }
+
+    private Step exactCleansingOilStep() {
+        return new Step(
+                1, "00:01", null, "얼굴", "세정", "헹굼", "메이크업 제거",
+                PurposeBasis.DIRECTLY_STATED, null, IdentificationLevel.EXACT_PRODUCT,
+                "오일", "테스트", "퓨어 클렌징 오일", null, null, null,
+                List.of(EvidenceSource.ON_SCREEN_TEXT), "제품명을 확인", 0.95);
     }
 }

@@ -190,7 +190,7 @@ export const demoAnalysisResult = {
       category: '클렌징',
       displayProductName: '초미세먼지 세정 클렌저',
       productName: '초미세먼지 세정 클렌저',
-      imageUrl: null,
+      imageUrl: 'https://mutsa.dev.me.kr/images/categories/etc.png',
       primaryAssessmentCategory: 'SAFE',
       safetySummary: '세정력이 뛰어나면서 자극이 적어 민감성 피부도 안심이에요.',
       benefitSummary: '뛰어난 세정력과 촉촉한 마무리감',
@@ -239,7 +239,7 @@ export const demoOptimization = {
   missingCount: 1,
   summary: '영상 속 제품 중 3개를 같은 카테고리의 인벤토리 제품으로 교체했어요.',
   steps: [
-    { order: 1, productName: '초미세먼지 세정 클렌저', replaceName: null, imageUrl: null, status: 'VIDEO_PRODUCT', reason: '영상 속 클렌저는 미세먼지 세정을 위한 제품이에요. 이 역할을 맡길 확인된 보유 클렌저가 없어 영상 속 제품을 사용해 주세요.' },
+    { order: 1, productName: '초미세먼지 세정 클렌저', replaceName: null, imageUrl: 'https://mutsa.dev.me.kr/images/categories/etc.png', status: 'VIDEO_PRODUCT', reason: '영상 속 클렌저는 미세먼지 세정을 위한 제품이에요. 이 역할을 맡길 확인된 보유 클렌저가 없어 영상 속 제품을 사용해 주세요.' },
     { order: 2, productName: '셀퓨전씨 쿨링 패드', replaceName: '라운드랩 1025 독도 토너', imageUrl: 'https://mutsa.dev.me.kr/images/categories/skin_tonerpad.png', status: 'REPLACED', reason: '보유하신 셀퓨전씨 쿨링 패드는 영상 속 독도 토너의 피부 결 정돈 역할을 이어갈 수 있어요. 추가 구매 없이 보유 제품으로 관리해 보세요.' },
     { order: 3, productName: '메디힐 수분 앰플', replaceName: '자작나무 수분 앰플', imageUrl: 'https://mutsa.dev.me.kr/images/categories/essence_serum.png', status: 'REPLACED', reason: '히알루론산을 활용한 수분 공급 단계를 보유 제품으로 이어갈 수 있어요.' },
     { order: 4, productName: '에스트라 아토베리어 로션', replaceName: '판테놀 장벽 로션', imageUrl: 'https://mutsa.dev.me.kr/images/categories/lotion.png', status: 'REPLACED', reason: '피부 장벽을 보호하는 보습 단계를 보유 제품으로 이어갈 수 있어요.' },
