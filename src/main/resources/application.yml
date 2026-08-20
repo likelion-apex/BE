@@ -137,11 +137,11 @@ product:
 inventory:
   ai-cache-ttl: 30d
   connect-timeout: ${INVENTORY_CONNECT_TIMEOUT:1s}
-  read-timeout: ${INVENTORY_READ_TIMEOUT:6s}
+  read-timeout: ${INVENTORY_READ_TIMEOUT:30s}
   gemini-connect-timeout: 3s
-  gemini-read-timeout: 5s
+  gemini-read-timeout: 20s
   groq-connect-timeout: 1s
-  groq-read-timeout: 2s
+  groq-read-timeout: 10s
   openai-max-output-tokens: 800
 
 cors:

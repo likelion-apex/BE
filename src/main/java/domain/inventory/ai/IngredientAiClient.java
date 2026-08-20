@@ -2,6 +2,8 @@ package domain.inventory.ai;
 
 import domain.cosmetic.client.GroqIngredientClient;
 import domain.cosmetic.client.OpenAiIngredientClient;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +18,7 @@ import org.springframework.stereotype.Component;
 public class IngredientAiClient {
 
     private static final List<AiProvider> ORDER = List.of(AiProvider.OPENAI, AiProvider.GEMINI, AiProvider.GROQ);
+    private static final int DETAIL_BATCH_SIZE = 8;
 
     private final OpenAiIngredientClient openAiIngredientClient;
     private final InventoryGeminiJsonClient geminiJsonClient;
@@ -40,6 +43,7 @@ public class IngredientAiClient {
         String userPrompt = "제품명: " + productName;
         for (AiProvider provider : ORDER) {
             if (skipGate.shouldSkip(provider)) {
+                log.info("전성분 조회 {} 쿨다운 중이라 건너뜁니다: productName={}", provider, productName);
                 continue;
             }
             try {
@@ -59,7 +63,7 @@ public class IngredientAiClient {
                 }
                 log.warn("전성분 {} 응답이 비어 있어 다음 provider로 넘어갑니다: productName={}", provider, productName);
             } catch (AiProviderUnavailableException e) {
-                log.warn("전성분 {} 실패: productName={}, message={}", provider, productName, e.getMessage());
+                logFailure("전성분", provider, productName, e);
                 skipGate.markFrom(provider, e);
             }
         }
@@ -71,9 +75,23 @@ public class IngredientAiClient {
         if (ingredientNames == null || ingredientNames.isEmpty()) {
             return Map.of();
         }
+        if (ingredientNames.size() <= DETAIL_BATCH_SIZE) {
+            return fetchIngredientDetailsBatch(ingredientNames);
+        }
+        // 성분 목록이 길면 단일 요청이 타임아웃되기 쉬우므로, 배치로 나눠 각 배치를 독립적으로
+        // 폴백시키고 결과를 병합한다. 한 배치가 실패해도 다른 배치 결과는 유지된다.
+        Map<String, IngredientAiDetail> merged = new LinkedHashMap<>();
+        for (List<String> batch : partition(ingredientNames, DETAIL_BATCH_SIZE)) {
+            merged.putAll(fetchIngredientDetailsBatch(batch));
+        }
+        return merged;
+    }
+
+    private Map<String, IngredientAiDetail> fetchIngredientDetailsBatch(List<String> ingredientNames) {
         String userPrompt = "성분 목록: " + String.join(", ", ingredientNames);
         for (AiProvider provider : ORDER) {
             if (skipGate.shouldSkip(provider)) {
+                log.info("배합목적/위험도 조회 {} 쿨다운 중이라 건너뜁니다: batchSize={}", provider, ingredientNames.size());
                 continue;
             }
             try {
@@ -89,12 +107,20 @@ public class IngredientAiClient {
                 }
                 log.warn("배합목적/위험도 {} 응답이 비어 있어 다음 provider로 넘어갑니다", provider);
             } catch (AiProviderUnavailableException e) {
-                log.warn("배합목적/위험도 {} 실패: message={}", provider, e.getMessage());
+                logFailure("배합목적/위험도", provider, null, e);
                 skipGate.markFrom(provider, e);
             }
         }
-        log.warn("배합목적/위험도 조회가 모든 provider에서 비어 있거나 실패했습니다");
+        log.warn("배합목적/위험도 조회가 모든 provider에서 비어 있거나 실패했습니다: batchSize={}", ingredientNames.size());
         return Map.of();
+    }
+
+    private static List<List<String>> partition(List<String> items, int size) {
+        List<List<String>> batches = new ArrayList<>();
+        for (int i = 0; i < items.size(); i += size) {
+            batches.add(items.subList(i, Math.min(i + size, items.size())));
+        }
+        return batches;
     }
 
     public String inferBrand(String productName) {
@@ -104,6 +130,7 @@ public class IngredientAiClient {
         String userPrompt = "제품명: " + productName;
         for (AiProvider provider : ORDER) {
             if (skipGate.shouldSkip(provider)) {
+                log.info("브랜드 추론 {} 쿨다운 중이라 건너뜁니다: productName={}", provider, productName);
                 continue;
             }
             try {
@@ -114,10 +141,19 @@ public class IngredientAiClient {
                     case GROQ -> groqIngredientClient.fetchBrand(productName);
                 };
             } catch (AiProviderUnavailableException e) {
-                log.warn("브랜드 추론 {} 실패: productName={}, message={}", provider, productName, e.getMessage());
+                logFailure("브랜드 추론", provider, productName, e);
                 skipGate.markFrom(provider, e);
             }
         }
         return null;
+    }
+
+    private static void logFailure(String label, AiProvider provider, String productName, AiProviderUnavailableException e) {
+        if (e.isQuotaExceeded()) {
+            log.warn("{} {} 할당량 소진으로 실패, 쿨다운을 겁니다: productName={}, retryAfter={}, message={}",
+                    label, provider, productName, e.getRetryAfter(), e.getMessage());
+        } else {
+            log.warn("{} {} 실패(쿨다운 없음): productName={}, message={}", label, provider, productName, e.getMessage());
+        }
     }
 }

@@ -46,6 +46,7 @@ public class PersonalizedAnalysisAiClient {
                 productName, ingredientNames, skinType, skinConcerns);
         for (AiProvider provider : ORDER) {
             if (skipGate.shouldSkip(provider)) {
+                log.info("맞춤 분석 {} 쿨다운 중이라 건너뜁니다: productName={}", provider, productName);
                 continue;
             }
             try {
@@ -65,7 +66,12 @@ public class PersonalizedAnalysisAiClient {
                 // 아니므로, 쿨다운 없이 이 요청 안에서만 다음 provider로 넘어간다.
                 log.warn("맞춤 분석 {} 응답이 비어 있어 다음 provider로 넘어갑니다: productName={}", provider, productName);
             } catch (AiProviderUnavailableException e) {
-                log.warn("맞춤 분석 {} 실패: productName={}, message={}", provider, productName, e.getMessage());
+                if (e.isQuotaExceeded()) {
+                    log.warn("맞춤 분석 {} 할당량 소진으로 실패, 쿨다운을 겁니다: productName={}, retryAfter={}, message={}",
+                            provider, productName, e.getRetryAfter(), e.getMessage());
+                } else {
+                    log.warn("맞춤 분석 {} 실패(쿨다운 없음): productName={}, message={}", provider, productName, e.getMessage());
+                }
                 skipGate.markFrom(provider, e);
             }
         }

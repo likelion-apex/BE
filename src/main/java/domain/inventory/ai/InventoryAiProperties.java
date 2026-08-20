@@ -8,19 +8,16 @@ public class InventoryAiProperties {
 
     private Duration aiCacheTtl = Duration.ofDays(30);
     private Duration connectTimeout = Duration.ofSeconds(1);
-    private Duration readTimeout = Duration.ofSeconds(6);
+    private Duration readTimeout = Duration.ofSeconds(30);
     private Duration geminiConnectTimeout = Duration.ofSeconds(3);
-    private Duration geminiReadTimeout = Duration.ofSeconds(5);
+    private Duration geminiReadTimeout = Duration.ofSeconds(20);
     private Duration groqConnectTimeout = Duration.ofSeconds(1);
-    private Duration groqReadTimeout = Duration.ofSeconds(2);
+    private Duration groqReadTimeout = Duration.ofSeconds(10);
     private int openaiMaxOutputTokens = 400;
 
     private Duration openaiQuotaCooldown = Duration.ofHours(1);
-    private Duration openaiTimeoutCooldown = Duration.ofMinutes(2);
     private Duration geminiQuotaCooldown = Duration.ofHours(1);
-    private Duration geminiTimeoutCooldown = Duration.ofMinutes(2);
     private Duration groqQuotaCooldown = Duration.ofHours(1);
-    private Duration groqTimeoutCooldown = Duration.ofMinutes(2);
 
     public Duration getAiCacheTtl() {
         return aiCacheTtl;
@@ -94,28 +91,12 @@ public class InventoryAiProperties {
         this.openaiQuotaCooldown = openaiQuotaCooldown;
     }
 
-    public Duration getOpenaiTimeoutCooldown() {
-        return openaiTimeoutCooldown;
-    }
-
-    public void setOpenaiTimeoutCooldown(Duration openaiTimeoutCooldown) {
-        this.openaiTimeoutCooldown = openaiTimeoutCooldown;
-    }
-
     public Duration getGeminiQuotaCooldown() {
         return geminiQuotaCooldown;
     }
 
     public void setGeminiQuotaCooldown(Duration geminiQuotaCooldown) {
         this.geminiQuotaCooldown = geminiQuotaCooldown;
-    }
-
-    public Duration getGeminiTimeoutCooldown() {
-        return geminiTimeoutCooldown;
-    }
-
-    public void setGeminiTimeoutCooldown(Duration geminiTimeoutCooldown) {
-        this.geminiTimeoutCooldown = geminiTimeoutCooldown;
     }
 
     public Duration getGroqQuotaCooldown() {
@@ -126,11 +107,4 @@ public class InventoryAiProperties {
         this.groqQuotaCooldown = groqQuotaCooldown;
     }
 
-    public Duration getGroqTimeoutCooldown() {
-        return groqTimeoutCooldown;
-    }
-
-    public void setGroqTimeoutCooldown(Duration groqTimeoutCooldown) {
-        this.groqTimeoutCooldown = groqTimeoutCooldown;
-    }
 }

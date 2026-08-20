@@ -277,6 +277,26 @@ class InventoryAnalysisCacheTest {
         verify(inventoryAiCacheService, never()).save(any(), any());
     }
 
+    /**
+     * 성분 이름은 3개 조회됐지만 상세(배합목적/위험도)는 일부만 확보된 경우(예: 배치 폴백 중
+     * 일부 배치만 실패), 불완전한 결과를 캐시하면 30일 동안 나머지 성분이 기본값으로 고정되어
+     * 버리므로 캐시하지 않아야 한다.
+     */
+    @Test
+    void doesNotCacheIncompleteIngredientDetails() {
+        when(inventoryRepository.findByIdAndMemberId(11L, 9L)).thenReturn(Optional.of(inventory));
+        when(inventoryAiCacheService.find(any())).thenReturn(Optional.empty());
+        when(ingredientAiClient.fetchIngredientNames("바닥 토너"))
+                .thenReturn(List.of("정제수", "글리세린", "메틸파라벤"));
+        when(ingredientAiClient.fetchIngredientDetails(List.of("정제수", "글리세린", "메틸파라벤")))
+                .thenReturn(Map.of("정제수", new IngredientAiDetail(List.of("용제"), List.of(), "LOW")));
+
+        IngredientAnalysisResponse response = inventoryService.getIngredientAnalysis(9L, 11L);
+
+        assertThat(response.ingredients()).hasSize(3);
+        verify(inventoryAiCacheService, never()).save(eq(InventoryAiCacheService.ingredientKey("바닥 토너")), any());
+    }
+
     @Test
     void ingredientAnalysisAlwaysReturnsBrandCapacityAndCountsEvenWithoutIngredients() {
         Product product = Product.builder()
@@ -486,8 +506,12 @@ class InventoryAnalysisCacheTest {
         verify(ingredientAiClient, never()).inferBrand(any());
     }
 
+    /**
+     * 브랜드 추론이 실패(빈 응답)하면 캐시에 저장하지 않는다. AI 호출이 일시적으로
+     * 실패했을 뿐일 수 있으므로, 빈 브랜드를 캐시하면 30일 동안 다시 시도할 기회를 잃는다.
+     */
     @Test
-    void savesUnknownBrandMarkerWhenInferenceFails() {
+    void doesNotCacheBrandWhenInferenceFails() {
         Product product = Product.builder()
                 .name("바닥 토너")
                 .category(ProductCategory.SKIN_TONER)
@@ -504,7 +528,7 @@ class InventoryAnalysisCacheTest {
         IngredientAnalysisResponse response = inventoryService.getIngredientAnalysis(9L, 11L);
 
         assertThat(response.brand()).isNull();
-        verify(inventoryAiCacheService).save(eq(InventoryAiCacheService.brandKey("바닥 토너")), eq(Map.of("brand", "")));
+        verify(inventoryAiCacheService, never()).save(eq(InventoryAiCacheService.brandKey("바닥 토너")), any());
         verify(inventoryAiCacheService, never()).save(eq(InventoryAiCacheService.ingredientKey("바닥 토너")), any());
     }
 
