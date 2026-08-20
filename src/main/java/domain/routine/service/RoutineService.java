@@ -1,13 +1,16 @@
 package domain.routine.service;
 
 import domain.beauty.shortform.application.ShortformAnalysisJsonMapper;
+import domain.beauty.shortform.application.ShortformAnalysisSnapshotNormalizer;
 import domain.beauty.shortform.application.ShortformRoutineTypeResolver;
 import domain.beauty.shortform.domain.RoutineOptimizationSnapshot;
 import domain.beauty.shortform.domain.RoutineSaveType;
 import domain.beauty.shortform.domain.ShortformAnalysis;
 import domain.beauty.shortform.domain.ShortformAnalysisRepository;
+import domain.beauty.shortform.domain.ShortformAnalysisSnapshot;
 import domain.ingredient.domain.InteractionType;
 import domain.ingredient.dto.request.ProductCompatibilityRequest;
+import domain.ingredient.dto.response.AnalysisReason;
 import domain.ingredient.dto.response.ProductCompatibilityResponse;
 import domain.ingredient.dto.response.ProductCompatibilityResponse.CompatibilityResult;
 import domain.ingredient.dto.response.SkinAnalysisResponse;
@@ -35,6 +38,7 @@ import domain.routine.dto.response.DailyRoutineResponse;
 import domain.routine.dto.response.RoutineCreateResponse;
 import domain.routine.dto.response.RoutineDeleteResponse;
 import domain.routine.dto.response.RoutineDetailResponse;
+import domain.routine.dto.response.RoutineDetailResponse.AiBriefing;
 import domain.routine.dto.response.RoutineGenerationResponse;
 import domain.routine.dto.response.RoutineGenerationResponse.GeneratedStep;
 import domain.routine.repository.DailyConditionRepository;
@@ -53,8 +57,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -81,6 +87,7 @@ public class RoutineService {
     private final ShortformAnalysisRepository shortformAnalysisRepository;
     private final ShortformAnalysisJsonMapper shortformAnalysisJsonMapper;
     private final PublicUrlResolver publicUrlResolver;
+    private final ShortformAnalysisSnapshotNormalizer shortformAnalysisSnapshotNormalizer;
 
     @Transactional
     public DailyRoutineResponse getDailyRoutine(Long memberId) {
@@ -228,6 +235,87 @@ public class RoutineService {
         Routine routine = routineRepository.findByIdAndMemberId(routineId, memberId)
                 .orElseThrow(() -> new CustomException(ErrorCode.ROUTINE_NOT_FOUND));
         return RoutineDetailResponse.from(routine, publicUrlResolver);
+        AiBriefing aiBriefing = resolveAiBriefing(routine);
+        Map<Integer, String> safetyEvaluationByOrder = resolveSafetyEvaluations(memberId, routine.getSteps());
+        return RoutineDetailResponse.from(routine, aiBriefing, safetyEvaluationByOrder);
+    }
+
+    /**
+     * 6.10 AI 브리핑. sourceAnalysis가 없으면(수동생성/AI자동생성 루틴) 전체 null.
+     * 있으면 resultJson(원본 영상 분석)과 optimizationJson(인벤토리 최적화 결과)을 각각 독립적으로
+     * 파싱해 합친다 - 한쪽이 blank/파싱실패여도 다른 쪽 필드는 정상 표시되고 전체 API는 죽지 않는다.
+     */
+    private AiBriefing resolveAiBriefing(Routine routine) {
+        ShortformAnalysis source = routine.getSourceAnalysis();
+        if (source == null) {
+            return null;
+        }
+
+        ShortformAnalysisSnapshot snapshot = null;
+        String resultJson = source.getResultJson();
+        if (resultJson != null && !resultJson.isBlank()) {
+            try {
+                snapshot = shortformAnalysisSnapshotNormalizer.normalize(
+                        shortformAnalysisJsonMapper.read(resultJson, ShortformAnalysisSnapshot.class));
+            } catch (CustomException exception) {
+                log.warn("AI 브리핑 원본 분석 파싱 실패: routineId={}", routine.getId(), exception);
+            }
+        }
+
+        Integer matchScore = null;
+        String optimizationSummary = null;
+        String optimizationJson = source.getOptimizationJson();
+        if (optimizationJson != null && !optimizationJson.isBlank()) {
+            try {
+                RoutineOptimizationSnapshot optimization = shortformAnalysisJsonMapper
+                        .read(optimizationJson, RoutineOptimizationSnapshot.class);
+                matchScore = optimization.overallScore();
+                optimizationSummary = optimization.summary();
+            } catch (CustomException exception) {
+                log.warn("AI 브리핑 최적화 결과 파싱 실패: routineId={}", routine.getId(), exception);
+            }
+        }
+
+        return new AiBriefing(
+                snapshot == null ? null : snapshot.title(),
+                snapshot == null ? null : snapshot.tag(),
+                snapshot == null ? null : snapshot.coreGoal(),
+                snapshot == null ? null : snapshot.synergyCombo(),
+                matchScore,
+                optimizationSummary);
+    }
+
+    /**
+     * 6.10 스텝별 AI 안전성 평가. product가 있는 스텝만 4.4(SkinAnalysisService)를 병렬 호출해
+     * aiAnalysis.reasons의 첫 번째 근거를 담는다. 실패한 스텝은 null 처리하고 나머지는 정상 진행한다.
+     */
+    private Map<Integer, String> resolveSafetyEvaluations(Long memberId, List<RoutineStep> steps) {
+        Map<Integer, CompletableFuture<String>> futuresByOrder = new LinkedHashMap<>();
+        for (RoutineStep step : steps) {
+            Product product = step.getProduct();
+            if (product == null) {
+                continue;
+            }
+            Long productId = product.getId();
+            int order = step.getOrder();
+            futuresByOrder.put(order, CompletableFuture.supplyAsync(() -> {
+                try {
+                    SkinAnalysisResponse response = skinAnalysisService.analyze(memberId, productId);
+                    List<AnalysisReason> reasons = response.aiAnalysis() == null
+                            ? List.of() : response.aiAnalysis().reasons();
+                    return (reasons == null || reasons.isEmpty()) ? null : reasons.get(0).reason();
+                } catch (RuntimeException exception) {
+                    log.warn("스텝 안전성 평가 실패: order={}, productId={}", order, productId, exception);
+                    return null;
+                }
+            }));
+        }
+
+        CompletableFuture.allOf(futuresByOrder.values().toArray(CompletableFuture[]::new)).join();
+
+        Map<Integer, String> result = new HashMap<>();
+        futuresByOrder.forEach((order, future) -> result.put(order, future.join()));
+        return result;
     }
 
     @Transactional
