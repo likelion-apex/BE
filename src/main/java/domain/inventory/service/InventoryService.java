@@ -135,7 +135,7 @@ public class InventoryService {
 
         return new AiAnalysisResponse(
                 inventory.getId(), productName, publicUrlResolver.resolve(product.getImageUrl()),
-                score, keywords, LocalDateTime.now());
+                inventory.isFavorite(), score, keywords, LocalDateTime.now());
     }
 
     public IngredientAnalysisResponse getIngredientAnalysis(Long memberId, Long inventoryId) {

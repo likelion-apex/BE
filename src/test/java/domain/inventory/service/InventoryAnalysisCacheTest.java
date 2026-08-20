@@ -172,6 +172,21 @@ class InventoryAnalysisCacheTest {
     }
 
     @Test
+    void aiAnalysisIncludesFavoriteStatus() {
+        inventory.updateFavorite(true);
+        when(inventoryRepository.findByIdAndMemberId(11L, 9L)).thenReturn(Optional.of(inventory));
+        when(memberRepository.findById(9L)).thenReturn(Optional.of(member));
+        when(inventoryAiCacheService.find(any())).thenReturn(Optional.empty());
+        when(ingredientAiClient.fetchIngredientNames("바닥 토너")).thenReturn(List.of());
+        when(personalizedAnalysisAiClient.analyze("바닥 토너", List.of(), SkinType.DRY, Set.of()))
+                .thenReturn(null);
+
+        AiAnalysisResponse response = inventoryService.getAiAnalysis(9L, 11L);
+
+        assertThat(response.isFavorite()).isTrue();
+    }
+
+    @Test
     void aiAnalysisScoreIsHighWhenIngredientsAreMostlyLowRisk() {
         when(inventoryRepository.findByIdAndMemberId(11L, 9L)).thenReturn(Optional.of(inventory));
         when(memberRepository.findById(9L)).thenReturn(Optional.of(member));
