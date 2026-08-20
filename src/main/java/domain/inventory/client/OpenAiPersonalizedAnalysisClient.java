@@ -39,7 +39,7 @@ public class OpenAiPersonalizedAnalysisClient {
             {"score": 88, "keywords": [{"keyword": "...", "reason": "..."}, {"keyword": "...", "reason": "..."}, {"keyword": "...", "reason": "..."}]}
             """;
 
-    private static final int REQUIRED_KEYWORD_COUNT = 3;
+    private static final int MAX_KEYWORD_COUNT = 3;
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
@@ -133,10 +133,12 @@ public class OpenAiPersonalizedAnalysisClient {
     }
 
     /**
-     * keyword/reason이 모두 채워진 항목이 {@value #REQUIRED_KEYWORD_COUNT}개 미만이면 불완전한 응답으로 보고
-     * null을 반환한다. 호출부(OpenAI/Gemini/Groq)는 null을 AiProviderUnavailableException으로 전환해
-     * 다음 provider로 폴백하므로, 이 메서드만 강화하면 폴백·쿨다운 로직 전체가 자연스럽게 적용된다.
-     * 유효 항목이 기준치를 넘으면 앞에서부터 필요한 개수만 사용한다.
+     * score만 유효하면 keywords가 부족해도 성공으로 간주한다(실제 provider 네트워크 호출을 유발하는
+     * 폴백은 진짜 장애 상황에만 남겨두기 위함). keyword/reason이 모두 채워진 항목만 사용하고,
+     * {@value #MAX_KEYWORD_COUNT}개를 넘으면 앞에서부터 그만큼만 취한다. 부족분(3개 미만)은
+     * 호출부(InventoryService)가 결정론적 기본 키워드로 채워 응답을 완성한다 — 이 방식이
+     * OpenAI/Gemini/Groq를 매번 순차 호출하는 것보다 훨씬 빠르고, 성분 분석 API와 동일한
+     * 지연시간 특성을 유지한다.
      */
     public static PersonalizedAnalysisResult parseResult(JsonNode parsed) {
         if (parsed == null || !parsed.isObject()) {
@@ -157,10 +159,9 @@ public class OpenAiPersonalizedAnalysisClient {
                 }
             });
         }
-        if (keywords.size() < REQUIRED_KEYWORD_COUNT) {
-            return null;
-        }
-        return new PersonalizedAnalysisResult(
-                Math.min(score, 100), List.copyOf(keywords.subList(0, REQUIRED_KEYWORD_COUNT)));
+        List<PersonalizedAnalysisResult.Keyword> limited = keywords.size() > MAX_KEYWORD_COUNT
+                ? List.copyOf(keywords.subList(0, MAX_KEYWORD_COUNT))
+                : List.copyOf(keywords);
+        return new PersonalizedAnalysisResult(Math.min(score, 100), limited);
     }
 }

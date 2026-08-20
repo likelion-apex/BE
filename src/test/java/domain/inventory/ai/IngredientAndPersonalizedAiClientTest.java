@@ -221,10 +221,12 @@ class IngredientAndPersonalizedAiClientTest {
     }
 
     @Test
-    void analyze_geminiReturnsIncompleteKeywords_thenGroqFallbackSucceeds() {
+    void analyze_geminiReturnsIncompleteKeywords_isAcceptedWithoutGroqFallback() {
+        // keywords가 부족해도 score만 유효하면 그 provider의 결과를 그대로 채택한다.
+        // 부족한 keywords는 InventoryService가 기본값으로 채우므로, 여기서 Groq까지
+        // 추가로 호출하지 않는다(불필요한 지연시간·네트워크 실패 유발을 방지).
         when(skipGate.shouldSkip(AiProvider.OPENAI)).thenReturn(false);
         when(skipGate.shouldSkip(AiProvider.GEMINI)).thenReturn(false);
-        when(skipGate.shouldSkip(AiProvider.GROQ)).thenReturn(false);
         when(openAiPersonalizedAnalysisClient.analyze(any(), any(), any(), any()))
                 .thenThrow(new AiProviderUnavailableException("openai down"));
         ObjectNode incompletePayload = new ObjectMapper().createObjectNode();
@@ -232,16 +234,14 @@ class IngredientAndPersonalizedAiClientTest {
         incompletePayload.putArray("keywords").addObject().put("keyword", "보습").put("reason", "건성에 맞음");
         when(geminiJsonClient.generateJson(eq(OpenAiPersonalizedAnalysisClient.SYSTEM_PROMPT), anyString()))
                 .thenReturn(incompletePayload);
-        PersonalizedAnalysisResult groqResult = new PersonalizedAnalysisResult(58, List.of());
-        when(groqPersonalizedAnalysisClient.analyze(eq("바닥 토너"), any(), any(), any()))
-                .thenReturn(groqResult);
 
         PersonalizedAnalysisResult result =
                 personalizedClient().analyze("바닥 토너", List.of("정제수"), SkinType.DRY, Set.of());
 
-        assertThat(result.score()).isEqualTo(58);
+        assertThat(result.score()).isEqualTo(65);
+        assertThat(result.keywords()).hasSize(1);
         verify(skipGate).markFrom(eq(AiProvider.OPENAI), any());
-        verify(skipGate).markFrom(eq(AiProvider.GEMINI), any());
+        verify(groqPersonalizedAnalysisClient, never()).analyze(any(), any(), any(), any());
     }
 
     @Test
