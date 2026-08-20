@@ -4,6 +4,7 @@ import domain.routine.domain.Routine;
 import domain.routine.domain.RoutineStatus;
 import domain.routine.domain.RoutineStep;
 import domain.routine.domain.RoutineType;
+import global.util.PublicUrlResolver;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Comparator;
 import java.util.List;
@@ -17,10 +18,10 @@ public record RoutineDetailResponse(
         @Schema(description = "루틴 단계 목록 (순서대로)") List<RoutineDetailStepResponse> steps
 ) {
 
-    public static RoutineDetailResponse from(Routine routine) {
+    public static RoutineDetailResponse from(Routine routine, PublicUrlResolver publicUrlResolver) {
         List<RoutineDetailStepResponse> steps = routine.getSteps().stream()
                 .sorted(Comparator.comparingInt(RoutineStep::getOrder))
-                .map(RoutineDetailStepResponse::from)
+                .map(step -> RoutineDetailStepResponse.from(step, publicUrlResolver))
                 .toList();
         return new RoutineDetailResponse(routine.getId(), routine.getName(), routine.getRoutineType(), routine.getStatus(), steps);
     }
@@ -37,7 +38,7 @@ public record RoutineDetailResponse(
             @Schema(description = "AI 추천 사유 (없으면 null)") String aiReason
     ) {
 
-        static RoutineDetailStepResponse from(RoutineStep step) {
+        static RoutineDetailStepResponse from(RoutineStep step, PublicUrlResolver publicUrlResolver) {
             return new RoutineDetailStepResponse(
                     step.getOrder(),
                     step.getProduct() != null ? step.getProduct().getId() : null,
@@ -45,7 +46,7 @@ public record RoutineDetailResponse(
                     step.getProductName(),
                     step.getBrand(),
                     step.getCategory(),
-                    step.getImageUrl(),
+                    publicUrlResolver.resolve(step.getImageUrl()),
                     step.getAiReason()
             );
         }

@@ -26,6 +26,7 @@ import domain.member.Role;
 import domain.member.SkinType;
 import global.exception.CustomException;
 import global.exception.ErrorCode;
+import global.util.PublicUrlResolver;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -67,7 +68,8 @@ class InventoryAnalysisCacheTest {
                 productService,
                 ingredientAiClient,
                 personalizedAnalysisAiClient,
-                inventoryAiCacheService);
+                inventoryAiCacheService,
+                new PublicUrlResolver(""));
         member = Member.builder()
                 .nickname("테스터")
                 .provider(Provider.KAKAO)

@@ -2,6 +2,7 @@ package domain.inventory.dto.response;
 
 import domain.inventory.Inventory;
 import domain.inventory.ProductCategory;
+import global.util.PublicUrlResolver;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
@@ -11,10 +12,11 @@ public record FavoriteInventoryResponse(
         @Schema(description = "즐겨찾기 목록") List<FavoriteInventoryItem> items
 ) {
 
-    public static FavoriteInventoryResponse of(long totalFavoriteCount, List<Inventory> favorites) {
+    public static FavoriteInventoryResponse of(
+            long totalFavoriteCount, List<Inventory> favorites, PublicUrlResolver publicUrlResolver) {
         return new FavoriteInventoryResponse(
                 totalFavoriteCount,
-                favorites.stream().map(FavoriteInventoryItem::from).toList()
+                favorites.stream().map(favorite -> FavoriteInventoryItem.from(favorite, publicUrlResolver)).toList()
         );
     }
 
@@ -29,14 +31,14 @@ public record FavoriteInventoryResponse(
             @Schema(description = "즐겨찾기 여부") boolean isFavorite
     ) {
 
-        public static FavoriteInventoryItem from(Inventory inventory) {
+        public static FavoriteInventoryItem from(Inventory inventory, PublicUrlResolver publicUrlResolver) {
             return new FavoriteInventoryItem(
                     inventory.getId(),
                     inventory.getProduct().getId(),
                     inventory.getProduct().getName(),
                     inventory.getProduct().getBrand(),
                     inventory.getProduct().getCategory(),
-                    inventory.getProduct().getImageUrl(),
+                    publicUrlResolver.resolve(inventory.getProduct().getImageUrl()),
                     inventory.isFavorite()
             );
         }
