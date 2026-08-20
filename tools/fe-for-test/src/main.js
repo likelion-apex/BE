@@ -582,7 +582,7 @@ function renderRoutineLibrary() {
       ${state.routine.libraryLoaded && !(library.routines || []).length ? '<div class="empty-card"><b>보관한 루틴이 없어요</b><p>숏폼 분석 결과나 AI 추천 루틴을 LIBRARY로 저장해 보세요.</p></div>' : ''}
       ${(library.routines || []).map((routine) => `<button class="library-routine-card" type="button" data-action="open-routine-detail" data-routine-id="${routine.routineId}">
         <span class="routine-type-badge ${String(routine.routineType).toLowerCase()}">${routine.routineType === 'DAY' ? 'DAY' : 'NIGHT'}</span>
-        <span><b>${escapeHtml(routine.name)}</b><small>${Number(routine.stepCount || 0)}단계 · ${formatDateTime(routine.createdAt)}${routine.matchScore != null ? ` · 매칭 ${routine.matchScore}점` : ''}</small></span><strong>›</strong>
+        <span><b>${escapeHtml(routine.name)}</b><small>${Number(routine.stepCount || 0)}단계 · ${formatDateTime(routine.createdAt)}${routine.overallScore != null ? ` · 매칭 ${routine.overallScore}점` : ''}</small></span><strong>›</strong>
       </button>`).join('')}
     </section>`;
 }
@@ -1398,6 +1398,7 @@ async function showRoutineDetail(routineId) {
     state.debug = detail;
     openDialog(dialogFrame('보관함 루틴', `
       <section class="routine-detail-head"><span class="routine-type-badge ${String(detail.routineType).toLowerCase()}">${detail.routineType}</span><h2>${escapeHtml(detail.name)}</h2><p>${detail.steps?.length || 0}단계 · ${escapeHtml(detail.status)}</p></section>
+      ${detail.aiBriefing ? renderBriefing(detail.aiBriefing) : ''}
       <div class="routine-detail-steps">${(detail.steps || []).map((step) => `<article><i>${step.order}</i><img src="${safeImageUrl(step.imageUrl, '/assets/product-jar.png')}" alt=""><span><b>${escapeHtml(step.productName)}</b><small>${escapeHtml(categoryLabels[step.category] || step.category || step.brand || '')}</small>${step.aiReason ? `<em>${escapeHtml(step.aiReason)}</em>` : ''}</span></article>`).join('')}</div>
     `, `<div class="dialog-action-stack"><button class="primary-button" type="button" data-action="apply-routine-today" data-routine-id="${detail.routineId}">오늘 루틴으로 적용</button><button class="danger-text" type="button" data-action="delete-routine" data-routine-id="${detail.routineId}">이 루틴 삭제</button></div>`), 'routine-detail-dialog');
   } catch (error) {
