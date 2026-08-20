@@ -175,6 +175,62 @@ class ShortformAnalysisApiIntegrationTest {
     }
 
     @Test
+    void recentHistoryExcludesFailedAndCancelledBeforeApplyingLimit() throws Exception {
+        Member member = saveMember("history-filter-member");
+        Member other = saveMember("history-filter-other");
+
+        for (int index = 0; index < 10; index++) {
+            analysisRepository.saveAndFlush(completedAnalysis(
+                    member,
+                    "visible-history-" + index,
+                    "\"ingredientDataStatus\":\"UNAVAILABLE\",\n"
+                            + "\"ingredientVerificationStatus\":\"UNVERIFIED\",\n"
+                            + "\"ingredientStats\":null,\n"
+                            + "\"ingredients\":[]"));
+        }
+        ShortformAnalysis pending = analysisRepository.saveAndFlush(new ShortformAnalysis(
+                member,
+                "pending-history",
+                "https://www.youtube.com/watch?v=pending-history",
+                "pending-history-fingerprint"));
+        ShortformAnalysis failed = new ShortformAnalysis(
+                member,
+                "failed-history",
+                "https://www.youtube.com/watch?v=failed-history",
+                "failed-history-fingerprint");
+        failed.fail("ANALYSIS-007", "분석 실패");
+        analysisRepository.saveAndFlush(failed);
+        ShortformAnalysis cancelled = new ShortformAnalysis(
+                member,
+                "cancelled-history",
+                "https://www.youtube.com/watch?v=cancelled-history",
+                "cancelled-history-fingerprint");
+        cancelled.cancel();
+        analysisRepository.saveAndFlush(cancelled);
+        analysisRepository.saveAndFlush(new ShortformAnalysis(
+                other,
+                "other-history",
+                "https://www.youtube.com/watch?v=other-history",
+                "other-history-fingerprint"));
+
+        mockMvc.perform(get("/api/shortform-analyses")
+                        .with(authentication(memberAuthentication(member.getId()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(10))
+                .andExpect(jsonPath("$.data.items[0].analysisId").value(pending.getId()))
+                .andExpect(jsonPath("$.data.items[0].status").value("PENDING"))
+                .andExpect(jsonPath("$.data.items[?(@.status == 'FAILED')]").isEmpty())
+                .andExpect(jsonPath("$.data.items[?(@.status == 'CANCELLED')]").isEmpty())
+                .andExpect(jsonPath("$.data.items[?(@.analysisId == %s)]"
+                        .formatted(failed.getId())).isEmpty())
+                .andExpect(jsonPath("$.data.items[?(@.analysisId == %s)]"
+                        .formatted(cancelled.getId())).isEmpty());
+
+        assertThat(analysisRepository.findById(failed.getId())).isPresent();
+        assertThat(analysisRepository.findById(cancelled.getId())).isPresent();
+    }
+
+    @Test
     void hidesAnotherMembersAnalysisAsNotFound() throws Exception {
         Member owner = saveMember("owner");
         Member other = saveMember("other");
