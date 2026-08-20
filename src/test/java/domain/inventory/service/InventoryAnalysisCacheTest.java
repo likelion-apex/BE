@@ -2,9 +2,11 @@ package domain.inventory.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -321,6 +323,34 @@ class InventoryAnalysisCacheTest {
 
         assertThat(response.score()).isEqualTo(70);
         assertThat(response.keywords()).isEmpty();
+    }
+
+    /**
+     * AI가 완전히 실패(null)했을 때 빈 keywords를 캐시에 저장하면, 이후 AI가 복구되어도
+     * TTL 동안 계속 빈 배열만 반환하는 문제가 있었다. 실패는 캐시하지 않아야 하며, 매 호출마다
+     * AI를 다시 시도해서 복구 즉시 키워드가 채워져야 한다.
+     */
+    @Test
+    void doesNotCacheKeywordsWhenAiFailsAndRetriesOnNextCall() {
+        when(inventoryRepository.findByIdAndMemberId(11L, 9L)).thenReturn(Optional.of(inventory));
+        when(memberRepository.findById(9L)).thenReturn(Optional.of(member));
+        when(inventoryAiCacheService.find(any())).thenReturn(Optional.empty());
+        when(ingredientAiClient.fetchIngredientNames("바닥 토너")).thenReturn(List.of());
+        when(personalizedAnalysisAiClient.analyze("바닥 토너", List.of(), SkinType.DRY, Set.of()))
+                .thenReturn(null)
+                .thenReturn(new PersonalizedAnalysisResult(
+                        80, List.of(new PersonalizedAnalysisResult.Keyword("보습", "건성"))));
+
+        AiAnalysisResponse firstResponse = inventoryService.getAiAnalysis(9L, 11L);
+        AiAnalysisResponse secondResponse = inventoryService.getAiAnalysis(9L, 11L);
+
+        assertThat(firstResponse.keywords()).isEmpty();
+        assertThat(secondResponse.keywords())
+                .containsExactly(new AiAnalysisResponse.AnalysisKeyword("보습", "건성"));
+        verify(personalizedAnalysisAiClient, times(2)).analyze(any(), any(), any(), any());
+        verify(inventoryAiCacheService, never()).save(
+                eq(InventoryAiCacheService.personalizedKey("바닥 토너", SkinType.DRY, Set.of())),
+                argThat(payload -> ((Map<?, ?>) payload).get("keywords") instanceof List<?> list && list.isEmpty()));
     }
 
     @Test

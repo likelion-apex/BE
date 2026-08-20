@@ -125,7 +125,12 @@ public class InventoryService {
             PersonalizedAnalysisResult result = personalizedAnalysisAiClient.analyze(
                     productName, ingredientNames, member.getSkinType(), member.getSkinConcerns());
             keywords = toKeywords(result);
-            saveCache(cacheKey, keywordsCachePayload(keywords));
+            // AI가 완전히 실패(result == null)했을 때는 캐시에 저장하지 않는다.
+            // 실패를 캐시하면 빈 keywords가 TTL 동안(기본 30일) 굳어져 AI가 복구된 뒤에도
+            // 계속 빈 배열만 반환하게 된다(재시도 불가).
+            if (result != null) {
+                saveCache(cacheKey, keywordsCachePayload(keywords));
+            }
         }
 
         return new AiAnalysisResponse(
