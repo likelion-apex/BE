@@ -40,7 +40,7 @@ public class Member {
     @Column
     private String email;
 
-    @Column(nullable = false)
+    @Column
     private String nickname;
 
     @Column(name = "profile_image_url")

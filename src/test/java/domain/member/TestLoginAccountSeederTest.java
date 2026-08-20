@@ -33,6 +33,7 @@ class TestLoginAccountSeederTest {
         assertThat(captor.getAllValues()).allSatisfy(member -> {
             assertThat(member.getProvider()).isEqualTo(Provider.LOCAL);
             assertThat(member.getRole()).isEqualTo(Role.USER);
+            assertThat(member.getNickname()).isNull();
             assertThat(member.getProfileImageUrl()).isNull();
             assertThat(member.getSkinType()).isNull();
             assertThat(member.getSkinConcerns()).isEmpty();
