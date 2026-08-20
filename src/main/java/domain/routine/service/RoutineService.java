@@ -86,8 +86,8 @@ public class RoutineService {
     private final ProductCompatibilityService productCompatibilityService;
     private final ShortformAnalysisRepository shortformAnalysisRepository;
     private final ShortformAnalysisJsonMapper shortformAnalysisJsonMapper;
-    private final PublicUrlResolver publicUrlResolver;
     private final ShortformAnalysisSnapshotNormalizer shortformAnalysisSnapshotNormalizer;
+    private final PublicUrlResolver publicUrlResolver;
 
     @Transactional
     public DailyRoutineResponse getDailyRoutine(Long memberId) {
@@ -104,7 +104,7 @@ public class RoutineService {
                 .findByMemberIdAndLogDateAndRoutineId(memberId, today, routine.getId())
                 .orElseGet(() -> createTodayLog(routine, today));
 
-        return DailyRoutineResponse.from(routine, routineLog, publicUrlResolver);
+        return DailyRoutineResponse.from(routine, routineLog, resolveAiBriefing(routine), publicUrlResolver);
     }
 
     @Transactional
@@ -114,7 +114,8 @@ public class RoutineService {
         step.updateCompleted(completed);
 
         RoutineLog routineLog = step.getRoutineLog();
-        return DailyRoutineResponse.from(routineLog.getRoutine(), routineLog, publicUrlResolver);
+        return DailyRoutineResponse.from(
+                routineLog.getRoutine(), routineLog, resolveAiBriefing(routineLog.getRoutine()), publicUrlResolver);
     }
 
     @Transactional
@@ -125,14 +126,16 @@ public class RoutineService {
             throw new CustomException(ErrorCode.ROUTINE_LOG_STEPS_INCOMPLETE);
         }
         routineLog.complete();
-        return DailyRoutineResponse.from(routineLog.getRoutine(), routineLog, publicUrlResolver);
+        return DailyRoutineResponse.from(
+                routineLog.getRoutine(), routineLog, resolveAiBriefing(routineLog.getRoutine()), publicUrlResolver);
     }
 
     @Transactional
     public DailyRoutineResponse completeAllSteps(Long memberId) {
         RoutineLog routineLog = findTodayRoutineLog(memberId);
         routineLog.getSteps().forEach(step -> step.updateCompleted(true));
-        return DailyRoutineResponse.from(routineLog.getRoutine(), routineLog, publicUrlResolver);
+        return DailyRoutineResponse.from(
+                routineLog.getRoutine(), routineLog, resolveAiBriefing(routineLog.getRoutine()), publicUrlResolver);
     }
 
     public CalendarMonthResponse getCalendarMonth(Long memberId, int year, int month) {
@@ -173,26 +176,26 @@ public class RoutineService {
                     .toList();
         }
 
-        Map<Long, Integer> matchScoreByRoutineId = resolveMatchScores(routines);
+        Map<Long, Integer> overallScoreByRoutineId = resolveOverallScores(routines);
 
         if ("SCORE".equals(sort)) {
             routines = routines.stream()
                     .sorted(Comparator
-                            .comparing((Routine r) -> matchScoreByRoutineId.get(r.getId()),
+                            .comparing((Routine r) -> overallScoreByRoutineId.get(r.getId()),
                                     Comparator.nullsLast(Comparator.reverseOrder()))
                             .thenComparing(Routine::getCreatedAt, Comparator.reverseOrder()))
                     .toList();
         }
 
-        return ArchivedRoutineListResponse.from(routines, matchScoreByRoutineId);
+        return ArchivedRoutineListResponse.from(routines, overallScoreByRoutineId);
     }
 
     /**
-     * 숏폼 분석에서 온 루틴(sourceAnalysis != null)만 optimizationJson을 파싱해
-     * 인벤토리 대체를 반영한 최종 매칭 점수(RoutineOptimizationSnapshot.overallScore)를 구한다.
-     * 원본 영상 분석 점수(ShortformAnalysis.resultOverallScore)는 사용하지 않는다.
+     * 숏폼 분석에서 온 루틴(sourceAnalysis != null)만 AI 매칭 점수를 구한다.
+     * 인벤토리 대체를 반영한 최종 점수(optimizationJson)를 우선 쓰고, 없으면(미최적화/파싱실패)
+     * 원본 영상 분석 점수(resultJson)로 폴백한다.
      */
-    private Map<Long, Integer> resolveMatchScores(List<Routine> routines) {
+    private Map<Long, Integer> resolveOverallScores(List<Routine> routines) {
         List<Long> analysisIds = routines.stream()
                 .map(Routine::getSourceAnalysis)
                 .filter(Objects::nonNull)
@@ -213,22 +216,50 @@ public class RoutineService {
                 continue;
             }
             ShortformAnalysis analysis = analysisById.get(source.getId());
-            String optimizationJson = analysis == null ? null : analysis.getOptimizationJson();
-            if (optimizationJson == null || optimizationJson.isBlank()) {
+            if (analysis == null) {
                 continue;
             }
-            try {
-                Integer overallScore = shortformAnalysisJsonMapper
-                        .read(optimizationJson, RoutineOptimizationSnapshot.class)
-                        .overallScore();
-                if (overallScore != null) {
-                    result.put(routine.getId(), overallScore);
-                }
-            } catch (CustomException exception) {
-                log.warn("매칭점수 파싱 실패: routineId={}", routine.getId(), exception);
+            RoutineOptimizationSnapshot optimization = parseOptimizationSnapshot(analysis, routine.getId());
+            Integer overallScore = optimization == null ? null : optimization.overallScore();
+            if (overallScore == null) {
+                // Member는 LAZY 연관관계라 루틴 개수만큼 추가 쿼리가 날 수 있음(N+1). 지금 규모에선 무시 가능.
+                ShortformAnalysisSnapshot snapshot = parseResultSnapshot(analysis, routine.getMember(), routine.getId());
+                overallScore = snapshot == null ? null : snapshot.overallScore();
+            }
+            if (overallScore != null) {
+                result.put(routine.getId(), overallScore);
             }
         }
         return result;
+    }
+
+    private RoutineOptimizationSnapshot parseOptimizationSnapshot(ShortformAnalysis analysis, Long routineId) {
+        String optimizationJson = analysis.getOptimizationJson();
+        if (optimizationJson == null || optimizationJson.isBlank()) {
+            return null;
+        }
+        try {
+            return shortformAnalysisJsonMapper.read(optimizationJson, RoutineOptimizationSnapshot.class);
+        } catch (CustomException exception) {
+            log.warn("최적화 결과 파싱 실패: routineId={}", routineId, exception);
+            return null;
+        }
+    }
+
+    private ShortformAnalysisSnapshot parseResultSnapshot(ShortformAnalysis analysis, Member member, Long routineId) {
+        String resultJson = analysis.getResultJson();
+        if (resultJson == null || resultJson.isBlank()) {
+            return null;
+        }
+        try {
+            return shortformAnalysisSnapshotNormalizer.normalize(
+                    shortformAnalysisJsonMapper.read(resultJson, ShortformAnalysisSnapshot.class),
+                    member.getNickname(),
+                    member.getSkinType() == null ? null : member.getSkinType().getLabel());
+        } catch (CustomException exception) {
+            log.warn("원본 분석 파싱 실패: routineId={}", routineId, exception);
+            return null;
+        }
     }
 
     public RoutineDetailResponse getRoutineDetail(Long memberId, Long routineId) {
@@ -250,37 +281,39 @@ public class RoutineService {
             return null;
         }
 
-        ShortformAnalysisSnapshot snapshot = null;
-        String resultJson = source.getResultJson();
-        if (resultJson != null && !resultJson.isBlank()) {
-            try {
-                snapshot = shortformAnalysisSnapshotNormalizer.normalize(
-                        shortformAnalysisJsonMapper.read(resultJson, ShortformAnalysisSnapshot.class));
-            } catch (CustomException exception) {
-                log.warn("AI 브리핑 원본 분석 파싱 실패: routineId={}", routine.getId(), exception);
-            }
+        ShortformAnalysisSnapshot snapshot = parseResultSnapshot(source, routine.getMember(), routine.getId());
+
+        Integer overallScore = null;
+        List<String> highlights = null;
+        String optimizationSummary = null;
+        RoutineOptimizationSnapshot optimization = parseOptimizationSnapshot(source, routine.getId());
+        if (optimization != null) {
+            overallScore = optimization.overallScore();
+            highlights = optimization.highlights();
+            optimizationSummary = optimization.summary();
         }
 
-        Integer matchScore = null;
-        String optimizationSummary = null;
-        String optimizationJson = source.getOptimizationJson();
-        if (optimizationJson != null && !optimizationJson.isBlank()) {
-            try {
-                RoutineOptimizationSnapshot optimization = shortformAnalysisJsonMapper
-                        .read(optimizationJson, RoutineOptimizationSnapshot.class);
-                matchScore = optimization.overallScore();
-                optimizationSummary = optimization.summary();
-            } catch (CustomException exception) {
-                log.warn("AI 브리핑 최적화 결과 파싱 실패: routineId={}", routine.getId(), exception);
-            }
+        // 폴백: optimizationJson 쪽 값이 없으면 원본(resultJson) 값 사용
+        if (overallScore == null && snapshot != null) {
+            overallScore = snapshot.overallScore();
+        }
+        if ((highlights == null || highlights.isEmpty()) && snapshot != null) {
+            highlights = snapshot.highlights();
+        }
+        if ((optimizationSummary == null || optimizationSummary.isBlank()) && snapshot != null) {
+            optimizationSummary = snapshot.summary();
+        }
+        if (highlights == null) {
+            highlights = List.of();
         }
 
         return new AiBriefing(
                 snapshot == null ? null : snapshot.title(),
                 snapshot == null ? null : snapshot.tag(),
+                overallScore,
+                highlights,
                 snapshot == null ? null : snapshot.coreGoal(),
                 snapshot == null ? null : snapshot.synergyCombo(),
-                matchScore,
                 optimizationSummary);
     }
 
@@ -335,7 +368,7 @@ public class RoutineService {
                 .orElseThrow(() -> new CustomException(ErrorCode.ROUTINE_NOT_FOUND));
 
         RoutineLog routineLog = applyAsTodayActive(memberId, routine);
-        return DailyRoutineResponse.from(routine, routineLog, publicUrlResolver);
+        return DailyRoutineResponse.from(routine, routineLog, resolveAiBriefing(routine), publicUrlResolver);
     }
 
     public RoutineGenerationResponse generateRoutine(Long memberId, RoutineType routineType) {

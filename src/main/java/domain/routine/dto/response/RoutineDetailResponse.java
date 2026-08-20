@@ -38,10 +38,15 @@ public record RoutineDetailResponse(
     public record AiBriefing(
             @Schema(description = "루틴 제목 (원본 영상 분석 기준, 파싱 실패/미완성 시 null)") String title,
             @Schema(description = "루틴 태그 (원본 영상 분석 기준, 파싱 실패/미완성 시 null)") String tag,
+            @Schema(description = "AI 매칭 점수. 인벤토리 대체를 반영한 최종 점수가 있으면 그 값, 없으면(미최적화) "
+                    + "원본 영상 분석 점수로 폴백. 둘 다 파싱 실패면 null")
+            Integer overallScore,
+            @Schema(description = "하이라이트 목록. 최적화 결과에 있으면 그 값, 비어있으면 원본 영상 분석 값으로 폴백")
+            List<String> highlights,
             @Schema(description = "루틴 핵심 목표 (원본 영상 분석 기준, 파싱 실패/미완성 시 null)") String coreGoal,
             @Schema(description = "시너지 성분 조합 (원본 영상 분석 기준, 파싱 실패/미완성 시 null)") String synergyCombo,
-            @Schema(description = "인벤토리 대체를 반영한 최종 매칭 점수 (미최적화/파싱 실패 시 null)") Integer matchScore,
-            @Schema(description = "인벤토리 대체를 반영한 최종 요약 (미최적화/파싱 실패 시 null)") String summary
+            @Schema(description = "요약. 최적화 결과가 있으면 그 값, 없으면(blank) 원본 영상 분석 값으로 폴백")
+            String summary
     ) {
     }
 

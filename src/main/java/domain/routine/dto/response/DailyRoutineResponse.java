@@ -5,6 +5,7 @@ import domain.routine.domain.RoutineLog;
 import domain.routine.domain.RoutineLogStep;
 import domain.routine.domain.RoutineStep;
 import domain.routine.domain.RoutineType;
+import domain.routine.dto.response.RoutineDetailResponse.AiBriefing;
 import global.util.PublicUrlResolver;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Comparator;
@@ -20,10 +21,13 @@ public record DailyRoutineResponse(
         @Schema(description = "루틴 타입 (DAY/NIGHT)") RoutineType routineType,
         @Schema(description = "오늘 전체완료 처리 여부") boolean completed,
         @Schema(description = "달성률 (0~100)") int completionRate,
-        @Schema(description = "루틴 단계 목록 (순서대로)") List<DailyRoutineStepResponse> steps
+        @Schema(description = "루틴 단계 목록 (순서대로)") List<DailyRoutineStepResponse> steps,
+        @Schema(description = "AI 브리핑. 숏폼 분석 기반 루틴이 아니면(수동생성/AI자동생성) null")
+        AiBriefing aiBriefing
 ) {
 
-    public static DailyRoutineResponse from(Routine routine, RoutineLog routineLog, PublicUrlResolver publicUrlResolver) {
+    public static DailyRoutineResponse from(
+            Routine routine, RoutineLog routineLog, AiBriefing aiBriefing, PublicUrlResolver publicUrlResolver) {
         Map<Long, RoutineStep> stepById = routine.getSteps().stream()
                 .collect(Collectors.toMap(RoutineStep::getId, Function.identity()));
 
@@ -38,7 +42,7 @@ public record DailyRoutineResponse(
 
         return new DailyRoutineResponse(
                 routine.getId(), routine.getName(), routine.getRoutineType(),
-                routineLog.isCompleted(), completionRate, steps);
+                routineLog.isCompleted(), completionRate, steps, aiBriefing);
     }
 
     @Schema(description = "데일리 루틴 단계 한 건")

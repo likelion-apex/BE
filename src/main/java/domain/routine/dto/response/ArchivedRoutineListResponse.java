@@ -13,9 +13,9 @@ public record ArchivedRoutineListResponse(
         @Schema(description = "루틴 목록") List<ArchivedRoutineSummary> routines
 ) {
 
-    public static ArchivedRoutineListResponse from(List<Routine> routines, Map<Long, Integer> matchScoreByRoutineId) {
+    public static ArchivedRoutineListResponse from(List<Routine> routines, Map<Long, Integer> overallScoreByRoutineId) {
         List<ArchivedRoutineSummary> summaries = routines.stream()
-                .map(routine -> ArchivedRoutineSummary.from(routine, matchScoreByRoutineId.get(routine.getId())))
+                .map(routine -> ArchivedRoutineSummary.from(routine, overallScoreByRoutineId.get(routine.getId())))
                 .toList();
         return new ArchivedRoutineListResponse(summaries.size(), summaries);
     }
@@ -27,14 +27,15 @@ public record ArchivedRoutineListResponse(
             @Schema(description = "루틴 타입 (DAY/NIGHT)") RoutineType routineType,
             @Schema(description = "단계 수") int stepCount,
             @Schema(description = "생성 일시") LocalDateTime createdAt,
-            @Schema(description = "인벤토리 대체를 반영한 최종 매칭 점수. 숏폼 분석 기반 루틴이 아니거나 아직 최적화되지 않았으면 null")
-            Integer matchScore
+            @Schema(description = "AI 매칭 점수. 인벤토리 대체를 반영한 최종 점수가 있으면 그 값, 없으면(미최적화) "
+                    + "원본 영상 분석 점수로 폴백. 숏폼 분석 기반 루틴이 아니거나 둘 다 파싱 실패면 null")
+            Integer overallScore
     ) {
 
-        static ArchivedRoutineSummary from(Routine routine, Integer matchScore) {
+        static ArchivedRoutineSummary from(Routine routine, Integer overallScore) {
             return new ArchivedRoutineSummary(
                     routine.getId(), routine.getName(), routine.getRoutineType(),
-                    routine.getSteps().size(), routine.getCreatedAt(), matchScore);
+                    routine.getSteps().size(), routine.getCreatedAt(), overallScore);
         }
     }
 }
