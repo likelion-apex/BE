@@ -12,7 +12,10 @@ class OpenAiPersonalizedAnalysisClientTest {
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Test
-    void parseResultReturnsNullWhenKeywordsHaveFewerThanThreeValidEntries() {
+    void parseResultSucceedsWithFewerThanThreeValidEntries() {
+        // score만 유효하면 keywords가 부족해도 성공으로 간주한다. 부족분은 InventoryService가
+        // 기본 키워드로 채우므로, 여기서 실패(null)로 만들어 매번 Gemini/Groq까지 순차 호출하게
+        // 하지 않는다(실제 배포 환경에서 지연시간/네트워크 실패를 유발했던 원인).
         ObjectNode payload = mapper.createObjectNode();
         payload.put("score", 80);
         var keywords = payload.putArray("keywords");
@@ -21,18 +24,24 @@ class OpenAiPersonalizedAnalysisClientTest {
 
         PersonalizedAnalysisResult result = OpenAiPersonalizedAnalysisClient.parseResult(payload);
 
-        assertThat(result).isNull();
+        assertThat(result).isNotNull();
+        assertThat(result.score()).isEqualTo(80);
+        assertThat(result.keywords()).containsExactly(
+                new PersonalizedAnalysisResult.Keyword("보습", "건성에 맞음"),
+                new PersonalizedAnalysisResult.Keyword("저자극", "민감성 성분 없음"));
     }
 
     @Test
-    void parseResultReturnsNullWhenKeywordsArrayIsEmpty() {
+    void parseResultSucceedsWithEmptyKeywordsArray() {
         ObjectNode payload = mapper.createObjectNode();
         payload.put("score", 80);
         payload.putArray("keywords");
 
         PersonalizedAnalysisResult result = OpenAiPersonalizedAnalysisClient.parseResult(payload);
 
-        assertThat(result).isNull();
+        assertThat(result).isNotNull();
+        assertThat(result.score()).isEqualTo(80);
+        assertThat(result.keywords()).isEmpty();
     }
 
     @Test
@@ -47,7 +56,10 @@ class OpenAiPersonalizedAnalysisClientTest {
 
         PersonalizedAnalysisResult result = OpenAiPersonalizedAnalysisClient.parseResult(payload);
 
-        assertThat(result).isNull();
+        assertThat(result).isNotNull();
+        assertThat(result.keywords()).containsExactly(
+                new PersonalizedAnalysisResult.Keyword("보습", "건성에 맞음"),
+                new PersonalizedAnalysisResult.Keyword("저알러지", "알레르기 유발 성분 없음"));
     }
 
     @Test
