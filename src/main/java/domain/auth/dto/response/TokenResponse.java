@@ -9,11 +9,20 @@ public record TokenResponse(
         @Schema(description = "인증 방식", example = "Bearer") String grantType,
         @Schema(description = "Access Token 만료까지 남은 시간(ms)") long accessTokenExpiresIn,
         @Schema(description = "이번 로그인으로 신규 가입되었는지 여부") boolean isNewMember,
+        @Schema(description = "온보딩이 필요한지 여부") boolean onboardingRequired,
         @Schema(description = "로그인한 회원 정보") MemberResponse member
 ) {
 
     public static TokenResponse of(String accessToken, String refreshToken, long accessTokenExpiresIn,
-                                    boolean isNewMember, MemberResponse member) {
-        return new TokenResponse(accessToken, refreshToken, "Bearer", accessTokenExpiresIn, isNewMember, member);
+                                    boolean isNewMember, boolean onboardingRequired, MemberResponse member) {
+        return new TokenResponse(
+                accessToken,
+                refreshToken,
+                "Bearer",
+                accessTokenExpiresIn,
+                isNewMember,
+                onboardingRequired,
+                member
+        );
     }
 }

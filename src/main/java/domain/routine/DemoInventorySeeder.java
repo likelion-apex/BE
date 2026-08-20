@@ -6,6 +6,8 @@ import domain.inventory.Product;
 import domain.inventory.ProductRepository;
 import domain.member.Member;
 import domain.member.MemberRepository;
+import domain.member.DemoMemberSeeder;
+import domain.member.Provider;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,7 +43,9 @@ public class DemoInventorySeeder implements ApplicationRunner {
             return;
         }
 
-        Member member = memberRepository.findAll().stream().findFirst().orElse(null);
+        Member member = memberRepository
+                .findByProviderAndProviderId(Provider.KAKAO, DemoMemberSeeder.DEMO_PROVIDER_ID)
+                .orElse(null);
         if (member == null) {
             return;
         }

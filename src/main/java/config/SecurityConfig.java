@@ -25,6 +25,7 @@ public class SecurityConfig {
 
     private static final String[] PERMIT_ALL_PATHS = {
             "/api/auth/kakao/login",
+            "/api/auth/local/login",
             "/api/auth/reissue",
             "/api/cosmetics/**",
             "/images/**",

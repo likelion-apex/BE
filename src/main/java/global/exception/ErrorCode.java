@@ -25,9 +25,12 @@ public enum ErrorCode {
     REFRESH_TOKEN_NOT_FOUND(HttpStatus.UNAUTHORIZED, "AUTH-008", "리프레시 토큰을 찾을 수 없습니다. 다시 로그인해주세요."),
     KAKAO_TOKEN_REQUEST_FAILED(HttpStatus.BAD_GATEWAY, "AUTH-009", "카카오 토큰 발급 요청에 실패했습니다."),
     KAKAO_USER_INFO_REQUEST_FAILED(HttpStatus.BAD_GATEWAY, "AUTH-010", "카카오 사용자 정보 조회에 실패했습니다."),
+    INVALID_LOCAL_CREDENTIALS(HttpStatus.UNAUTHORIZED, "AUTH-011", "아이디 또는 비밀번호가 올바르지 않습니다."),
+    LOCAL_LOGIN_DISABLED(HttpStatus.NOT_FOUND, "AUTH-012", "ID/PW 로그인을 사용할 수 없습니다."),
 
     // 회원
     MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "MEMBER-001", "회원 정보를 찾을 수 없습니다."),
+    ONBOARDING_REQUIREMENTS_NOT_MET(HttpStatus.CONFLICT, "MEMBER-002", "온보딩 필수 정보를 모두 입력해 주세요."),
 
     // YouTube 뷰티 루틴 분석
     BEAUTY_INVALID_YOUTUBE_URL(HttpStatus.BAD_REQUEST, "BEAUTY-001", "유효한 YouTube URL이 아닙니다."),

@@ -9,7 +9,7 @@ import java.util.List;
 @Schema(description = "회원 정보")
 public record MemberResponse(
         @Schema(description = "회원 ID") Long id,
-        @Schema(description = "이메일 (카카오 계정에 등록된 이메일, 없을 수 있음)") String email,
+        @Schema(description = "계정 이메일 (없을 수 있음)") String email,
         @Schema(description = "닉네임") String nickname,
         @Schema(description = "프로필 이미지 URL") String profileImageUrl,
         @Schema(description = "가입 경로") String provider,

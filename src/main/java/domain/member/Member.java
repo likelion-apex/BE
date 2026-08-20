@@ -53,6 +53,9 @@ public class Member {
     @Column(name = "provider_id", nullable = false)
     private String providerId;
 
+    @Column(name = "password_hash", length = 100)
+    private String passwordHash;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Role role;
@@ -67,6 +70,9 @@ public class Member {
     @Column(name = "skin_concern", length = 30)
     private Set<SkinConcern> skinConcerns = new LinkedHashSet<>();
 
+    @Column(name = "onboarding_completed_at")
+    private LocalDateTime onboardingCompletedAt;
+
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;
@@ -75,13 +81,24 @@ public class Member {
     private LocalDateTime updatedAt;
 
     @Builder
-    public Member(String email, String nickname, String profileImageUrl, Provider provider, String providerId, Role role) {
+    public Member(
+            String email,
+            String nickname,
+            String profileImageUrl,
+            Provider provider,
+            String providerId,
+            String passwordHash,
+            Role role,
+            LocalDateTime onboardingCompletedAt
+    ) {
         this.email = email;
         this.nickname = nickname;
         this.profileImageUrl = profileImageUrl;
         this.provider = provider;
         this.providerId = providerId;
+        this.passwordHash = passwordHash;
         this.role = role != null ? role : Role.USER;
+        this.onboardingCompletedAt = onboardingCompletedAt;
     }
 
     public void updateProfile(String nickname, String profileImageUrl) {
@@ -102,5 +119,19 @@ public class Member {
         if (skinConcerns != null) {
             this.skinConcerns.addAll(skinConcerns);
         }
+    }
+
+    public void updatePasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
+    public void completeOnboarding() {
+        if (this.onboardingCompletedAt == null) {
+            this.onboardingCompletedAt = LocalDateTime.now();
+        }
+    }
+
+    public boolean isOnboardingCompleted() {
+        return onboardingCompletedAt != null;
     }
 }

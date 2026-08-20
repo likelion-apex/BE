@@ -15,7 +15,10 @@ import global.exception.ErrorCode;
 import security.jwt.JwtTokenProvider;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Locale;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -26,11 +29,17 @@ import org.springframework.util.StringUtils;
 public class AuthService {
 
     private static final String DEFAULT_NICKNAME = "카카오사용자";
+    private static final String DUMMY_PASSWORD_HASH =
+            "$2y$12$vAKP/IgjSttNfxBmgWKPqeF/qy6REPpQ5Mw.rD7PwWSQOJ8jW4X42";
 
     private final KakaoOAuthClient kakaoOAuthClient;
     private final MemberRepository memberRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtTokenProvider jwtTokenProvider;
+    private final PasswordEncoder passwordEncoder;
+
+    @Value("${test-login.enabled:false}")
+    private boolean testLoginEnabled;
 
     public TokenResponse loginWithKakao(String code, String redirectUri) {
         KakaoTokenResponse kakaoToken = kakaoOAuthClient.requestToken(code, redirectUri);
@@ -60,6 +69,23 @@ public class AuthService {
         return issueTokens(member, isNewMember);
     }
 
+    public TokenResponse loginWithLocal(String loginId, String password) {
+        if (!testLoginEnabled) {
+            throw new CustomException(ErrorCode.LOCAL_LOGIN_DISABLED);
+        }
+
+        String normalizedLoginId = loginId.strip().toLowerCase(Locale.ROOT);
+        var memberCandidate = memberRepository.findByProviderAndProviderId(Provider.LOCAL, normalizedLoginId);
+        String passwordHash = memberCandidate.map(Member::getPasswordHash).orElse(DUMMY_PASSWORD_HASH);
+        boolean passwordMatches = passwordEncoder.matches(password, passwordHash);
+
+        if (memberCandidate.isEmpty() || !passwordMatches) {
+            throw new CustomException(ErrorCode.INVALID_LOCAL_CREDENTIALS);
+        }
+
+        return issueTokens(memberCandidate.get(), false);
+    }
+
     public TokenResponse reissue(String refreshTokenValue) {
         jwtTokenProvider.validateToken(refreshTokenValue);
 
@@ -74,6 +100,10 @@ public class AuthService {
         Member member = memberRepository.findById(savedRefreshToken.getMemberId())
                 .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
 
+        if (member.getProvider() == Provider.LOCAL && !testLoginEnabled) {
+            throw new CustomException(ErrorCode.LOCAL_LOGIN_DISABLED);
+        }
+
         String newAccessToken = jwtTokenProvider.createAccessToken(member);
         String newRefreshToken = jwtTokenProvider.createRefreshToken(member);
         savedRefreshToken.rotate(newRefreshToken, toLocalDateTime(jwtTokenProvider.getRefreshTokenExpiration()));
@@ -83,6 +113,7 @@ public class AuthService {
                 newRefreshToken,
                 jwtTokenProvider.getAccessTokenExpiration(),
                 false,
+                !member.isOnboardingCompleted(),
                 MemberResponse.from(member)
         );
     }
@@ -107,6 +138,7 @@ public class AuthService {
                 refreshToken,
                 jwtTokenProvider.getAccessTokenExpiration(),
                 isNewMember,
+                !member.isOnboardingCompleted(),
                 MemberResponse.from(member)
         );
     }

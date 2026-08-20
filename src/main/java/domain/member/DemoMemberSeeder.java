@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 데모/테스트용 회원 시딩. members 테이블이 비어있을 때만 1건 생성해
+ * 데모/테스트용 회원 시딩. 고정 provider ID가 없을 때만 1건 생성해
  * 재시작/재배포 시 중복 삽입을 막는다. 운영 DB 오염을 막기 위해 local 프로필에서만 동작한다.
  * 인벤토리/루틴 데모 시더가 이 회원을 전제하므로 IngredientDataSeeder 다음, 그 둘보다는 먼저 실행되어야 한다.
  */
@@ -22,12 +22,14 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class DemoMemberSeeder implements ApplicationRunner {
 
+    public static final String DEMO_PROVIDER_ID = "demo-provider-id";
+
     private final MemberRepository memberRepository;
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        if (memberRepository.count() > 0) {
+        if (memberRepository.findByProviderAndProviderId(Provider.KAKAO, DEMO_PROVIDER_ID).isPresent()) {
             log.info("회원 데이터가 이미 존재하여 데모 회원 시딩을 건너뜁니다.");
             return;
         }
@@ -36,11 +38,12 @@ public class DemoMemberSeeder implements ApplicationRunner {
                 .email("demo@apex.dev")
                 .nickname("데모유저")
                 .provider(Provider.KAKAO)
-                .providerId("demo-provider-id")
+                .providerId(DEMO_PROVIDER_ID)
                 .role(Role.USER)
                 .build();
         member.updateSkinType(SkinType.DRY);
         member.updateSkinConcerns(Set.of(SkinConcern.DRYNESS, SkinConcern.SENSITIVE));
+        member.completeOnboarding();
 
         Member saved = memberRepository.save(member);
         log.info("데모 회원 시딩 완료: id={}, skinType={}, skinConcerns={}",

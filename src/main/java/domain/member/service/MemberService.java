@@ -1,6 +1,7 @@
 package domain.member.service;
 
 import domain.auth.dto.response.MemberResponse;
+import domain.inventory.InventoryRepository;
 import domain.member.Member;
 import domain.member.MemberRepository;
 import domain.member.SkinConcern;
@@ -12,6 +13,7 @@ import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 @Service
 @RequiredArgsConstructor
@@ -19,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class MemberService {
 
     private final MemberRepository memberRepository;
+    private final InventoryRepository inventoryRepository;
 
     @Transactional(readOnly = true)
     public MemberResponse getMyInfo(Long memberId) {
@@ -48,6 +51,21 @@ public class MemberService {
         member.updateNickname(request.nickname());
         member.updateSkinType(request.skinType());
         member.updateSkinConcerns(Set.copyOf(request.skinConcerns()));
+        return MemberResponse.from(member);
+    }
+
+    public MemberResponse completeOnboarding(Long memberId) {
+        Member member = findMember(memberId);
+        boolean profileComplete = StringUtils.hasText(member.getNickname())
+                && member.getSkinType() != null
+                && member.getSkinConcerns() != null
+                && !member.getSkinConcerns().isEmpty();
+
+        if (!profileComplete || !inventoryRepository.existsByMemberId(memberId)) {
+            throw new CustomException(ErrorCode.ONBOARDING_REQUIREMENTS_NOT_MET);
+        }
+
+        member.completeOnboarding();
         return MemberResponse.from(member);
     }
 
