@@ -6,6 +6,7 @@ import domain.inventory.CategoryImageResolver;
 import domain.inventory.ProductCategory;
 import global.util.PublicUrlResolver;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ClassPathResource;
 
 class ShortformProductImageResolverTest {
 
@@ -15,17 +16,16 @@ class ShortformProductImageResolverTest {
     @Test
     void returnsAbsoluteStaticImageForEverySupportedCategory() {
         for (ProductCategory category : ProductCategory.values()) {
-            assertThat(resolver.resolve(category, "https://external.example/product.jpg"))
+            assertThat(resolver.resolve(category))
                     .isEqualTo("https://mutsa.dev.me.kr/images/categories/"
                             + category.name().toLowerCase() + ".png");
         }
     }
 
     @Test
-    void allowsOnlyValidHttpsExternalImagesForUnsupportedCategories() {
-        assertThat(resolver.resolve(null, "https://images.example/product.jpg"))
-                .isEqualTo("https://images.example/product.jpg");
-        assertThat(resolver.resolve(null, "http://images.example/product.jpg")).isNull();
-        assertThat(resolver.resolve(null, "not-a-url")).isNull();
+    void returnsEtcImageForUnsupportedCategories() {
+        assertThat(resolver.resolve(null))
+                .isEqualTo("https://mutsa.dev.me.kr/images/categories/etc.png");
+        assertThat(new ClassPathResource("static/images/categories/etc.png").exists()).isTrue();
     }
 }

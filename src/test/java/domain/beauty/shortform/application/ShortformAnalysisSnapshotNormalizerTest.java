@@ -71,4 +71,29 @@ class ShortformAnalysisSnapshotNormalizerTest {
                 .isEqualTo("Lavandula Angustifolia (Lavender) Oil");
         assertThat(normalized.ingredientMarketOrVariant()).isEqualTo("50ml");
     }
+
+    @Test
+    void replacesStoredExternalImageWithEtcImageForUnsupportedProduct() {
+        StepResult storedStep = new StepResult(
+                1, 1, "00:01", null, "오일", "테스트", "퓨어 클렌징 오일",
+                "테스트", "퓨어 클렌징 오일", ProductResolutionStatus.CATALOG_MATCH, 1,
+                "https://external.example/cleansing-oil.jpg", null, 1, "제품명을 확인", 75,
+                "노폐물 세정", List.of("노폐물 세정"), new ScoreBreakdown(25, 25, 25),
+                SafetyLevel.SAFE, AssessmentCategory.SAFE, "성분이 안전함",
+                "피부 반응을 살피며 사용해 주세요.",
+                List.of(new ReasonCard(
+                        ReasonTone.POSITIVE, AssessmentCategory.SAFE, "부담이 적은 성분 구성",
+                        "피부 반응을 살피며 사용해 주세요.", "SERVER")),
+                IngredientDataStatus.UNAVAILABLE, IngredientVerificationStatus.UNVERIFIED,
+                null, List.of(), null, null, List.of());
+        ShortformAnalysisSnapshot stored = new ShortformAnalysisSnapshot(
+                "3.0", "video", "https://youtube.com/watch?v=video", "클렌징 루틴", "스킨케어",
+                75, List.of(), "노폐물 세정", "이중 세안", "요약", List.of(), "안내",
+                List.of(storedStep), null);
+
+        StepResult normalized = normalizer.normalize(stored).steps().getFirst();
+
+        assertThat(normalized.imageUrl())
+                .isEqualTo("https://mutsa.dev.me.kr/images/categories/etc.png");
+    }
 }
