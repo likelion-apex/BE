@@ -142,7 +142,7 @@ inventory:
   gemini-read-timeout: 5s
   groq-connect-timeout: 1s
   groq-read-timeout: 2s
-  openai-max-output-tokens: 400
+  openai-max-output-tokens: 800
 
 cors:
   allowed-origins: http://localhost:3000

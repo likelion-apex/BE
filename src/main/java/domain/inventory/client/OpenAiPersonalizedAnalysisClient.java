@@ -40,6 +40,7 @@ public class OpenAiPersonalizedAnalysisClient {
             """;
 
     private static final int MAX_KEYWORD_COUNT = 3;
+    private static final String FALLBACK_REASON = "AI가 구체적인 이유를 제공하지 않았습니다.";
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
@@ -99,11 +100,10 @@ public class OpenAiPersonalizedAnalysisClient {
                     ? null
                     : response.path("choices").path(0).path("message").path("content").asText(null);
             JsonNode parsed = InventoryAiJsonSupport.readObject(objectMapper, content);
-            PersonalizedAnalysisResult result = parseResult(parsed);
-            if (result == null) {
-                throw new AiProviderUnavailableException("OpenAI 맞춤 분석 응답이 비어 있습니다.");
-            }
-            return result;
+            // null(유효 keyword가 하나도 없는 완전히 빈 응답)은 예외로 바꾸지 않고 그대로 반환한다.
+            // 콘텐츠 품질 문제이지 provider 장애가 아니므로, 호출부가 쿨다운 없이 다음
+            // provider로 넘어가도록 한다.
+            return parseResult(parsed);
         } catch (AiProviderUnavailableException e) {
             throw e;
         } catch (RestClientException e) {
@@ -134,11 +134,14 @@ public class OpenAiPersonalizedAnalysisClient {
 
     /**
      * score만 유효하면 keywords가 부족해도 성공으로 간주한다(실제 provider 네트워크 호출을 유발하는
-     * 폴백은 진짜 장애 상황에만 남겨두기 위함). keyword/reason이 모두 채워진 항목만 사용하고,
-     * {@value #MAX_KEYWORD_COUNT}개를 넘으면 앞에서부터 그만큼만 취한다. 부족분(3개 미만)은
-     * 호출부(InventoryService)가 결정론적 기본 키워드로 채워 응답을 완성한다 — 이 방식이
-     * OpenAI/Gemini/Groq를 매번 순차 호출하는 것보다 훨씬 빠르고, 성분 분석 API와 동일한
-     * 지연시간 특성을 유지한다.
+     * 폴백은 진짜 장애 상황에만 남겨두기 위함). 단, 유효한 keyword가 단 하나도 없으면(완전히 빈 응답)
+     * 이는 해당 provider가 사실상 응답을 만들어내지 못한 것으로 보고 null을 반환해 다음 provider로
+     * 폴백시킨다("일부만 채워진 응답"과 "완전히 빈 응답"을 구분: 전자는 흔한 토큰 절삭 문제라 매번
+     * 폴백하면 지연시간이 커지지만, 후자는 드물고 명확한 실패 신호라 한 번 더 시도할 가치가 있다).
+     * keyword가 있는데 reason만 비어 있으면 항목을 통째로 버리지 않고 {@link #FALLBACK_REASON}으로
+     * 채워 살린다(포맷 차이로 멀쩡한 keyword까지 사라져 0개가 되는 상황을 줄이기 위함).
+     * {@value #MAX_KEYWORD_COUNT}개를 넘으면 앞에서부터 그만큼만 취한다. 1~2개로 부족한 경우는
+     * 호출부(InventoryService)가 결정론적 기본 키워드로 채워 응답을 완성한다.
      */
     public static PersonalizedAnalysisResult parseResult(JsonNode parsed) {
         if (parsed == null || !parsed.isObject()) {
@@ -153,11 +156,16 @@ public class OpenAiPersonalizedAnalysisClient {
         if (keywordsNode.isArray()) {
             keywordsNode.forEach(node -> {
                 String keyword = node.path("keyword").asText(null);
-                String reason = node.path("reason").asText(null);
-                if (keyword != null && !keyword.isBlank() && reason != null && !reason.isBlank()) {
-                    keywords.add(new PersonalizedAnalysisResult.Keyword(keyword, reason));
+                if (keyword == null || keyword.isBlank()) {
+                    return;
                 }
+                String reason = node.path("reason").asText(null);
+                keywords.add(new PersonalizedAnalysisResult.Keyword(
+                        keyword, reason == null || reason.isBlank() ? FALLBACK_REASON : reason));
             });
+        }
+        if (keywords.isEmpty()) {
+            return null;
         }
         List<PersonalizedAnalysisResult.Keyword> limited = keywords.size() > MAX_KEYWORD_COUNT
                 ? List.copyOf(keywords.subList(0, MAX_KEYWORD_COUNT))

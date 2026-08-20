@@ -120,6 +120,40 @@ class IngredientAndPersonalizedAiClientTest {
     }
 
     @Test
+    void openAiReturnsEmptyList_thenGeminiFallbackSucceedsWithoutCooldown() {
+        // 화장품은 항상 전성분이 있어야 하므로, 예외 없이 빈 배열이 와도 실패로 간주해
+        // 다음 provider로 넘어간다. 단, 이건 provider 장애가 아니라 콘텐츠 문제이므로
+        // 쿨다운(markFrom)은 걸지 않는다.
+        when(skipGate.shouldSkip(AiProvider.OPENAI)).thenReturn(false);
+        when(skipGate.shouldSkip(AiProvider.GEMINI)).thenReturn(false);
+        when(openAiIngredientClient.fetchIngredientNames("바닥 토너")).thenReturn(List.of());
+        ObjectNode payload = new ObjectMapper().createObjectNode();
+        payload.putArray("ingredients").add("정제수");
+        when(geminiJsonClient.generateJson(eq(OpenAiIngredientClient.SYSTEM_PROMPT), anyString()))
+                .thenReturn(payload);
+
+        List<String> result = ingredientClient().fetchIngredientNames("바닥 토너");
+
+        assertThat(result).containsExactly("정제수");
+        verify(skipGate, never()).markFrom(eq(AiProvider.OPENAI), any());
+    }
+
+    @Test
+    void allThreeProvidersReturnEmptyList_returnsEmptyListWithoutCooldown() {
+        when(skipGate.shouldSkip(AiProvider.OPENAI)).thenReturn(false);
+        when(skipGate.shouldSkip(AiProvider.GEMINI)).thenReturn(false);
+        when(skipGate.shouldSkip(AiProvider.GROQ)).thenReturn(false);
+        ObjectNode emptyPayload = new ObjectMapper().createObjectNode();
+        emptyPayload.putArray("ingredients");
+        when(openAiIngredientClient.fetchIngredientNames(any())).thenReturn(List.of());
+        when(geminiJsonClient.generateJson(any(), any())).thenReturn(emptyPayload);
+        when(groqIngredientClient.fetchIngredientNames(any())).thenReturn(List.of());
+
+        assertThat(ingredientClient().fetchIngredientNames("바닥 토너")).isEmpty();
+        verify(skipGate, never()).markFrom(any(), any());
+    }
+
+    @Test
     void allThreeProvidersFail_returnsEmptyList() {
         when(skipGate.shouldSkip(AiProvider.OPENAI)).thenReturn(false);
         when(skipGate.shouldSkip(AiProvider.GEMINI)).thenReturn(false);
@@ -177,6 +211,23 @@ class IngredientAndPersonalizedAiClientTest {
 
         assertThat(result.get("정제수").purposes()).containsExactly("피부컨디셔닝제");
         assertThat(result.get("정제수").riskLevel()).isEqualTo("MEDIUM");
+    }
+
+    @Test
+    void details_openAiReturnsEmptyMap_thenGeminiFallbackSucceeds() {
+        when(skipGate.shouldSkip(AiProvider.OPENAI)).thenReturn(false);
+        when(skipGate.shouldSkip(AiProvider.GEMINI)).thenReturn(false);
+        when(openAiIngredientClient.fetchIngredientDetails(List.of("정제수"))).thenReturn(Map.of());
+        ObjectNode payload = new ObjectMapper().createObjectNode();
+        payload.putArray("ingredients").addObject()
+                .put("name", "정제수").putArray("purposes").add("용제");
+        when(geminiJsonClient.generateJson(eq(OpenAiIngredientClient.DETAIL_SYSTEM_PROMPT), anyString()))
+                .thenReturn(payload);
+
+        Map<String, IngredientAiDetail> result = ingredientClient().fetchIngredientDetails(List.of("정제수"));
+
+        assertThat(result.get("정제수").purposes()).containsExactly("용제");
+        verify(skipGate, never()).markFrom(eq(AiProvider.OPENAI), any());
     }
 
     // ---- PersonalizedAnalysisAiClient.analyze ----
@@ -242,6 +293,33 @@ class IngredientAndPersonalizedAiClientTest {
         assertThat(result.keywords()).hasSize(1);
         verify(skipGate).markFrom(eq(AiProvider.OPENAI), any());
         verify(groqPersonalizedAnalysisClient, never()).analyze(any(), any(), any(), any());
+    }
+
+    @Test
+    void analyze_geminiReturnsZeroValidKeywords_thenGroqFallbackSucceeds() {
+        // keyword가 단 하나도 유효하지 않은(완전히 빈) 응답은 provider가 사실상 응답을
+        // 만들어내지 못한 것으로 보고 다음 provider로 폴백한다.
+        when(skipGate.shouldSkip(AiProvider.OPENAI)).thenReturn(false);
+        when(skipGate.shouldSkip(AiProvider.GEMINI)).thenReturn(false);
+        when(skipGate.shouldSkip(AiProvider.GROQ)).thenReturn(false);
+        when(openAiPersonalizedAnalysisClient.analyze(any(), any(), any(), any()))
+                .thenThrow(new AiProviderUnavailableException("openai down"));
+        ObjectNode emptyKeywordsPayload = new ObjectMapper().createObjectNode();
+        emptyKeywordsPayload.put("score", 65);
+        emptyKeywordsPayload.putArray("keywords");
+        when(geminiJsonClient.generateJson(eq(OpenAiPersonalizedAnalysisClient.SYSTEM_PROMPT), anyString()))
+                .thenReturn(emptyKeywordsPayload);
+        PersonalizedAnalysisResult groqResult = new PersonalizedAnalysisResult(
+                58, List.of(new PersonalizedAnalysisResult.Keyword("보습", "건성에 맞음")));
+        when(groqPersonalizedAnalysisClient.analyze(eq("바닥 토너"), any(), any(), any()))
+                .thenReturn(groqResult);
+
+        PersonalizedAnalysisResult result =
+                personalizedClient().analyze("바닥 토너", List.of("정제수"), SkinType.DRY, Set.of());
+
+        assertThat(result.score()).isEqualTo(58);
+        verify(skipGate).markFrom(eq(AiProvider.OPENAI), any());
+        verify(skipGate, never()).markFrom(eq(AiProvider.GEMINI), any());
     }
 
     @Test

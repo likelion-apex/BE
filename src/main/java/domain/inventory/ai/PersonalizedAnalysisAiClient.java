@@ -57,22 +57,26 @@ public class PersonalizedAnalysisAiClient {
                             productName, ingredientNames, skinType, skinConcerns);
                 };
                 if (result != null) {
+                    log.info("맞춤 분석 성공: provider={}, productName={}, keywordCount={}",
+                            provider, productName, result.keywords() == null ? 0 : result.keywords().size());
                     return result;
                 }
+                // 완전히 빈 응답(유효 keyword 0개)은 콘텐츠 품질 문제이지 provider 장애가
+                // 아니므로, 쿨다운 없이 이 요청 안에서만 다음 provider로 넘어간다.
+                log.warn("맞춤 분석 {} 응답이 비어 있어 다음 provider로 넘어갑니다: productName={}", provider, productName);
             } catch (AiProviderUnavailableException e) {
                 log.warn("맞춤 분석 {} 실패: productName={}, message={}", provider, productName, e.getMessage());
                 skipGate.markFrom(provider, e);
             }
         }
+        log.warn("맞춤 분석이 모든 provider에서 비어 있거나 실패했습니다: productName={}", productName);
         return null;
     }
 
     private PersonalizedAnalysisResult geminiResult(String userPrompt) {
         JsonNode payload = geminiJsonClient.generateJson(OpenAiPersonalizedAnalysisClient.SYSTEM_PROMPT, userPrompt);
-        PersonalizedAnalysisResult result = OpenAiPersonalizedAnalysisClient.parseResult(payload);
-        if (result == null) {
-            throw new AiProviderUnavailableException("Gemini 맞춤 분석 응답이 비어 있습니다.");
-        }
-        return result;
+        // null(완전히 빈 응답)은 예외로 바꾸지 않고 그대로 반환한다 - 호출부가 쿨다운 없이
+        // 다음 provider로 넘어가도록 한다.
+        return OpenAiPersonalizedAnalysisClient.parseResult(payload);
     }
 }

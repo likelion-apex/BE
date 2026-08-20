@@ -32,26 +32,38 @@ class OpenAiPersonalizedAnalysisClientTest {
     }
 
     @Test
-    void parseResultSucceedsWithEmptyKeywordsArray() {
+    void parseResultReturnsNullWhenKeywordsArrayIsEmpty() {
+        // 유효 keyword가 단 하나도 없는 완전히 빈 응답은 해당 provider가 응답을 만들어내지
+        // 못한 것으로 보고 null을 반환해 다음 provider로 폴백시킨다.
         ObjectNode payload = mapper.createObjectNode();
         payload.put("score", 80);
         payload.putArray("keywords");
 
         PersonalizedAnalysisResult result = OpenAiPersonalizedAnalysisClient.parseResult(payload);
 
-        assertThat(result).isNotNull();
-        assertThat(result.score()).isEqualTo(80);
-        assertThat(result.keywords()).isEmpty();
+        assertThat(result).isNull();
     }
 
     @Test
-    void parseResultDropsEntriesWithBlankKeywordOrReason() {
+    void parseResultReturnsNullWhenAllEntriesHaveBlankKeyword() {
+        ObjectNode payload = mapper.createObjectNode();
+        payload.put("score", 80);
+        var keywords = payload.putArray("keywords");
+        keywords.addObject().put("keyword", "").put("reason", "빈 키워드");
+        keywords.addObject().put("keyword", "  ").put("reason", "공백 키워드");
+
+        PersonalizedAnalysisResult result = OpenAiPersonalizedAnalysisClient.parseResult(payload);
+
+        assertThat(result).isNull();
+    }
+
+    @Test
+    void parseResultDropsEntriesWithBlankKeyword() {
         ObjectNode payload = mapper.createObjectNode();
         payload.put("score", 80);
         var keywords = payload.putArray("keywords");
         keywords.addObject().put("keyword", "보습").put("reason", "건성에 맞음");
         keywords.addObject().put("keyword", "").put("reason", "빈 키워드");
-        keywords.addObject().put("keyword", "저자극").put("reason", "");
         keywords.addObject().put("keyword", "저알러지").put("reason", "알레르기 유발 성분 없음");
 
         PersonalizedAnalysisResult result = OpenAiPersonalizedAnalysisClient.parseResult(payload);
@@ -60,6 +72,22 @@ class OpenAiPersonalizedAnalysisClientTest {
         assertThat(result.keywords()).containsExactly(
                 new PersonalizedAnalysisResult.Keyword("보습", "건성에 맞음"),
                 new PersonalizedAnalysisResult.Keyword("저알러지", "알레르기 유발 성분 없음"));
+    }
+
+    @Test
+    void parseResultKeepsKeywordWithFallbackReasonWhenReasonIsBlank() {
+        // keyword는 있는데 reason만 비어 있으면 항목을 통째로 버리지 않고 대체 문구로 채워 살린다.
+        ObjectNode payload = mapper.createObjectNode();
+        payload.put("score", 80);
+        var keywords = payload.putArray("keywords");
+        keywords.addObject().put("keyword", "저자극").put("reason", "");
+
+        PersonalizedAnalysisResult result = OpenAiPersonalizedAnalysisClient.parseResult(payload);
+
+        assertThat(result).isNotNull();
+        assertThat(result.keywords()).hasSize(1);
+        assertThat(result.keywords().get(0).keyword()).isEqualTo("저자극");
+        assertThat(result.keywords().get(0).reason()).isNotBlank();
     }
 
     @Test
