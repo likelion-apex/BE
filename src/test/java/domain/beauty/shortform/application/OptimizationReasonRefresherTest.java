@@ -33,7 +33,7 @@ class OptimizationReasonRefresherTest {
     private final OptimizationReasonRefresher refresher = new OptimizationReasonRefresher(
             evidenceService,
             reasonClient,
-            new OptimizationReasonComposer(),
+            new OptimizationReasonComposer(new KoreanUserCopyNormalizer()),
             new OptimizationScoreCalculator());
 
     @Test

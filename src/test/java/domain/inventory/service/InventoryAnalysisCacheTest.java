@@ -9,16 +9,20 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import domain.beauty.shortform.application.ProductCapacityNormalizer;
 import domain.inventory.Inventory;
 import domain.inventory.InventoryRepository;
 import domain.inventory.Product;
 import domain.inventory.ProductCategory;
+import domain.inventory.ai.CautionIngredientCatalog;
 import domain.inventory.ai.IngredientAiClient;
+import domain.inventory.ai.IngredientAiDetail;
 import domain.inventory.ai.InventoryAiCacheService;
 import domain.inventory.ai.PersonalizedAnalysisAiClient;
 import domain.inventory.client.PersonalizedAnalysisResult;
 import domain.inventory.dto.response.AiAnalysisResponse;
 import domain.inventory.dto.response.IngredientAnalysisResponse;
+import domain.inventory.dto.response.IngredientRiskLevel;
 import domain.member.Member;
 import domain.member.MemberRepository;
 import domain.member.Provider;
@@ -26,6 +30,7 @@ import domain.member.Role;
 import domain.member.SkinType;
 import global.exception.CustomException;
 import global.exception.ErrorCode;
+import global.util.PublicUrlResolver;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -67,7 +72,10 @@ class InventoryAnalysisCacheTest {
                 productService,
                 ingredientAiClient,
                 personalizedAnalysisAiClient,
-                inventoryAiCacheService);
+                inventoryAiCacheService,
+                new PublicUrlResolver(""),
+                new ProductCapacityNormalizer(),
+                new CautionIngredientCatalog());
         member = Member.builder()
                 .nickname("테스터")
                 .provider(Provider.KAKAO)
@@ -98,9 +106,10 @@ class InventoryAnalysisCacheTest {
         IngredientAnalysisResponse response = inventoryService.getIngredientAnalysis(9L, 11L);
 
         assertThat(response.ingredients()).containsExactly(
-                new IngredientAnalysisResponse.IngredientPurpose("정제수", List.of("기제(용매)")));
+                new IngredientAnalysisResponse.IngredientDetail(
+                        "정제수", List.of("기제(용매)"), IngredientRiskLevel.MEDIUM));
         verify(ingredientAiClient, never()).fetchIngredientNames(any());
-        verify(ingredientAiClient, never()).fetchIngredientPurposes(any());
+        verify(ingredientAiClient, never()).fetchIngredientDetails(any());
     }
 
     @Test
@@ -125,8 +134,8 @@ class InventoryAnalysisCacheTest {
         when(inventoryRepository.findByIdAndMemberId(11L, 9L)).thenReturn(Optional.of(inventory));
         when(inventoryAiCacheService.find(any())).thenReturn(Optional.empty());
         when(ingredientAiClient.fetchIngredientNames("바닥 토너")).thenReturn(List.of("정제수"));
-        when(ingredientAiClient.fetchIngredientPurposes(List.of("정제수")))
-                .thenReturn(Map.of("정제수", List.of("기제(용매)")));
+        when(ingredientAiClient.fetchIngredientDetails(List.of("정제수")))
+                .thenReturn(Map.of("정제수", new IngredientAiDetail(List.of("기제(용매)"), "LOW")));
 
         inventoryService.getIngredientAnalysis(9L, 11L);
 
@@ -145,18 +154,63 @@ class InventoryAnalysisCacheTest {
     }
 
     @Test
+    void ingredientAnalysisAlwaysReturnsBrandCapacityAndCountsEvenWithoutIngredients() {
+        Product product = Product.builder()
+                .name("바닥 토너 200ml")
+                .brand("바닥 브랜드")
+                .category(ProductCategory.SKIN_TONER)
+                .build();
+        ReflectionTestUtils.setField(product, "id", 4L);
+        Inventory emptyInventory = Inventory.builder().member(member).product(product).build();
+        ReflectionTestUtils.setField(emptyInventory, "id", 12L);
+
+        when(inventoryRepository.findByIdAndMemberId(12L, 9L)).thenReturn(Optional.of(emptyInventory));
+        when(inventoryAiCacheService.find(any())).thenReturn(Optional.empty());
+        when(ingredientAiClient.fetchIngredientNames("바닥 토너 200ml")).thenReturn(List.of());
+
+        IngredientAnalysisResponse response = inventoryService.getIngredientAnalysis(9L, 12L);
+
+        assertThat(response.brand()).isEqualTo("바닥 브랜드");
+        assertThat(response.capacity()).isEqualTo("200ml");
+        assertThat(response.ingredients()).isEmpty();
+        assertThat(response.riskDistribution()).isEqualTo(new IngredientAnalysisResponse.RiskDistribution(0, 0, 0));
+        assertThat(response.caution20Count()).isZero();
+        assertThat(response.allergyCount()).isZero();
+    }
+
+    @Test
+    void ingredientAnalysisCountsCaution20AndAllergyMatches() {
+        when(inventoryRepository.findByIdAndMemberId(11L, 9L)).thenReturn(Optional.of(inventory));
+        when(inventoryAiCacheService.find(any())).thenReturn(Optional.empty());
+        when(ingredientAiClient.fetchIngredientNames("바닥 토너"))
+                .thenReturn(List.of("메틸파라벤", "리모넨", "정제수"));
+        when(ingredientAiClient.fetchIngredientDetails(List.of("메틸파라벤", "리모넨", "정제수")))
+                .thenReturn(Map.of(
+                        "메틸파라벤", new IngredientAiDetail(List.of("보존제"), "MEDIUM"),
+                        "리모넨", new IngredientAiDetail(List.of("향료"), "HIGH"),
+                        "정제수", new IngredientAiDetail(List.of("기제(용매)"), "LOW")));
+
+        IngredientAnalysisResponse response = inventoryService.getIngredientAnalysis(9L, 11L);
+
+        assertThat(response.caution20Count()).isEqualTo(1);
+        assertThat(response.allergyCount()).isEqualTo(1);
+        assertThat(response.riskDistribution()).isEqualTo(new IngredientAnalysisResponse.RiskDistribution(1, 1, 1));
+    }
+
+    @Test
     void ingredientAnalysisStillReturnsWhenCacheFails() {
         when(inventoryRepository.findByIdAndMemberId(11L, 9L)).thenReturn(Optional.of(inventory));
         when(inventoryAiCacheService.find(any())).thenThrow(new RuntimeException("inventory_ai_caches missing"));
         when(ingredientAiClient.fetchIngredientNames("바닥 토너")).thenReturn(List.of("정제수"));
-        when(ingredientAiClient.fetchIngredientPurposes(List.of("정제수")))
-                .thenReturn(Map.of("정제수", List.of("기제(용매)")));
+        when(ingredientAiClient.fetchIngredientDetails(List.of("정제수")))
+                .thenReturn(Map.of("정제수", new IngredientAiDetail(List.of("기제(용매)"), "LOW")));
         doThrow(new RuntimeException("read-only transaction")).when(inventoryAiCacheService).save(any(), any());
 
         IngredientAnalysisResponse response = inventoryService.getIngredientAnalysis(9L, 11L);
 
         assertThat(response.ingredients()).containsExactly(
-                new IngredientAnalysisResponse.IngredientPurpose("정제수", List.of("기제(용매)")));
+                new IngredientAnalysisResponse.IngredientDetail(
+                        "정제수", List.of("기제(용매)"), IngredientRiskLevel.LOW));
     }
 
     @Test

@@ -13,7 +13,8 @@ import org.junit.jupiter.api.Test;
 
 class ReasonCardNormalizerTest {
 
-    private final ReasonCardNormalizer normalizer = new ReasonCardNormalizer();
+    private final ReasonCardNormalizer normalizer =
+            new ReasonCardNormalizer(new KoreanUserCopyNormalizer());
 
     @Test
     void addsMissingCautionCardAndKeepsFourLevelOrder() {

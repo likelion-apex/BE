@@ -14,14 +14,21 @@ import domain.beauty.shortform.domain.ShortformAnalysisSnapshot;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.IngredientStats;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.ScoreBreakdown;
 import domain.beauty.shortform.domain.ShortformAnalysisSnapshot.StepResult;
+import domain.inventory.CategoryImageResolver;
+import global.util.PublicUrlResolver;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
 class RoutineOptimizationNormalizerTest {
 
+    private static final KoreanUserCopyNormalizer KOREAN_COPY = new KoreanUserCopyNormalizer();
     private final RoutineOptimizationNormalizer normalizer =
-            new RoutineOptimizationNormalizer(new ShortformProductCategoryResolver());
+            new RoutineOptimizationNormalizer(
+                    new ShortformProductCategoryResolver(),
+                    new ShortformProductImageResolver(
+                            new CategoryImageResolver(), new PublicUrlResolver("https://mutsa.dev.me.kr")),
+                    KOREAN_COPY);
 
     @Test
     void readsLegacyCompatibleJsonAndConvertsItToReplacement() throws Exception {
@@ -78,7 +85,8 @@ class RoutineOptimizationNormalizerTest {
             assertThat(step.productId()).isEqualTo(10L);
             assertThat(step.productName()).isEqualTo("영상 수분 앰플");
             assertThat(step.replaceName()).isNull();
-            assertThat(step.imageUrl()).isEqualTo("/ampoule.png");
+            assertThat(step.imageUrl())
+                    .isEqualTo("https://mutsa.dev.me.kr/images/categories/essence_serum.png");
         });
         assertThat(normalized.replacedCount()).isZero();
         assertThat(normalized.missingCount()).isEqualTo(1);

@@ -3,6 +3,7 @@ package domain.home.dto.response;
 import domain.routine.domain.Routine;
 import domain.routine.domain.RoutineStep;
 import domain.routine.domain.RoutineType;
+import global.util.PublicUrlResolver;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Comparator;
 import java.util.List;
@@ -15,10 +16,10 @@ public record TodayRoutineResponse(
         @Schema(description = "루틴 단계 목록 (순서대로)") List<RoutineStepSummary> steps
 ) {
 
-    public static TodayRoutineResponse from(Routine routine) {
+    public static TodayRoutineResponse from(Routine routine, PublicUrlResolver publicUrlResolver) {
         List<RoutineStepSummary> steps = routine.getSteps().stream()
                 .sorted(Comparator.comparingInt(RoutineStep::getOrder))
-                .map(RoutineStepSummary::from)
+                .map(step -> RoutineStepSummary.from(step, publicUrlResolver))
                 .toList();
         return new TodayRoutineResponse(routine.getId(), routine.getName(), routine.getRoutineType(), steps);
     }
@@ -34,7 +35,7 @@ public record TodayRoutineResponse(
             @Schema(description = "이미지 URL") String imageUrl
     ) {
 
-        public static RoutineStepSummary from(RoutineStep step) {
+        public static RoutineStepSummary from(RoutineStep step, PublicUrlResolver publicUrlResolver) {
             return new RoutineStepSummary(
                     step.getOrder(),
                     step.getProduct() != null ? step.getProduct().getId() : null,
@@ -42,7 +43,7 @@ public record TodayRoutineResponse(
                     step.getProductName(),
                     step.getBrand(),
                     step.getCategory(),
-                    step.getImageUrl()
+                    publicUrlResolver.resolve(step.getImageUrl())
             );
         }
     }

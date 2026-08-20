@@ -11,6 +11,7 @@ import domain.inventory.dto.response.ProductListResponse;
 import domain.inventory.dto.response.ProductSearchResponse;
 import global.exception.CustomException;
 import global.exception.ErrorCode;
+import global.util.PublicUrlResolver;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,18 +26,20 @@ public class ProductService {
     private final CategoryImageResolver categoryImageResolver;
     private final OpenAiCategoryClassifier categoryClassifier;
     private final PopularProductCache popularProductCache;
+    private final PublicUrlResolver publicUrlResolver;
 
     @Transactional(readOnly = true)
     public ProductSearchResponse search(String keyword) {
         if (keyword == null || keyword.isBlank()) {
-            return ProductSearchResponse.from(List.of());
+            return ProductSearchResponse.from(List.of(), publicUrlResolver);
         }
-        return ProductSearchResponse.from(productRepository.findByNameContainingIgnoreCase(keyword.trim()));
+        return ProductSearchResponse.from(
+                productRepository.findByNameContainingIgnoreCase(keyword.trim()), publicUrlResolver);
     }
 
     @Transactional(readOnly = true)
     public ProductListResponse listAll() {
-        return ProductListResponse.from(productRepository.findAllByOrderByIdAsc());
+        return ProductListResponse.from(productRepository.findAllByOrderByIdAsc(), publicUrlResolver);
     }
 
     @Transactional(readOnly = true)

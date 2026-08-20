@@ -16,6 +16,7 @@ import domain.routine.repository.DailyConditionRepository;
 import domain.routine.repository.RoutineRepository;
 import global.exception.CustomException;
 import global.exception.ErrorCode;
+import global.util.PublicUrlResolver;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,7 @@ public class HomeService {
     private final DailyConditionRepository dailyConditionRepository;
     private final MemberRepository memberRepository;
     private final InventoryService inventoryService;
+    private final PublicUrlResolver publicUrlResolver;
 
     public HomeSummaryResponse getSummary(Long memberId) {
         TodayConditionResponse todayCondition = dailyConditionRepository
@@ -44,7 +46,7 @@ public class HomeService {
         RoutineType routineType = routineTypeResolver.resolve(null);
         TodayRoutineResponse todayRoutine = routineRepository
                 .findByMemberIdAndStatusAndRoutineType(memberId, RoutineStatus.ACTIVE, routineType)
-                .map(TodayRoutineResponse::from)
+                .map(routine -> TodayRoutineResponse.from(routine, publicUrlResolver))
                 .orElse(null);
 
         FavoriteInventoryResponse favoriteInventory = inventoryService.getFavorites(memberId, FAVORITE_LIMIT);

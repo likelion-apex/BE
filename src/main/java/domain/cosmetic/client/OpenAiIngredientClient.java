@@ -1,6 +1,7 @@
 package domain.cosmetic.client;
 
 import domain.inventory.ai.AiProviderUnavailableException;
+import domain.inventory.ai.IngredientAiDetail;
 import domain.inventory.ai.InventoryAiJsonSupport;
 import domain.inventory.ai.InventoryAiProperties;
 import java.util.List;
@@ -33,13 +34,17 @@ public class OpenAiIngredientClient {
             반드시 아래 JSON 형식으로만 답변하세요: {"ingredients": ["성분1", "성분2"]}
             """;
 
-    public static final String PURPOSE_SYSTEM_PROMPT = """
-            당신은 화장품 성분의 배합목적(용도)을 알려주는 어시스턴트입니다.
-            사용자가 알려준 성분 목록 각각에 대해 화장품 원료로서의 배합목적을 1~3개씩 한국어로 나열하세요
-            (예: "피부 보습", "피부 컨디셔닝", "기제(용매)", "피부 진정").
-            성분의 배합목적을 확실히 알 수 없으면 해당 성분은 빈 배열로 응답하세요.
+    public static final String DETAIL_SYSTEM_PROMPT = """
+            당신은 화장품 성분의 배합목적(용도)과 위험도를 알려주는 어시스턴트입니다.
+            사용자가 알려준 성분 목록 각각에 대해 다음을 판단하세요:
+            1. 화장품 원료로서의 배합목적을 1~3개씩 한국어로 나열하세요
+               (예: "피부 보습", "피부 컨디셔닝", "기제(용매)", "피부 진정").
+               배합목적을 확실히 알 수 없으면 해당 성분은 빈 배열로 응답하세요.
+            2. 피부 자극/알레르기 유발 가능성 등을 고려한 일반적인 위험도를 "LOW"(낮음, 안전),
+               "MEDIUM"(중간, 주의 필요), "HIGH"(높음, 자극/위험 가능성 높음) 중 하나로 판단하세요.
+               확신이 없으면 "MEDIUM"으로 응답하세요.
             반드시 아래 JSON 형식으로만, 요청받은 성분 개수와 이름을 그대로 유지하여 답변하세요:
-            {"ingredients": [{"name": "성분1", "purposes": ["용도1", "용도2"]}]}
+            {"ingredients": [{"name": "성분1", "purposes": ["용도1", "용도2"], "riskLevel": "LOW"}]}
             """;
 
     private final RestClient restClient;
@@ -72,16 +77,16 @@ public class OpenAiIngredientClient {
         return InventoryAiJsonSupport.parseIngredientNames(payload);
     }
 
-    public Map<String, List<String>> fetchIngredientPurposes(List<String> ingredientNames) {
+    public Map<String, IngredientAiDetail> fetchIngredientDetails(List<String> ingredientNames) {
         if (ingredientNames == null || ingredientNames.isEmpty()) {
             return Map.of();
         }
         JsonNode payload = completeJson(
-                PURPOSE_SYSTEM_PROMPT,
+                DETAIL_SYSTEM_PROMPT,
                 "성분 목록: " + String.join(", ", ingredientNames),
-                "배합목적 조회",
+                "배합목적/위험도 조회",
                 String.join(",", ingredientNames));
-        return InventoryAiJsonSupport.parsePurposes(payload);
+        return InventoryAiJsonSupport.parseIngredientDetails(payload);
     }
 
     private JsonNode completeJson(String systemPrompt, String userPrompt, String action, String context) {

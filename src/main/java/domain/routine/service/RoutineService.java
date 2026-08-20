@@ -267,7 +267,7 @@ public class RoutineService {
                 .orElseThrow(() -> new CustomException(ErrorCode.ROUTINE_NOT_FOUND));
         AiBriefing aiBriefing = resolveAiBriefing(routine);
         Map<Integer, String> safetyEvaluationByOrder = resolveSafetyEvaluations(memberId, routine.getSteps());
-        return RoutineDetailResponse.from(routine, aiBriefing, safetyEvaluationByOrder);
+        return RoutineDetailResponse.from(routine, aiBriefing, safetyEvaluationByOrder, publicUrlResolver);
     }
 
     /**

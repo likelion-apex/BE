@@ -1,9 +1,12 @@
 package domain.inventory.service;
 
+import domain.beauty.shortform.application.ProductCapacityNormalizer;
 import domain.inventory.Inventory;
 import domain.inventory.InventoryRepository;
 import domain.inventory.Product;
+import domain.inventory.ai.CautionIngredientCatalog;
 import domain.inventory.ai.IngredientAiClient;
+import domain.inventory.ai.IngredientAiDetail;
 import domain.inventory.ai.InventoryAiCacheService;
 import domain.inventory.ai.PersonalizedAnalysisAiClient;
 import domain.inventory.client.OpenAiPersonalizedAnalysisClient;
@@ -13,6 +16,7 @@ import domain.inventory.dto.response.AiAnalysisResponse;
 import domain.inventory.dto.response.FavoriteInventoryResponse;
 import domain.inventory.dto.response.FavoriteUpdateResponse;
 import domain.inventory.dto.response.IngredientAnalysisResponse;
+import domain.inventory.dto.response.IngredientRiskLevel;
 import domain.inventory.dto.response.InventoryCreateResponse;
 import domain.inventory.dto.response.InventoryDeleteResponse;
 import domain.inventory.dto.response.InventoryListResponse;
@@ -20,6 +24,7 @@ import domain.member.Member;
 import domain.member.MemberRepository;
 import global.exception.CustomException;
 import global.exception.ErrorCode;
+import global.util.PublicUrlResolver;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -46,6 +51,9 @@ public class InventoryService {
     private final IngredientAiClient ingredientAiClient;
     private final PersonalizedAnalysisAiClient personalizedAnalysisAiClient;
     private final InventoryAiCacheService inventoryAiCacheService;
+    private final PublicUrlResolver publicUrlResolver;
+    private final ProductCapacityNormalizer productCapacityNormalizer;
+    private final CautionIngredientCatalog cautionIngredientCatalog;
 
     @Transactional(readOnly = true)
     public FavoriteInventoryResponse getFavorites(Long memberId, Integer limit) {
@@ -53,12 +61,13 @@ public class InventoryService {
         long totalFavoriteCount = inventoryRepository.countByMemberIdAndFavoriteTrue(memberId);
         List<Inventory> favorites = inventoryRepository
                 .findAllByMemberIdAndFavoriteTrueOrderByCreatedAtDesc(memberId, PageRequest.of(0, size));
-        return FavoriteInventoryResponse.of(totalFavoriteCount, favorites);
+        return FavoriteInventoryResponse.of(totalFavoriteCount, favorites, publicUrlResolver);
     }
 
     @Transactional(readOnly = true)
     public InventoryListResponse getAll(Long memberId) {
-        return InventoryListResponse.from(inventoryRepository.findAllByMemberIdOrderByCreatedAtDesc(memberId));
+        return InventoryListResponse.from(
+                inventoryRepository.findAllByMemberIdOrderByCreatedAtDesc(memberId), publicUrlResolver);
     }
 
     public InventoryCreateResponse create(Long memberId, InventoryCreateRequest request) {
@@ -109,33 +118,66 @@ public class InventoryService {
 
     public IngredientAnalysisResponse getIngredientAnalysis(Long memberId, Long inventoryId) {
         Inventory inventory = findOwnedInventory(memberId, inventoryId);
-        String productName = inventory.getProduct().getName();
+        Product product = inventory.getProduct();
+        String productName = product.getName();
+        String brand = product.getBrand();
+        String capacity = productCapacityNormalizer.normalize(productName);
+
         String cacheKey = InventoryAiCacheService.ingredientKey(productName);
-        List<IngredientAnalysisResponse.IngredientPurpose> cached = findCachedIngredients(cacheKey);
+        List<IngredientAnalysisResponse.IngredientDetail> cached = findCachedIngredients(cacheKey);
+        List<IngredientAnalysisResponse.IngredientDetail> ingredients;
         if (cached != null) {
-            return new IngredientAnalysisResponse(inventory.getId(), productName, cached);
+            ingredients = cached;
+        } else {
+            List<String> ingredientNames = ingredientAiClient.fetchIngredientNames(productName);
+            Map<String, IngredientAiDetail> detailsByName = ingredientAiClient.fetchIngredientDetails(ingredientNames);
+            ingredients = ingredientNames.stream()
+                    .map(name -> toIngredientDetail(name, detailsByName.get(name)))
+                    .toList();
+            if (!ingredients.isEmpty()) {
+                saveCache(cacheKey, ingredientCachePayload(ingredients));
+            }
         }
 
-        List<String> ingredientNames = ingredientAiClient.fetchIngredientNames(productName);
-        Map<String, List<String>> purposesByName = ingredientAiClient.fetchIngredientPurposes(ingredientNames);
-        List<IngredientAnalysisResponse.IngredientPurpose> ingredients = ingredientNames.stream()
-                .map(name -> new IngredientAnalysisResponse.IngredientPurpose(
-                        name, purposesByName.getOrDefault(name, List.of())))
+        return buildIngredientAnalysisResponse(inventory.getId(), productName, brand, capacity, ingredients);
+    }
+
+    private IngredientAnalysisResponse.IngredientDetail toIngredientDetail(String name, IngredientAiDetail detail) {
+        List<String> purposes = detail == null || detail.purposes() == null ? List.of() : detail.purposes();
+        IngredientRiskLevel riskLevel = IngredientRiskLevel.fromRaw(detail == null ? null : detail.riskLevel());
+        return new IngredientAnalysisResponse.IngredientDetail(name, purposes, riskLevel);
+    }
+
+    private IngredientAnalysisResponse buildIngredientAnalysisResponse(
+            Long inventoryId, String productName, String brand, String capacity,
+            List<IngredientAnalysisResponse.IngredientDetail> ingredients) {
+        List<String> names = ingredients.stream()
+                .map(IngredientAnalysisResponse.IngredientDetail::ingredientName)
                 .toList();
-        if (!ingredients.isEmpty()) {
-            saveCache(cacheKey, ingredientCachePayload(ingredients));
-        }
-        return new IngredientAnalysisResponse(inventory.getId(), productName, ingredients);
+        int low = countByRisk(ingredients, IngredientRiskLevel.LOW);
+        int medium = countByRisk(ingredients, IngredientRiskLevel.MEDIUM);
+        int high = countByRisk(ingredients, IngredientRiskLevel.HIGH);
+        int caution20Count = cautionIngredientCatalog.countCaution20(names);
+        int allergyCount = cautionIngredientCatalog.countAllergens(names);
+        return new IngredientAnalysisResponse(
+                inventoryId, productName, brand, capacity, ingredients,
+                new IngredientAnalysisResponse.RiskDistribution(low, medium, high),
+                caution20Count, allergyCount);
+    }
+
+    private int countByRisk(
+            List<IngredientAnalysisResponse.IngredientDetail> ingredients, IngredientRiskLevel level) {
+        return (int) ingredients.stream().filter(detail -> detail.riskLevel() == level).count();
     }
 
     private List<String> cachedIngredientNames(String productName) {
-        List<IngredientAnalysisResponse.IngredientPurpose> cached =
+        List<IngredientAnalysisResponse.IngredientDetail> cached =
                 findCachedIngredients(InventoryAiCacheService.ingredientKey(productName));
         if (cached == null || cached.isEmpty()) {
             return List.of();
         }
         return cached.stream()
-                .map(IngredientAnalysisResponse.IngredientPurpose::ingredientName)
+                .map(IngredientAnalysisResponse.IngredientDetail::ingredientName)
                 .filter(name -> name != null && !name.isBlank())
                 .toList();
     }
@@ -151,7 +193,7 @@ public class InventoryService {
         }
     }
 
-    private List<IngredientAnalysisResponse.IngredientPurpose> findCachedIngredients(String cacheKey) {
+    private List<IngredientAnalysisResponse.IngredientDetail> findCachedIngredients(String cacheKey) {
         try {
             return inventoryAiCacheService.find(cacheKey)
                     .map(this::ingredientsFromCache)
@@ -190,12 +232,13 @@ public class InventoryService {
     }
 
     private Map<String, Object> ingredientCachePayload(
-            List<IngredientAnalysisResponse.IngredientPurpose> ingredients) {
+            List<IngredientAnalysisResponse.IngredientDetail> ingredients) {
         List<Map<String, Object>> items = new ArrayList<>();
-        for (IngredientAnalysisResponse.IngredientPurpose ingredient : ingredients) {
+        for (IngredientAnalysisResponse.IngredientDetail ingredient : ingredients) {
             Map<String, Object> item = new HashMap<>();
             item.put("ingredientName", ingredient.ingredientName());
             item.put("purposes", ingredient.purposes() == null ? List.of() : ingredient.purposes());
+            item.put("riskLevel", ingredient.riskLevel() == null ? null : ingredient.riskLevel().name());
             items.add(item);
         }
         Map<String, Object> payload = new HashMap<>();
@@ -213,12 +256,12 @@ public class InventoryService {
         return new AiAnalysisResponse(inventoryId, productName, result.score(), keywords, LocalDateTime.now());
     }
 
-    private List<IngredientAnalysisResponse.IngredientPurpose> ingredientsFromCache(JsonNode payload) {
+    private List<IngredientAnalysisResponse.IngredientDetail> ingredientsFromCache(JsonNode payload) {
         JsonNode ingredientsNode = payload.path("ingredients");
         if (!ingredientsNode.isArray() || ingredientsNode.isEmpty()) {
             return null;
         }
-        List<IngredientAnalysisResponse.IngredientPurpose> ingredients = new ArrayList<>();
+        List<IngredientAnalysisResponse.IngredientDetail> ingredients = new ArrayList<>();
         ingredientsNode.forEach(node -> {
             String name = node.path("ingredientName").asText(null);
             if (name == null || name.isBlank()) {
@@ -234,7 +277,8 @@ public class InventoryService {
                     }
                 });
             }
-            ingredients.add(new IngredientAnalysisResponse.IngredientPurpose(name, purposes));
+            IngredientRiskLevel riskLevel = IngredientRiskLevel.fromRaw(node.path("riskLevel").asText(null));
+            ingredients.add(new IngredientAnalysisResponse.IngredientDetail(name, purposes, riskLevel));
         });
         return ingredients.isEmpty() ? null : ingredients;
     }

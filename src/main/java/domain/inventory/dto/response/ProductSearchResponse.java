@@ -2,6 +2,7 @@ package domain.inventory.dto.response;
 
 import domain.inventory.Product;
 import domain.inventory.ProductCategory;
+import global.util.PublicUrlResolver;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
@@ -10,8 +11,9 @@ public record ProductSearchResponse(
         @Schema(description = "검색된 화장품 목록") List<ProductSearchItem> items
 ) {
 
-    public static ProductSearchResponse from(List<Product> products) {
-        return new ProductSearchResponse(products.stream().map(ProductSearchItem::from).toList());
+    public static ProductSearchResponse from(List<Product> products, PublicUrlResolver publicUrlResolver) {
+        return new ProductSearchResponse(
+                products.stream().map(product -> ProductSearchItem.from(product, publicUrlResolver)).toList());
     }
 
     @Schema(description = "검색된 화장품 한 건")
@@ -23,13 +25,13 @@ public record ProductSearchResponse(
             @Schema(description = "이미지 URL") String imageUrl
     ) {
 
-        public static ProductSearchItem from(Product product) {
+        public static ProductSearchItem from(Product product, PublicUrlResolver publicUrlResolver) {
             return new ProductSearchItem(
                     product.getId(),
                     product.getName(),
                     product.getBrand(),
                     product.getCategory(),
-                    product.getImageUrl()
+                    publicUrlResolver.resolve(product.getImageUrl())
             );
         }
     }

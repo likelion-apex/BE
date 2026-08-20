@@ -57,7 +57,7 @@ public class IngredientAiClient {
         return List.of();
     }
 
-    public Map<String, List<String>> fetchIngredientPurposes(List<String> ingredientNames) {
+    public Map<String, IngredientAiDetail> fetchIngredientDetails(List<String> ingredientNames) {
         if (ingredientNames == null || ingredientNames.isEmpty()) {
             return Map.of();
         }
@@ -68,13 +68,13 @@ public class IngredientAiClient {
             }
             try {
                 return switch (provider) {
-                    case OPENAI -> openAiIngredientClient.fetchIngredientPurposes(ingredientNames);
-                    case GEMINI -> InventoryAiJsonSupport.parsePurposes(geminiJsonClient.generateJson(
-                            OpenAiIngredientClient.PURPOSE_SYSTEM_PROMPT, userPrompt));
-                    case GROQ -> groqIngredientClient.fetchIngredientPurposes(ingredientNames);
+                    case OPENAI -> openAiIngredientClient.fetchIngredientDetails(ingredientNames);
+                    case GEMINI -> InventoryAiJsonSupport.parseIngredientDetails(geminiJsonClient.generateJson(
+                            OpenAiIngredientClient.DETAIL_SYSTEM_PROMPT, userPrompt));
+                    case GROQ -> groqIngredientClient.fetchIngredientDetails(ingredientNames);
                 };
             } catch (AiProviderUnavailableException e) {
-                log.warn("배합목적 {} 실패: message={}", provider, e.getMessage());
+                log.warn("배합목적/위험도 {} 실패: message={}", provider, e.getMessage());
                 skipGate.markFrom(provider, e);
             }
         }

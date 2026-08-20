@@ -3,6 +3,7 @@ package domain.beauty.shortform.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import domain.beauty.domain.BeautyRoutineAnalysis.EvidenceSource;
@@ -17,6 +18,8 @@ import domain.beauty.shortform.domain.ProductResolutionStatus;
 import domain.cosmetic.client.KakaoImageClient;
 import domain.inventory.ProductRepository;
 import domain.inventory.ProductCategory;
+import domain.inventory.CategoryImageResolver;
+import global.util.PublicUrlResolver;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -33,7 +36,9 @@ class ShortformProductMatcherTest {
                 .thenReturn(Optional.empty());
         when(imageClient.searchImageUrl(anyString())).thenReturn(null);
         ShortformProductMatcher matcher = new ShortformProductMatcher(
-                repository, imageClient, new ShortformProductCategoryResolver());
+                repository, imageClient, new ShortformProductCategoryResolver(),
+                new ShortformProductImageResolver(
+                        new CategoryImageResolver(), new PublicUrlResolver("https://mutsa.dev.me.kr")));
         ProductEnrichmentData estimated = new ProductEnrichmentData(
                 "토리든",
                 "다이브인 저분자 히알루론산 수딩 크림",
@@ -52,6 +57,9 @@ class ShortformProductMatcherTest {
         assertThat(matched.productResolutionStatus()).isEqualTo(ProductResolutionStatus.AI_NORMALIZED);
         assertThat(matched.displayProductName()).contains("다이브인");
         assertThat(matched.productCategory()).isEqualTo(ProductCategory.CREAM);
+        assertThat(matched.imageUrl())
+                .isEqualTo("https://mutsa.dev.me.kr/images/categories/cream.png");
+        verifyNoInteractions(imageClient);
     }
 
     private Step categoryStep() {
