@@ -443,9 +443,14 @@ public class RoutineService {
         routine.activate();
 
         LocalDate today = LocalDate.now();
-        return routineLogRepository
-                .findByMemberIdAndLogDateAndRoutineId(memberId, today, routine.getId())
-                .orElseGet(() -> createTodayLog(routine, today));
+        routineLogRepository.findByMemberIdAndLogDateAndRoutineId(memberId, today, routine.getId())
+                .ifPresent(existing -> {
+                    routineLogRepository.delete(existing);
+                    // delete가 flush되기 전에 아래 createTodayLog()의 insert가 먼저 나가면
+                    // (member_id, log_date, routine_id) 유니크 제약과 충돌하므로 즉시 flush한다.
+                    routineLogRepository.flush();
+                });
+        return createTodayLog(routine, today);
     }
 
     private List<String> collectConflictWarnings(List<GeneratedStep> steps) {
