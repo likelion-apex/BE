@@ -547,6 +547,7 @@ function renderDailyRoutine() {
       <p>${routine.steps?.length || 0}단계 · ${routine.routineType === 'DAY' ? '데이 케어' : '나이트 케어'}</p>
       <div class="routine-progress" aria-label="루틴 달성률 ${rate}%"><span style="width:${rate}%"></span></div>
     </section>
+    ${routine.aiBriefing ? renderBriefing(routine.aiBriefing) : ''}
     <section class="page-section daily-routine-section">
       <div class="section-heading"><h2>오늘의 케어 순서</h2><span>단계를 눌러 완료 체크</span></div>
       <div class="daily-routine-list">

@@ -102,7 +102,7 @@ public class RoutineService {
                 .findByMemberIdAndLogDateAndRoutineId(memberId, today, routine.getId())
                 .orElseGet(() -> createTodayLog(routine, today));
 
-        return DailyRoutineResponse.from(routine, routineLog);
+        return DailyRoutineResponse.from(routine, routineLog, resolveAiBriefing(routine));
     }
 
     @Transactional
@@ -112,7 +112,7 @@ public class RoutineService {
         step.updateCompleted(completed);
 
         RoutineLog routineLog = step.getRoutineLog();
-        return DailyRoutineResponse.from(routineLog.getRoutine(), routineLog);
+        return DailyRoutineResponse.from(routineLog.getRoutine(), routineLog, resolveAiBriefing(routineLog.getRoutine()));
     }
 
     @Transactional
@@ -123,14 +123,14 @@ public class RoutineService {
             throw new CustomException(ErrorCode.ROUTINE_LOG_STEPS_INCOMPLETE);
         }
         routineLog.complete();
-        return DailyRoutineResponse.from(routineLog.getRoutine(), routineLog);
+        return DailyRoutineResponse.from(routineLog.getRoutine(), routineLog, resolveAiBriefing(routineLog.getRoutine()));
     }
 
     @Transactional
     public DailyRoutineResponse completeAllSteps(Long memberId) {
         RoutineLog routineLog = findTodayRoutineLog(memberId);
         routineLog.getSteps().forEach(step -> step.updateCompleted(true));
-        return DailyRoutineResponse.from(routineLog.getRoutine(), routineLog);
+        return DailyRoutineResponse.from(routineLog.getRoutine(), routineLog, resolveAiBriefing(routineLog.getRoutine()));
     }
 
     public CalendarMonthResponse getCalendarMonth(Long memberId, int year, int month) {
@@ -363,7 +363,7 @@ public class RoutineService {
                 .orElseThrow(() -> new CustomException(ErrorCode.ROUTINE_NOT_FOUND));
 
         RoutineLog routineLog = applyAsTodayActive(memberId, routine);
-        return DailyRoutineResponse.from(routine, routineLog);
+        return DailyRoutineResponse.from(routine, routineLog, resolveAiBriefing(routine));
     }
 
     public RoutineGenerationResponse generateRoutine(Long memberId, RoutineType routineType) {

@@ -18,8 +18,9 @@ public record DailyLogDetailResponse(
         String condition = dailyCondition != null ? dailyCondition.getCondition().getLabel() : null;
         String memo = dailyCondition != null ? dailyCondition.getMemo() : null;
 
+        // 6.8은 이번 스코프 밖: aiBriefing 없이 유지(null)
         List<DailyRoutineResponse> routineLogs = logs.stream()
-                .map(log -> DailyRoutineResponse.from(log.getRoutine(), log))
+                .map(log -> DailyRoutineResponse.from(log.getRoutine(), log, null))
                 .toList();
 
         return new DailyLogDetailResponse(date, condition, memo, routineLogs);
