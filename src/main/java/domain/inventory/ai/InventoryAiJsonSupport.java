@@ -4,12 +4,33 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 public final class InventoryAiJsonSupport {
 
     private InventoryAiJsonSupport() {
+    }
+
+    /**
+     * OpenAI/Gemini/Groq 등 AI provider 호출에서 발생한 {@link RestClientException}을
+     * {@link AiProviderUnavailableException}으로 변환한다. 429는 할당량 소진으로, 그 외 4xx는
+     * 요청 거부로, 나머지(5xx/타임아웃/연결 실패 등)는 일반 장애로 분류하며, 어느 경우든 예외가
+     * 즉시(재시도 대기 없이) 던져지므로 호출측 오케스트레이터가 바로 다음 provider로 넘어간다.
+     */
+    public static AiProviderUnavailableException mapToUnavailable(
+            String providerLabel, RestClientException exception) {
+        if (exception instanceof RestClientResponseException responseException) {
+            if (responseException.getStatusCode().value() == 429) {
+                return AiProviderUnavailableException.quota(providerLabel + " 호출에 실패했습니다.", exception);
+            }
+            if (responseException.getStatusCode().is4xxClientError()) {
+                return new AiProviderUnavailableException(providerLabel + " 요청이 거부되었습니다.", exception);
+            }
+        }
+        return new AiProviderUnavailableException(providerLabel + " 호출에 실패했습니다.", exception);
     }
 
     static String textOrNull(JsonNode node) {

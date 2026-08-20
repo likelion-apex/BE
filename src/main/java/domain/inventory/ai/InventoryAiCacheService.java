@@ -22,7 +22,7 @@ import tools.jackson.databind.ObjectMapper;
 public class InventoryAiCacheService {
 
     static final String INGREDIENT_VERSION = "v2";
-    static final String PERSONALIZED_VERSION = "v1";
+    static final String PERSONALIZED_VERSION = "v2";
     static final String BRAND_VERSION = "v1";
     private static final int MAX_CACHE_KEY_LENGTH = 255;
 

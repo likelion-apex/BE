@@ -10,7 +10,6 @@ import domain.inventory.ai.IngredientAiDetail;
 import domain.inventory.ai.InventoryAiCacheService;
 import domain.inventory.ai.InventoryAiJsonSupport;
 import domain.inventory.ai.PersonalizedAnalysisAiClient;
-import domain.inventory.client.OpenAiPersonalizedAnalysisClient;
 import domain.inventory.client.PersonalizedAnalysisResult;
 import domain.inventory.dto.request.InventoryCreateRequest;
 import domain.inventory.dto.response.AiAnalysisResponse;
@@ -46,6 +45,10 @@ public class InventoryService {
 
     private static final int DEFAULT_FAVORITE_LIMIT = 4;
     private static final String DEFAULT_PURPOSE = "배합목적 확인 필요";
+    private static final int RISK_SCORE_WEIGHT_LOW = 100;
+    private static final int RISK_SCORE_WEIGHT_MEDIUM = 60;
+    private static final int RISK_SCORE_WEIGHT_HIGH = 20;
+    private static final int DEFAULT_SCORE_WITHOUT_INGREDIENTS = 70;
 
     private final InventoryRepository inventoryRepository;
     private final MemberRepository memberRepository;
@@ -100,22 +103,28 @@ public class InventoryService {
     public AiAnalysisResponse getAiAnalysis(Long memberId, Long inventoryId) {
         Inventory inventory = findOwnedInventory(memberId, inventoryId);
         Member member = findMember(memberId);
-        String productName = inventory.getProduct().getName();
+        Product product = inventory.getProduct();
+        String productName = product.getName();
+
+        List<IngredientAnalysisResponse.IngredientDetail> ingredients = resolveIngredients(productName);
+        int score = computeRiskBasedScore(ingredients);
+        List<String> ingredientNames = ingredients.stream()
+                .map(IngredientAnalysisResponse.IngredientDetail::ingredientName)
+                .toList();
+
         String cacheKey = InventoryAiCacheService.personalizedKey(
                 productName, member.getSkinType(), member.getSkinConcerns());
-        PersonalizedAnalysisResult cached = findCachedAnalysis(cacheKey);
-        if (cached != null) {
-            return toAiResponse(inventory.getId(), productName, cached);
+        List<AiAnalysisResponse.AnalysisKeyword> keywords = findCachedKeywords(cacheKey);
+        if (keywords == null) {
+            PersonalizedAnalysisResult result = personalizedAnalysisAiClient.analyze(
+                    productName, ingredientNames, member.getSkinType(), member.getSkinConcerns());
+            keywords = toKeywords(result);
+            saveCache(cacheKey, keywordsCachePayload(keywords));
         }
 
-        List<String> ingredientNames = cachedIngredientNames(productName);
-        PersonalizedAnalysisResult result = personalizedAnalysisAiClient.analyze(
-                productName, ingredientNames, member.getSkinType(), member.getSkinConcerns());
-        if (result == null) {
-            throw new CustomException(ErrorCode.AI_ANALYSIS_FAILED);
-        }
-        saveCache(cacheKey, personalizedCachePayload(result));
-        return toAiResponse(inventory.getId(), productName, result);
+        return new AiAnalysisResponse(
+                inventory.getId(), productName, publicUrlResolver.resolve(product.getImageUrl()),
+                score, keywords, LocalDateTime.now());
     }
 
     public IngredientAnalysisResponse getIngredientAnalysis(Long memberId, Long inventoryId) {
@@ -125,23 +134,50 @@ public class InventoryService {
         String brand = resolveBrand(product);
         String capacity = productCapacityNormalizer.normalize(productName);
 
-        String cacheKey = InventoryAiCacheService.ingredientKey(productName);
-        List<IngredientAnalysisResponse.IngredientDetail> cached = findCachedIngredients(cacheKey);
-        List<IngredientAnalysisResponse.IngredientDetail> ingredients;
-        if (cached != null) {
-            ingredients = cached;
-        } else {
-            List<String> ingredientNames = ingredientAiClient.fetchIngredientNames(productName);
-            Map<String, IngredientAiDetail> detailsByName = ingredientAiClient.fetchIngredientDetails(ingredientNames);
-            ingredients = ingredientNames.stream()
-                    .map(name -> toIngredientDetail(name, detailsByName.get(name)))
-                    .toList();
-            if (!ingredients.isEmpty()) {
-                saveCache(cacheKey, ingredientCachePayload(ingredients));
-            }
-        }
+        List<IngredientAnalysisResponse.IngredientDetail> ingredients = resolveIngredients(productName);
 
         return buildIngredientAnalysisResponse(inventory.getId(), productName, brand, capacity, ingredients);
+    }
+
+    /**
+     * 전성분/배합목적/위험도를 캐시 → (캐시 미스 시) AI 순으로 조회한다.
+     * /ai-analysis와 /ingredients가 동일 캐시 키를 공유하므로, 한쪽에서 이미 조회했다면
+     * 다른 쪽에서는 AI를 다시 호출하지 않는다.
+     */
+    private List<IngredientAnalysisResponse.IngredientDetail> resolveIngredients(String productName) {
+        String cacheKey = InventoryAiCacheService.ingredientKey(productName);
+        List<IngredientAnalysisResponse.IngredientDetail> cached = findCachedIngredients(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+        List<String> ingredientNames = ingredientAiClient.fetchIngredientNames(productName);
+        Map<String, IngredientAiDetail> detailsByName = ingredientAiClient.fetchIngredientDetails(ingredientNames);
+        List<IngredientAnalysisResponse.IngredientDetail> ingredients = ingredientNames.stream()
+                .map(name -> toIngredientDetail(name, detailsByName.get(name)))
+                .toList();
+        if (!ingredients.isEmpty()) {
+            saveCache(cacheKey, ingredientCachePayload(ingredients));
+        }
+        return ingredients;
+    }
+
+    /**
+     * 성분 위험도 비율 기반 결정론적 점수. 낮음/중간/높음 성분 각각에 가중치를 부여해
+     * 전체 성분 수로 평균낸다(낮음 비율이 높을수록 고득점). 성분 정보가 전혀 없으면
+     * {@link #DEFAULT_SCORE_WITHOUT_INGREDIENTS}를 반환한다.
+     */
+    private int computeRiskBasedScore(List<IngredientAnalysisResponse.IngredientDetail> ingredients) {
+        if (ingredients == null || ingredients.isEmpty()) {
+            return DEFAULT_SCORE_WITHOUT_INGREDIENTS;
+        }
+        int low = countByRisk(ingredients, IngredientRiskLevel.LOW);
+        int medium = countByRisk(ingredients, IngredientRiskLevel.MEDIUM);
+        int high = countByRisk(ingredients, IngredientRiskLevel.HIGH);
+        double weightedSum = (double) low * RISK_SCORE_WEIGHT_LOW
+                + (double) medium * RISK_SCORE_WEIGHT_MEDIUM
+                + (double) high * RISK_SCORE_WEIGHT_HIGH;
+        int score = (int) Math.round(weightedSum / ingredients.size());
+        return Math.max(0, Math.min(100, score));
     }
 
     private String resolveBrand(Product product) {
@@ -209,27 +245,50 @@ public class InventoryService {
         return (int) ingredients.stream().filter(detail -> detail.riskLevel() == level).count();
     }
 
-    private List<String> cachedIngredientNames(String productName) {
-        List<IngredientAnalysisResponse.IngredientDetail> cached =
-                findCachedIngredients(InventoryAiCacheService.ingredientKey(productName));
-        if (cached == null || cached.isEmpty()) {
-            return List.of();
-        }
-        return cached.stream()
-                .map(IngredientAnalysisResponse.IngredientDetail::ingredientName)
-                .filter(name -> name != null && !name.isBlank())
-                .toList();
-    }
-
-    private PersonalizedAnalysisResult findCachedAnalysis(String cacheKey) {
+    /**
+     * 캐시된 판단 근거 키워드를 조회한다. 캐시 엔트리가 없으면 null(재조회 필요),
+     * 있으면 빈 배열이라도 그대로 반환한다(불필요한 재조회 방지).
+     */
+    private List<AiAnalysisResponse.AnalysisKeyword> findCachedKeywords(String cacheKey) {
         try {
             return inventoryAiCacheService.find(cacheKey)
-                    .map(OpenAiPersonalizedAnalysisClient::parseResult)
+                    .map(this::keywordsFromCache)
                     .orElse(null);
         } catch (RuntimeException e) {
             log.warn("맞춤 분석 캐시 조회를 건너뜁니다: cacheKey={}, message={}", cacheKey, e.getMessage());
             return null;
         }
+    }
+
+    private List<AiAnalysisResponse.AnalysisKeyword> keywordsFromCache(JsonNode payload) {
+        JsonNode keywordsNode = payload.path("keywords");
+        if (!keywordsNode.isArray()) {
+            return List.of();
+        }
+        List<AiAnalysisResponse.AnalysisKeyword> keywords = new ArrayList<>();
+        keywordsNode.forEach(node -> {
+            String keyword = node.path("keyword").asText(null);
+            if (keyword == null || keyword.isBlank()) {
+                return;
+            }
+            String reason = node.path("reason").asText(null);
+            keywords.add(new AiAnalysisResponse.AnalysisKeyword(keyword, reason));
+        });
+        return keywords;
+    }
+
+    /**
+     * AI 맞춤 분석 결과에서 키워드만 채택한다(점수는 성분 위험도 기반으로 별도 산출하므로 폐기).
+     * AI가 완전히 실패(null)해도 예외를 던지지 않고 빈 배열로 degrade한다.
+     */
+    private List<AiAnalysisResponse.AnalysisKeyword> toKeywords(PersonalizedAnalysisResult result) {
+        if (result == null || result.keywords() == null) {
+            return List.of();
+        }
+        return result.keywords().stream()
+                .filter(keyword -> keyword != null && keyword.keyword() != null && !keyword.keyword().isBlank())
+                .map(keyword -> new AiAnalysisResponse.AnalysisKeyword(keyword.keyword(), keyword.reason()))
+                .toList();
     }
 
     private List<IngredientAnalysisResponse.IngredientDetail> findCachedIngredients(String cacheKey) {
@@ -251,22 +310,16 @@ public class InventoryService {
         }
     }
 
-    private Map<String, Object> personalizedCachePayload(PersonalizedAnalysisResult result) {
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("score", result.score());
-        List<Map<String, String>> keywords = new ArrayList<>();
-        List<PersonalizedAnalysisResult.Keyword> source =
-                result.keywords() == null ? List.of() : result.keywords();
-        for (PersonalizedAnalysisResult.Keyword keyword : source) {
-            if (keyword == null || keyword.keyword() == null || keyword.keyword().isBlank()) {
-                continue;
-            }
+    private Map<String, Object> keywordsCachePayload(List<AiAnalysisResponse.AnalysisKeyword> keywords) {
+        List<Map<String, String>> items = new ArrayList<>();
+        for (AiAnalysisResponse.AnalysisKeyword keyword : keywords) {
             Map<String, String> item = new HashMap<>();
             item.put("keyword", keyword.keyword());
             item.put("reason", keyword.reason() == null ? "" : keyword.reason());
-            keywords.add(item);
+            items.add(item);
         }
-        payload.put("keywords", keywords);
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("keywords", items);
         return payload;
     }
 
@@ -283,16 +336,6 @@ public class InventoryService {
         Map<String, Object> payload = new HashMap<>();
         payload.put("ingredients", items);
         return payload;
-    }
-
-    private AiAnalysisResponse toAiResponse(Long inventoryId, String productName, PersonalizedAnalysisResult result) {
-        List<PersonalizedAnalysisResult.Keyword> source =
-                result.keywords() == null ? List.of() : result.keywords();
-        List<AiAnalysisResponse.AnalysisKeyword> keywords = source.stream()
-                .filter(keyword -> keyword != null && keyword.keyword() != null && !keyword.keyword().isBlank())
-                .map(keyword -> new AiAnalysisResponse.AnalysisKeyword(keyword.keyword(), keyword.reason()))
-                .toList();
-        return new AiAnalysisResponse(inventoryId, productName, result.score(), keywords, LocalDateTime.now());
     }
 
     private List<IngredientAnalysisResponse.IngredientDetail> ingredientsFromCache(JsonNode payload) {
