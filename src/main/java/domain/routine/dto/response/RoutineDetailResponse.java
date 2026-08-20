@@ -61,7 +61,9 @@ public record RoutineDetailResponse(
             @Schema(description = "이미지 URL") String imageUrl,
             @Schema(description = "AI 추천 사유 (없으면 null)") String aiReason,
             @Schema(description = "AI 안전성 평가 (4.4 피부적합도 분석의 첫 번째 근거, 제품 없거나 분석 실패 시 null)")
-            String safetyEvaluation
+            String safetyEvaluation,
+            @Schema(description = "대체 여부. 인벤토리 제품으로 대체됐으면 REPLACED, 영상 속 제품 그대로면 VIDEO_PRODUCT")
+            String status
     ) {
 
         static RoutineDetailStepResponse from(
@@ -75,7 +77,8 @@ public record RoutineDetailResponse(
                     step.getCategory(),
                     publicUrlResolver.resolve(step.getImageUrl()),
                     step.getAiReason(),
-                    safetyEvaluation
+                    safetyEvaluation,
+                    step.getInventory() != null ? "REPLACED" : "VIDEO_PRODUCT"
             );
         }
     }

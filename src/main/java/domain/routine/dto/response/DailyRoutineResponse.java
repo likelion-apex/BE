@@ -56,7 +56,9 @@ public record DailyRoutineResponse(
             @Schema(description = "브랜드") String brand,
             @Schema(description = "카테고리") String category,
             @Schema(description = "이미지 URL") String imageUrl,
-            @Schema(description = "완료 여부") boolean completed
+            @Schema(description = "완료 여부") boolean completed,
+            @Schema(description = "대체 여부. 인벤토리 제품으로 대체됐으면 REPLACED, 영상 속 제품 그대로면 VIDEO_PRODUCT")
+            String status
     ) {
 
         public static DailyRoutineStepResponse from(
@@ -70,7 +72,8 @@ public record DailyRoutineResponse(
                     step != null ? step.getBrand() : null,
                     step != null ? step.getCategory() : null,
                     step != null ? publicUrlResolver.resolve(step.getImageUrl()) : null,
-                    logStep.isCompleted()
+                    logStep.isCompleted(),
+                    step != null ? (step.getInventory() != null ? "REPLACED" : "VIDEO_PRODUCT") : null
             );
         }
     }
