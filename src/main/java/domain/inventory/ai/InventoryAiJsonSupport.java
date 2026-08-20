@@ -80,20 +80,26 @@ public final class InventoryAiJsonSupport {
             if (name == null) {
                 return;
             }
-            List<String> purposes = new ArrayList<>();
-            JsonNode purposesNode = node.path("purposes");
-            if (purposesNode.isArray()) {
-                purposesNode.forEach(purposeNode -> {
-                    String value = textOrNull(purposeNode);
-                    if (value != null) {
-                        purposes.add(value.trim());
-                    }
-                });
-            }
+            List<String> purposes = stringList(node.path("purposes"));
+            List<String> efficacyTags = stringList(node.path("efficacyTags"));
             String riskLevel = textOrNull(node.path("riskLevel"));
-            result.put(name, new IngredientAiDetail(purposes, riskLevel));
+            result.put(name, new IngredientAiDetail(purposes, efficacyTags, riskLevel));
         });
         return result;
+    }
+
+    private static List<String> stringList(JsonNode arrayNode) {
+        if (!arrayNode.isArray()) {
+            return new ArrayList<>();
+        }
+        List<String> values = new ArrayList<>();
+        arrayNode.forEach(itemNode -> {
+            String value = textOrNull(itemNode);
+            if (value != null) {
+                values.add(value.trim());
+            }
+        });
+        return values;
     }
 
     private static String ingredientName(JsonNode node) {

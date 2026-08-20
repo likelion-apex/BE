@@ -8,7 +8,7 @@ public class InventoryAiProperties {
 
     private Duration aiCacheTtl = Duration.ofDays(30);
     private Duration connectTimeout = Duration.ofSeconds(1);
-    private Duration readTimeout = Duration.ofSeconds(10);
+    private Duration readTimeout = Duration.ofSeconds(6);
     private Duration geminiConnectTimeout = Duration.ofSeconds(3);
     private Duration geminiReadTimeout = Duration.ofSeconds(5);
     private Duration groqConnectTimeout = Duration.ofSeconds(1);
