@@ -21,7 +21,9 @@ import domain.inventory.ai.PersonalizedAnalysisAiClient;
 import domain.inventory.client.PersonalizedAnalysisResult;
 import domain.inventory.dto.response.AiAnalysisResponse;
 import domain.inventory.dto.response.IngredientAnalysisResponse;
+import domain.inventory.dto.response.IngredientPurposeCategory;
 import domain.inventory.dto.response.IngredientRiskLevel;
+import domain.inventory.dto.response.SkinEfficacyTag;
 import domain.member.Member;
 import domain.member.MemberRepository;
 import domain.member.Provider;
@@ -97,7 +99,7 @@ class InventoryAnalysisCacheTest {
         ObjectNode payload = new ObjectMapper().createObjectNode();
         payload.putArray("ingredients").addObject()
                 .put("ingredientName", "정제수")
-                .putArray("purposes").add("기제(용매)");
+                .putArray("purposes").add("용제");
         when(inventoryAiCacheService.find(InventoryAiCacheService.ingredientKey("바닥 토너")))
                 .thenReturn(Optional.of(payload));
 
@@ -105,7 +107,8 @@ class InventoryAnalysisCacheTest {
 
         assertThat(response.ingredients()).containsExactly(
                 new IngredientAnalysisResponse.IngredientDetail(
-                        "정제수", List.of("기제(용매)"), IngredientRiskLevel.MEDIUM));
+                        "정제수", List.of(IngredientPurposeCategory.SOLVENT), List.of(),
+                        IngredientRiskLevel.MEDIUM));
         verify(ingredientAiClient, never()).fetchIngredientNames(any());
         verify(ingredientAiClient, never()).fetchIngredientDetails(any());
         verify(ingredientAiClient, never()).inferBrand(any());
@@ -120,11 +123,11 @@ class InventoryAnalysisCacheTest {
         ObjectNode ingredientPayload = mapper.createObjectNode();
         var ingredientsArray = ingredientPayload.putArray("ingredients");
         ingredientsArray.addObject().put("ingredientName", "정제수").put("riskLevel", "LOW")
-                .putArray("purposes").add("기제(용매)");
+                .putArray("purposes").add("용제");
         ingredientsArray.addObject().put("ingredientName", "글리세린").put("riskLevel", "LOW")
-                .putArray("purposes").add("보습");
+                .putArray("purposes").add("피부컨디셔닝제");
         ingredientsArray.addObject().put("ingredientName", "메틸파라벤").put("riskLevel", "MEDIUM")
-                .putArray("purposes").add("보존제");
+                .putArray("purposes").add("변성제");
         when(inventoryAiCacheService.find(InventoryAiCacheService.ingredientKey("바닥 토너")))
                 .thenReturn(Optional.of(ingredientPayload));
 
@@ -175,8 +178,8 @@ class InventoryAnalysisCacheTest {
                 .thenReturn(List.of("정제수", "글리세린"));
         when(ingredientAiClient.fetchIngredientDetails(List.of("정제수", "글리세린")))
                 .thenReturn(Map.of(
-                        "정제수", new IngredientAiDetail(List.of("기제(용매)"), "LOW"),
-                        "글리세린", new IngredientAiDetail(List.of("보습"), "LOW")));
+                        "정제수", new IngredientAiDetail(List.of("용제"), List.of(), "LOW"),
+                        "글리세린", new IngredientAiDetail(List.of("피부컨디셔닝제"), List.of("피부 보습"), "LOW")));
         when(personalizedAnalysisAiClient.analyze(eq("바닥 토너"), any(), any(), any())).thenReturn(null);
 
         AiAnalysisResponse response = inventoryService.getAiAnalysis(9L, 11L);
@@ -193,8 +196,8 @@ class InventoryAnalysisCacheTest {
                 .thenReturn(List.of("리모넨", "트리클로산"));
         when(ingredientAiClient.fetchIngredientDetails(List.of("리모넨", "트리클로산")))
                 .thenReturn(Map.of(
-                        "리모넨", new IngredientAiDetail(List.of("향료"), "HIGH"),
-                        "트리클로산", new IngredientAiDetail(List.of("보존제"), "HIGH")));
+                        "리모넨", new IngredientAiDetail(List.of("향료"), List.of(), "HIGH"),
+                        "트리클로산", new IngredientAiDetail(List.of("변성제"), List.of(), "HIGH")));
         when(personalizedAnalysisAiClient.analyze(eq("바닥 토너"), any(), any(), any())).thenReturn(null);
 
         AiAnalysisResponse response = inventoryService.getAiAnalysis(9L, 11L);
@@ -208,7 +211,7 @@ class InventoryAnalysisCacheTest {
         when(inventoryAiCacheService.find(any())).thenReturn(Optional.empty());
         when(ingredientAiClient.fetchIngredientNames("바닥 토너")).thenReturn(List.of("정제수"));
         when(ingredientAiClient.fetchIngredientDetails(List.of("정제수")))
-                .thenReturn(Map.of("정제수", new IngredientAiDetail(List.of("기제(용매)"), "LOW")));
+                .thenReturn(Map.of("정제수", new IngredientAiDetail(List.of("용제"), List.of(), "LOW")));
 
         inventoryService.getIngredientAnalysis(9L, 11L);
 
@@ -259,9 +262,9 @@ class InventoryAnalysisCacheTest {
                 .thenReturn(List.of("메틸파라벤", "리모넨", "정제수"));
         when(ingredientAiClient.fetchIngredientDetails(List.of("메틸파라벤", "리모넨", "정제수")))
                 .thenReturn(Map.of(
-                        "메틸파라벤", new IngredientAiDetail(List.of("보존제"), "MEDIUM"),
-                        "리모넨", new IngredientAiDetail(List.of("향료"), "HIGH"),
-                        "정제수", new IngredientAiDetail(List.of("기제(용매)"), "LOW")));
+                        "메틸파라벤", new IngredientAiDetail(List.of("변성제"), List.of(), "MEDIUM"),
+                        "리모넨", new IngredientAiDetail(List.of("향료"), List.of(), "HIGH"),
+                        "정제수", new IngredientAiDetail(List.of("용제"), List.of(), "LOW")));
 
         IngredientAnalysisResponse response = inventoryService.getIngredientAnalysis(9L, 11L);
 
@@ -276,14 +279,14 @@ class InventoryAnalysisCacheTest {
         when(inventoryAiCacheService.find(any())).thenThrow(new RuntimeException("inventory_ai_caches missing"));
         when(ingredientAiClient.fetchIngredientNames("바닥 토너")).thenReturn(List.of("정제수"));
         when(ingredientAiClient.fetchIngredientDetails(List.of("정제수")))
-                .thenReturn(Map.of("정제수", new IngredientAiDetail(List.of("기제(용매)"), "LOW")));
+                .thenReturn(Map.of("정제수", new IngredientAiDetail(List.of("용제"), List.of(), "LOW")));
         doThrow(new RuntimeException("read-only transaction")).when(inventoryAiCacheService).save(any(), any());
 
         IngredientAnalysisResponse response = inventoryService.getIngredientAnalysis(9L, 11L);
 
         assertThat(response.ingredients()).containsExactly(
                 new IngredientAnalysisResponse.IngredientDetail(
-                        "정제수", List.of("기제(용매)"), IngredientRiskLevel.LOW));
+                        "정제수", List.of(IngredientPurposeCategory.SOLVENT), List.of(), IngredientRiskLevel.LOW));
     }
 
     @Test
@@ -293,7 +296,7 @@ class InventoryAnalysisCacheTest {
         when(inventoryAiCacheService.find(any())).thenThrow(new RuntimeException("inventory_ai_caches missing"));
         when(ingredientAiClient.fetchIngredientNames("바닥 토너")).thenReturn(List.of("정제수"));
         when(ingredientAiClient.fetchIngredientDetails(List.of("정제수")))
-                .thenReturn(Map.of("정제수", new IngredientAiDetail(List.of("기제(용매)"), "LOW")));
+                .thenReturn(Map.of("정제수", new IngredientAiDetail(List.of("용제"), List.of(), "LOW")));
         when(personalizedAnalysisAiClient.analyze("바닥 토너", List.of("정제수"), SkinType.DRY, Set.of()))
                 .thenReturn(new PersonalizedAnalysisResult(
                         80, List.of(new PersonalizedAnalysisResult.Keyword("보습", "건성"))));
@@ -335,7 +338,7 @@ class InventoryAnalysisCacheTest {
         when(ingredientAiClient.inferBrand("바닥 토너")).thenReturn("이니스프리");
         when(ingredientAiClient.fetchIngredientNames("바닥 토너")).thenReturn(List.of("정제수"));
         when(ingredientAiClient.fetchIngredientDetails(List.of("정제수")))
-                .thenReturn(Map.of("정제수", new IngredientAiDetail(List.of("기제(용매)"), "LOW")));
+                .thenReturn(Map.of("정제수", new IngredientAiDetail(List.of("용제"), List.of(), "LOW")));
 
         IngredientAnalysisResponse response = inventoryService.getIngredientAnalysis(9L, 11L);
 
@@ -396,13 +399,33 @@ class InventoryAnalysisCacheTest {
         when(inventoryAiCacheService.find(any())).thenReturn(Optional.empty());
         when(ingredientAiClient.fetchIngredientNames("바닥 토너")).thenReturn(List.of("정제수"));
         when(ingredientAiClient.fetchIngredientDetails(List.of("정제수")))
-                .thenReturn(Map.of("정제수", new IngredientAiDetail(List.of(), "LOW")));
+                .thenReturn(Map.of("정제수", new IngredientAiDetail(List.of(), List.of(), "LOW")));
 
         IngredientAnalysisResponse response = inventoryService.getIngredientAnalysis(9L, 11L);
 
         assertThat(response.ingredients()).containsExactly(
                 new IngredientAnalysisResponse.IngredientDetail(
-                        "정제수", List.of("배합목적 확인 필요"), IngredientRiskLevel.LOW));
+                        "정제수", List.of(IngredientPurposeCategory.SKIN_CONDITIONING_AGENT), List.of(),
+                        IngredientRiskLevel.LOW));
         verify(ingredientAiClient, never()).inferBrand(any());
+    }
+
+    @Test
+    void limitsEfficacyTagsToTwoAndDropsUnrecognizedPurposes() {
+        when(inventoryRepository.findByIdAndMemberId(11L, 9L)).thenReturn(Optional.of(inventory));
+        when(inventoryAiCacheService.find(any())).thenReturn(Optional.empty());
+        when(ingredientAiClient.fetchIngredientNames("바닥 토너")).thenReturn(List.of("정제수"));
+        when(ingredientAiClient.fetchIngredientDetails(List.of("정제수")))
+                .thenReturn(Map.of("정제수", new IngredientAiDetail(
+                        List.of("알수없는목적"), List.of("피부 보습", "피부 보호", "피부 보습"), "LOW")));
+
+        IngredientAnalysisResponse response = inventoryService.getIngredientAnalysis(9L, 11L);
+
+        assertThat(response.ingredients()).containsExactly(
+                new IngredientAnalysisResponse.IngredientDetail(
+                        "정제수",
+                        List.of(IngredientPurposeCategory.SKIN_CONDITIONING_AGENT),
+                        List.of(SkinEfficacyTag.MOISTURIZING, SkinEfficacyTag.PROTECTION),
+                        IngredientRiskLevel.LOW));
     }
 }

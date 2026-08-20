@@ -137,7 +137,7 @@ product:
 inventory:
   ai-cache-ttl: 30d
   connect-timeout: ${INVENTORY_CONNECT_TIMEOUT:1s}
-  read-timeout: ${INVENTORY_READ_TIMEOUT:10s}
+  read-timeout: ${INVENTORY_READ_TIMEOUT:6s}
   gemini-connect-timeout: 3s
   gemini-read-timeout: 5s
   groq-connect-timeout: 1s

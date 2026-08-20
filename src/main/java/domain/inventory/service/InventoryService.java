@@ -16,10 +16,12 @@ import domain.inventory.dto.response.AiAnalysisResponse;
 import domain.inventory.dto.response.FavoriteInventoryResponse;
 import domain.inventory.dto.response.FavoriteUpdateResponse;
 import domain.inventory.dto.response.IngredientAnalysisResponse;
+import domain.inventory.dto.response.IngredientPurposeCategory;
 import domain.inventory.dto.response.IngredientRiskLevel;
 import domain.inventory.dto.response.InventoryCreateResponse;
 import domain.inventory.dto.response.InventoryDeleteResponse;
 import domain.inventory.dto.response.InventoryListResponse;
+import domain.inventory.dto.response.SkinEfficacyTag;
 import domain.member.Member;
 import domain.member.MemberRepository;
 import global.exception.CustomException;
@@ -28,8 +30,10 @@ import global.util.PublicUrlResolver;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -44,7 +48,9 @@ import tools.jackson.databind.JsonNode;
 public class InventoryService {
 
     private static final int DEFAULT_FAVORITE_LIMIT = 4;
-    private static final String DEFAULT_PURPOSE = "배합목적 확인 필요";
+    private static final IngredientPurposeCategory DEFAULT_PURPOSE_CATEGORY =
+            IngredientPurposeCategory.SKIN_CONDITIONING_AGENT;
+    private static final int MAX_EFFICACY_TAGS = 2;
     private static final int RISK_SCORE_WEIGHT_LOW = 100;
     private static final int RISK_SCORE_WEIGHT_MEDIUM = 60;
     private static final int RISK_SCORE_WEIGHT_HIGH = 20;
@@ -211,16 +217,51 @@ public class InventoryService {
     }
 
     private IngredientAnalysisResponse.IngredientDetail toIngredientDetail(String name, IngredientAiDetail detail) {
-        List<String> purposes = purposesOrFallback(detail == null ? null : detail.purposes());
+        List<IngredientPurposeCategory> purposes = resolvePurposes(detail == null ? null : detail.purposes());
+        List<SkinEfficacyTag> efficacyTags = resolveEfficacyTags(detail == null ? null : detail.efficacyTags());
         IngredientRiskLevel riskLevel = IngredientRiskLevel.fromRaw(detail == null ? null : detail.riskLevel());
-        return new IngredientAnalysisResponse.IngredientDetail(name, purposes, riskLevel);
+        return new IngredientAnalysisResponse.IngredientDetail(name, purposes, efficacyTags, riskLevel);
     }
 
-    private List<String> purposesOrFallback(List<String> purposes) {
-        if (purposes == null || purposes.isEmpty()) {
-            return List.of(DEFAULT_PURPOSE);
+    /**
+     * 배합목적은 7개 공식 카테고리로만 제한하며 최소 1개를 보장한다(매칭 실패/빈 응답 시 기본값으로 보정).
+     */
+    private List<IngredientPurposeCategory> resolvePurposes(List<String> rawPurposes) {
+        Set<IngredientPurposeCategory> resolved = toDistinctCategories(rawPurposes);
+        if (resolved.isEmpty()) {
+            return List.of(DEFAULT_PURPOSE_CATEGORY);
         }
-        return purposes;
+        return List.copyOf(resolved);
+    }
+
+    private Set<IngredientPurposeCategory> toDistinctCategories(List<String> rawPurposes) {
+        Set<IngredientPurposeCategory> resolved = new LinkedHashSet<>();
+        if (rawPurposes == null) {
+            return resolved;
+        }
+        for (String raw : rawPurposes) {
+            IngredientPurposeCategory category = IngredientPurposeCategory.fromRaw(raw);
+            if (category != null) {
+                resolved.add(category);
+            }
+        }
+        return resolved;
+    }
+
+    /**
+     * 효능 태그는 강제 기본값 없이 0~2개까지 허용한다(둘 다 해당 없으면 빈 배열 유지).
+     */
+    private List<SkinEfficacyTag> resolveEfficacyTags(List<String> rawEfficacyTags) {
+        Set<SkinEfficacyTag> resolved = new LinkedHashSet<>();
+        if (rawEfficacyTags != null) {
+            for (String raw : rawEfficacyTags) {
+                SkinEfficacyTag tag = SkinEfficacyTag.fromRaw(raw);
+                if (tag != null) {
+                    resolved.add(tag);
+                }
+            }
+        }
+        return resolved.stream().limit(MAX_EFFICACY_TAGS).toList();
     }
 
     private IngredientAnalysisResponse buildIngredientAnalysisResponse(
@@ -329,13 +370,21 @@ public class InventoryService {
         for (IngredientAnalysisResponse.IngredientDetail ingredient : ingredients) {
             Map<String, Object> item = new HashMap<>();
             item.put("ingredientName", ingredient.ingredientName());
-            item.put("purposes", ingredient.purposes() == null ? List.of() : ingredient.purposes());
+            item.put("purposes", enumNames(ingredient.purposes()));
+            item.put("efficacyTags", enumNames(ingredient.efficacyTags()));
             item.put("riskLevel", ingredient.riskLevel() == null ? null : ingredient.riskLevel().name());
             items.add(item);
         }
         Map<String, Object> payload = new HashMap<>();
         payload.put("ingredients", items);
         return payload;
+    }
+
+    private List<String> enumNames(List<? extends Enum<?>> values) {
+        if (values == null) {
+            return List.of();
+        }
+        return values.stream().map(Enum::name).toList();
     }
 
     private List<IngredientAnalysisResponse.IngredientDetail> ingredientsFromCache(JsonNode payload) {
@@ -349,20 +398,28 @@ public class InventoryService {
             if (name == null || name.isBlank()) {
                 return;
             }
-            List<String> purposes = new ArrayList<>();
-            JsonNode purposesNode = node.path("purposes");
-            if (purposesNode.isArray()) {
-                purposesNode.forEach(purpose -> {
-                    String value = purpose.asText(null);
-                    if (value != null && !value.isBlank()) {
-                        purposes.add(value);
-                    }
-                });
-            }
+            List<String> purposeNames = textValues(node.path("purposes"));
+            List<String> efficacyTagNames = textValues(node.path("efficacyTags"));
+            List<IngredientPurposeCategory> purposes = resolvePurposes(purposeNames);
+            List<SkinEfficacyTag> efficacyTags = resolveEfficacyTags(efficacyTagNames);
             IngredientRiskLevel riskLevel = IngredientRiskLevel.fromRaw(node.path("riskLevel").asText(null));
-            ingredients.add(new IngredientAnalysisResponse.IngredientDetail(name, purposesOrFallback(purposes), riskLevel));
+            ingredients.add(new IngredientAnalysisResponse.IngredientDetail(
+                    name, purposes, efficacyTags, riskLevel));
         });
         return ingredients.isEmpty() ? null : ingredients;
+    }
+
+    private List<String> textValues(JsonNode arrayNode) {
+        List<String> values = new ArrayList<>();
+        if (arrayNode.isArray()) {
+            arrayNode.forEach(node -> {
+                String value = node.asText(null);
+                if (value != null && !value.isBlank()) {
+                    values.add(value);
+                }
+            });
+        }
+        return values;
     }
 
     private Inventory findOwnedInventory(Long memberId, Long inventoryId) {

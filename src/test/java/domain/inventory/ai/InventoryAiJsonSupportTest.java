@@ -27,6 +27,38 @@ class InventoryAiJsonSupportTest {
     }
 
     @Test
+    void parseIngredientDetails_parsesPurposesAndEfficacyTags() {
+        ObjectMapper objectMapper = new ObjectMapper();
+        ObjectNode payload = objectMapper.createObjectNode();
+        ObjectNode ingredientNode = payload.putArray("ingredients").addObject();
+        ingredientNode.put("name", "정제수");
+        ingredientNode.putArray("purposes").add("용제");
+        ingredientNode.putArray("efficacyTags").add("피부 보습").add("피부 보호");
+        ingredientNode.put("riskLevel", "LOW");
+
+        var result = InventoryAiJsonSupport.parseIngredientDetails(payload);
+
+        IngredientAiDetail detail = result.get("정제수");
+        assertThat(detail.purposes()).containsExactly("용제");
+        assertThat(detail.efficacyTags()).containsExactly("피부 보습", "피부 보호");
+        assertThat(detail.riskLevel()).isEqualTo("LOW");
+    }
+
+    @Test
+    void parseIngredientDetails_efficacyTagsDefaultToEmptyListWhenMissing() {
+        ObjectMapper objectMapper = new ObjectMapper();
+        ObjectNode payload = objectMapper.createObjectNode();
+        ObjectNode ingredientNode = payload.putArray("ingredients").addObject();
+        ingredientNode.put("name", "정제수");
+        ingredientNode.putArray("purposes").add("용제");
+        ingredientNode.put("riskLevel", "LOW");
+
+        var result = InventoryAiJsonSupport.parseIngredientDetails(payload);
+
+        assertThat(result.get("정제수").efficacyTags()).isEmpty();
+    }
+
+    @Test
     void parseBrand_returnsValueWhenPresent() {
         ObjectNode payload = new ObjectMapper().createObjectNode();
         payload.put("brand", "이니스프리");
