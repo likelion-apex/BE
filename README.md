@@ -39,6 +39,7 @@ TEST_LOGIN_ENABLED=true
 
 - 기본값은 `false`이며 비활성화 시 `POST /api/auth/local/login`은 `AUTH-012`(404)를 반환합니다.
 - 활성화 시 애플리케이션 시작 과정에서 계정이 없는 경우에만 생성합니다. 기존 계정의 피부 정보, 인벤토리와 온보딩 상태는 초기화하지 않습니다.
+- 사전 계정에는 로그인 ID와 이메일만 설정합니다. 닉네임·피부 타입·피부 고민·첫 인벤토리 제품은 일반 사용자와 동일하게 온보딩에서 입력합니다.
 - 비밀번호는 BCrypt strength 12 해시만 저장하며 API 응답이나 로그에 포함하지 않습니다.
 - 온보딩 마지막 제품 등록 후 `POST /api/members/me/onboarding/complete`를 호출해야 다음 로그인부터 메인 화면으로 이동합니다.
 - 심사 종료 뒤 `TEST_LOGIN_ENABLED=false`로 되돌리면 공유 계정의 신규 로그인과 Refresh Token 재발급을 닫을 수 있습니다. 이미 발급된 Access Token은 최대 1시간의 기존 만료 시간까지 유효합니다.

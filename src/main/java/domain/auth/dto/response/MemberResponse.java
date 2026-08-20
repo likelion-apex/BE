@@ -10,7 +10,7 @@ import java.util.List;
 public record MemberResponse(
         @Schema(description = "회원 ID") Long id,
         @Schema(description = "계정 이메일 (없을 수 있음)") String email,
-        @Schema(description = "닉네임") String nickname,
+        @Schema(description = "닉네임 (온보딩 전에는 null)") String nickname,
         @Schema(description = "프로필 이미지 URL") String profileImageUrl,
         @Schema(description = "가입 경로") String provider,
         @Schema(description = "권한") String role,
