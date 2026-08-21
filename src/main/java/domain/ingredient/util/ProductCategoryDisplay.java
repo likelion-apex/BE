@@ -14,7 +14,8 @@ public final class ProductCategoryDisplay {
             ProductCategory.EYECARE, "아이케어",
             ProductCategory.MIST, "미스트,젤",
             ProductCategory.SKIN_TONERPAD, "스킨/토너 패드",
-            ProductCategory.BAM, "밤/멀티밤"
+            ProductCategory.BAM, "밤/멀티밤",
+            ProductCategory.ETC, "기타"
     );
 
     private ProductCategoryDisplay() {

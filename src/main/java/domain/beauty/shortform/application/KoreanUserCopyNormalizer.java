@@ -81,6 +81,7 @@ public class KoreanUserCopyNormalizer {
                 case FACEOIL -> List.of("보습막 형성");
                 case CREAM, BAM -> List.of("피부 장벽 보습");
                 case EYECARE -> List.of("눈가 보습");
+                case ETC -> List.of("피부 컨디션 관리");
             };
         }
         String source = (compact(rawCategory) + " " + compact(productName)).toLowerCase(Locale.ROOT);
@@ -106,6 +107,7 @@ public class KoreanUserCopyNormalizer {
             case FACEOIL -> "보습막 형성";
             case CREAM, BAM -> "피부 장벽 보습";
             case EYECARE -> "눈가 보습";
+            case ETC -> "해당 단계의 피부 관리";
         };
     }
 

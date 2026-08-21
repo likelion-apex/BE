@@ -37,10 +37,10 @@ class AiProviderSkipGateTest {
         AiProviderSkipGate gate = new AiProviderSkipGate(defaultProperties());
 
         gate.markFrom(AiProvider.GROQ,
-                AiProviderUnavailableException.quota("429", null, Duration.ofMillis(1)));
+                AiProviderUnavailableException.quota("429", null, Duration.ofMillis(200)));
         assertThat(gate.shouldSkip(AiProvider.GROQ)).isTrue();
 
-        // retryAfter가 1ms이므로 곧 만료되어야 한다(기본 1시간 쿨다운과 달리 매우 짧다).
+        // retryAfter가 200ms이므로 곧 만료되어야 한다(기본 1시간 쿨다운과 달리 매우 짧다).
         awaitUntilFalse(() -> gate.shouldSkip(AiProvider.GROQ));
         assertThat(gate.shouldSkip(AiProvider.GROQ)).isFalse();
     }
