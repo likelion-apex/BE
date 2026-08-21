@@ -379,7 +379,8 @@ public class RoutineService {
 
         for (Inventory inventory : inventories) {
             ProductCategory category = inventory.getProduct().getCategory();
-            if (category == null) {
+            // ETC는 정해진 스킨케어 단계가 없어 루틴 스텝에 넣지 않으므로, 분석도 건너뛴다.
+            if (category == null || category == ProductCategory.ETC) {
                 continue;
             }
             SkinAnalysisResponse analysis = skinAnalysisService.analyze(memberId, inventory.getProduct().getId());
@@ -393,6 +394,11 @@ public class RoutineService {
         List<GeneratedStep> steps = new ArrayList<>();
         int order = 1;
         for (ProductCategory category : ProductCategory.values()) {
+            // ETC(기타)는 선크림/클렌저/마스크 등 정해진 스킨케어 단계가 없는 잡화 버킷이라
+            // AI 루틴 스텝 생성 대상에서 제외한다(category == null과 동일하게 취급).
+            if (category == ProductCategory.ETC) {
+                continue;
+            }
             Inventory inventory = bestInventoryByCategory.get(category);
             if (inventory == null) {
                 continue;
